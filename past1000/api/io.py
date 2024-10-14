@@ -5,14 +5,18 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+import re
 from pathlib import Path
-from typing import Optional, TypeAlias
+from typing import List, Optional, TypeAlias
 
 import click
-from log import setup_logger
 from loguru import logger
 
+from past1000.api.log import setup_logger
+
 PathLike: TypeAlias = str | Path
+
+setup_logger()
 
 
 def check_data_dir(
@@ -46,6 +50,68 @@ def check_data_dir(
     return path
 
 
+def get_matching_files(
+    directory: PathLike,
+    pattern: str,
+) -> List[str]:
+    """
+    获取指定目录下所有符合正则表达式的文件名列表。
+
+    Args:
+        directory: 要搜索的目录路径。
+        pattern: 正则表达式模式。
+
+    Returns:
+        符合正则表达式的文件名列表。
+    """
+    directory = Path(directory)
+    logger.info(f"搜索目录: {directory}")
+    logger.debug(f"正则表达式: {pattern}")
+    regex = re.compile(pattern)
+    matching_files = [
+        file.name
+        for file in directory.iterdir()
+        if file.is_file() and regex.match(file.name)
+    ]
+    logger.info(f"找到 {len(matching_files)} 个文件。")
+    return matching_files
+
+
+def create_cmip_regex(
+    variable: Optional[str] = None,
+    model: Optional[str] = None,
+    frequency: Optional[str] = None,
+    experiment: Optional[str] = None,
+    ensemble: Optional[str] = None,
+) -> str:
+    """创建用于匹配CMIP文件名的正则表达式。
+
+    Args:
+        variable: 变量名。
+        model: 模型名。
+        frequency: 频率。
+        experiment: 实验名。
+        ensemble: 集合名。
+
+    Returns:
+        用于匹配CMIP文件名的正则表达式。
+    """
+    logger.debug(f"变量名: {variable}")
+    logger.debug(f"模型名: {model}")
+    logger.debug(f"频率: {frequency}")
+    logger.debug(f"实验名: {experiment}")
+    logger.debug(f"集合名: {ensemble}")
+    pattern = [
+        r"(?P<variable>{})".format(variable or r"[\w]+"),
+        r"(?P<frequency>{})".format(frequency or r"[\w]+"),
+        r"(?P<model>{})".format(re.escape(model) if model else r"[\w-]+"),
+        r"(?P<experiment>{})".format(experiment or r"[\w]+"),
+        r"(?P<ensemble>{})".format(ensemble or r"[\w]+"),
+        r"[\d]{6}-[\d]{6}",
+    ]
+    return r"_".join(pattern) + r"\.nc$"
+
+
 @click.command()
 @click.argument("path", type=click.Path(exists=False), default=None)
 @click.option("--create", "-c", is_flag=True, help="如果目录不存在，是否创建")
@@ -58,5 +124,4 @@ def cli(path: Optional[str] = None, create: bool = False):
 
 
 if __name__ == "__main__":
-    setup_logger()
     cli()

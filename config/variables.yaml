@@ -1,34 +1,42 @@
 
 pr:
   name: precipitation_flux
+  freq: Amon
   units: kg m-2 s-1
   description: Precipitation (includes both liquid and solid phases)
 
 tas:
   name: air_temperature
+  freq: Amon
   units: K
   description: Air temperature
 
 sfcWind:
   name: wind_speed
+  freq: Amon
   units: m s-1
+  description: Wind speed at 10 m above the surface
 
 rld:
   name: longwave_radiation
+  freq: CFmon
   units: W m-2
   description: Longwave radiation
 
 rsd:
   name: shortwave_radiation
+  freq: CFmon
   units: W m-2
   description: Shortwave radiation
 
 ps:
   name: atmospheric_pressure
+  freq: AERmon
   units: Pa
   description: Atmospheric pressure
 
-hur:
-  name: vapor_pressure
-  units: Pa
-  description: Vapor pressure
+hurs:
+  name: relative_humidity
+  freq: Amon
+  units: "%"
+  description: Relative humidity

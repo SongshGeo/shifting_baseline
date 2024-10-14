@@ -1,4 +1,6 @@
 defaults:
 - ds: mac
+- model: MRI-ESM2-0
 - _self_
 
+freq: mon

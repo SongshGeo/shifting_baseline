@@ -1,0 +1,8 @@
+name: MRI-ESM2-0
+name_ch: 日本气象研究所地球系统模式2.0版
+
+pattern: <variable>_<frequency>_<model>_past1000_r1i1p1f1_gn_<start><end>.nc
+
+examples:
+  - hurs_Amon_MRI-ESM2-0_past1000_r1i1p1f1_gn_<start><end>.nc
+  - rld_CFmon_MRI-ESM2-0_past1000_r1i1p1f1_gn_<start><end>.nc

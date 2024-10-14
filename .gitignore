@@ -161,3 +161,5 @@ multirun
 # MacOS
 .DS_Store
 .obsidian
+
+playground.ipynb
