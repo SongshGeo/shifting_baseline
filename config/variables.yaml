@@ -1,0 +1,34 @@
+
+pr:
+  name: precipitation_flux
+  units: kg m-2 s-1
+  description: Precipitation (includes both liquid and solid phases)
+
+tas:
+  name: air_temperature
+  units: K
+  description: Air temperature
+
+sfcWind:
+  name: wind_speed
+  units: m s-1
+
+rld:
+  name: longwave_radiation
+  units: W m-2
+  description: Longwave radiation
+
+rsd:
+  name: shortwave_radiation
+  units: W m-2
+  description: Shortwave radiation
+
+ps:
+  name: atmospheric_pressure
+  units: Pa
+  description: Atmospheric pressure
+
+hur:
+  name: vapor_pressure
+  units: Pa
+  description: Vapor pressure
