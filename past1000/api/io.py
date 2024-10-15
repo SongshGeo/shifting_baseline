@@ -10,11 +10,13 @@ from pathlib import Path
 from typing import List, Optional, TypeAlias
 
 import click
+import xarray as xr
 from loguru import logger
 
 from past1000.api.log import setup_logger
 
 PathLike: TypeAlias = str | Path
+XarrayData: TypeAlias = xr.Dataset | xr.DataArray
 
 setup_logger()
 
@@ -112,15 +114,77 @@ def create_cmip_regex(
     return r"_".join(pattern) + r"\.nc$"
 
 
+def write_geo_attrs(
+    dataset: xr.Dataset,
+) -> xr.Dataset:
+    """写入地理属性"""
+    dataset.lat.attrs["units"] = "degree"
+    dataset.lon.attrs["units"] = "degree"
+    logger.debug(f"写入地理属性: {dataset}")
+    return dataset
+
+
+def read_nc(
+    path: PathLike,
+    verbose: bool = False,
+    variable: Optional[str] = None,
+) -> XarrayData:
+    """读取nc文件"""
+    logger.info(f"Reading {path}")
+    dataset = xr.open_dataset(path)
+    if variable:
+        dataset = dataset[variable]
+    dataset = write_geo_attrs(dataset)
+    if verbose:
+        logger.debug(f"Info: {dataset.info()}")
+    return dataset
+
+
+def search_cmip_files(
+    path: PathLike,
+    model: Optional[str] = None,
+    variable: Optional[str] = None,
+    **kwargs,
+) -> List[str]:
+    """搜索CMIP文件"""
+    regex = create_cmip_regex(model=model, variable=variable, **kwargs)
+    files = get_matching_files(path, regex)
+    if not files:
+        logger.warning("未找到匹配的文件。")
+    elif len(files) > 1:
+        logger.info(f"找到 {len(files)} 个匹配的文件。")
+    return files
+
+
 @click.command()
 @click.argument("path", type=click.Path(exists=False), default=None)
-@click.option("--create", "-c", is_flag=True, help="如果目录不存在，是否创建")
-def cli(path: Optional[str] = None, create: bool = False):
-    """检查数据目录，如果不存在则创建（当指定 --create 选项时）。
+@click.option("--model", "-m", type=str, help="模型名")
+@click.option("--variable", "-v", type=str, help="变量名")
+@click.option("--frequency", "-f", type=str, help="频率")
+@click.option("--experiment", "-e", type=str, help="实验名")
+@click.option("--ensemble", "-n", type=str, help="集合名")
+def cli(
+    path: PathLike = Path.cwd(),
+    model: Optional[str] = None,
+    variable: Optional[str] = None,
+    frequency: Optional[str] = None,
+    experiment: Optional[str] = None,
+    ensemble: Optional[str] = None,
+):
+    """搜索CMIP文件。
 
-    PATH: 要检查的目录路径
+    PATH: 要搜索的目录路径
     """
-    check_data_dir(path, create)
+    files = search_cmip_files(
+        path,
+        model=model,
+        variable=variable,
+        frequency=frequency,
+        experiment=experiment,
+        ensemble=ensemble,
+    )
+    for file in files:
+        logger.info(file)
 
 
 if __name__ == "__main__":

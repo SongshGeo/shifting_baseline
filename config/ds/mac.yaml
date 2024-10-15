@@ -3,3 +3,6 @@ root: /Users/songshgeo/Documents/VSCode/past1000
 
 # 数据目录
 folder: /Volumes/CMIP6/past1000
+
+# 黄河流域矢量图
+shp: /Users/songshgeo/Documents/Datasets/黄河流域矢量图/空间范围/huang_huai_hai_merged.shp

@@ -1,42 +1,53 @@
 
 pr:
   name: precipitation_flux
+  display_name: Precipitation
   freq: Amon
   units: kg m-2 s-1
+  output_units: mm/year
+  color: "#257180"
   description: Precipitation (includes both liquid and solid phases)
 
 tas:
   name: air_temperature
+  display_name: Air Temperature
   freq: Amon
   units: K
+  color: "#D91656"
+  output_units: degC
   description: Air temperature
 
 sfcWind:
   name: wind_speed
   freq: Amon
   units: m s-1
+  output_units: m/s
   description: Wind speed at 10 m above the surface
 
 rld:
   name: longwave_radiation
   freq: CFmon
   units: W m-2
+  output_units: W m-2
   description: Longwave radiation
 
 rsd:
   name: shortwave_radiation
   freq: CFmon
   units: W m-2
+  output_units: W m-2
   description: Shortwave radiation
 
 ps:
   name: atmospheric_pressure
   freq: AERmon
   units: Pa
+  output_units: kPa
   description: Atmospheric pressure
 
 hurs:
   name: relative_humidity
   freq: Amon
   units: "%"
+  output_units: "%"
   description: Relative humidity

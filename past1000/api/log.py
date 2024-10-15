@@ -32,6 +32,7 @@ def setup_logger() -> None:
         level="DEBUG",
         format=fmt,
     )
+    logger.info("新一次日志记录")
 
 
 if __name__ == "__main__":
