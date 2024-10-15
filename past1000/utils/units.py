@@ -50,3 +50,16 @@ def pr_kg_to_mm(
     if isinstance(volume, pint.Quantity):
         return volume.to(unit)
     return volume.pint.to(unit)
+
+
+def convert_cmip_units(
+    data: xr.DataArray,
+    variable: str,
+    output_units: str,
+) -> xr.DataArray:
+    """
+    转换CMIP数据单位。
+    """
+    if variable == "pr":
+        data = pr_kg_to_mm(data)
+    return data.pint.quantify().pint.to(output_units)

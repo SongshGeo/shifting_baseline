@@ -45,5 +45,16 @@ def clip_data(
     return write_geo_attrs(xda)
 
 
+def clip_data_by_shp(
+    data: xr.DataArray,
+    shp: gpd.GeoDataFrame,
+    crs: str = "epsg:4326",
+    **kwargs,
+) -> xr.DataArray:
+    """
+    裁剪空间数据.
+    """
+
+
 if __name__ == "__main__":
     pass
