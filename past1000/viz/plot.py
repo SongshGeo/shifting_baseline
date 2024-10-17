@@ -5,45 +5,11 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
-from functools import wraps
-from typing import Callable, Optional, Tuple
+from typing import Optional
 
-import matplotlib.pyplot as plt
 import xarray as xr
+from matplotkit import with_axes
 from matplotlib.axes import Axes
-
-
-def with_axes(
-    decorated_func: Callable | None = None, figsize: Tuple[int, int] = (6, 4)
-) -> Callable:
-    """装饰一个函数/方法，如果该方法接受一个参数叫'ax'并且为None，为其增加一个默认的绘图布。
-
-    Parameters:
-        decorated_func:
-            被装饰的函数，检查是否有参数传递给装饰器，若没有则返回装饰器本身。
-        figsize:
-            图片画布的大小，默认宽度为6，高度为4。
-
-    Returns:
-        被装饰的函数
-    """
-
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            ax = kwargs.get("ax", None)
-            if ax is None:
-                _, ax = plt.subplots(figsize=figsize)
-                kwargs["ax"] = ax
-                result = func(*args, **kwargs)
-                return result
-            else:
-                return func(*args, **kwargs)
-
-        return wrapper
-
-    # 检查是否有参数传递给装饰器，若没有则返回装饰器本身
-    return decorator(decorated_func) if decorated_func else decorator
 
 
 @with_axes(figsize=(12, 3))
@@ -56,6 +22,19 @@ def plot_single_time_series(
 ) -> None:
     """
     绘制单个时间序列图。
+
+    Args:
+        data: xr.DataArray
+            输入数据。
+        freq: str
+            时间频率，默认每年。
+        attrs: dict
+            属性字典，默认None。
+        ax: matplotlib.axes.Axes
+
+    Returns:
+        ax: matplotlib.axes.Axes
+            绘图的Axes对象。
     """
     if attrs is None:
         attrs = {}
