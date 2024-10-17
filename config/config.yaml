@@ -1,7 +1,6 @@
 defaults:
 - ds: mac
 - model: MRI-ESM2-0
-- vars: variables
 - _self_
 
 freq: mon

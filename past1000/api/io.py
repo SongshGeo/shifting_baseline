@@ -128,10 +128,11 @@ def read_nc(
     path: PathLike,
     verbose: bool = False,
     variable: Optional[str] = None,
+    **kwargs,
 ) -> XarrayData:
     """读取nc文件"""
-    logger.info(f"Reading {path}")
-    dataset = xr.open_dataset(path)
+    logger.info(f"读取nc文件: {path}")
+    dataset = xr.open_dataset(path, **kwargs)
     if variable:
         dataset = dataset[variable]
     dataset = write_geo_attrs(dataset)

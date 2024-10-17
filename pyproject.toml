@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Processing data from CMIP6 for 'past 1000' experiment."
 authors = ["SongshGeo <songshgeo@gmail.com>"]
 readme = "README.md"
+include = [
+    'config/variables.yaml',
+]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
