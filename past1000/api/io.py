@@ -131,7 +131,7 @@ def read_nc(
     **kwargs,
 ) -> XarrayData:
     """读取nc文件"""
-    logger.info(f"读取nc文件: {path}")
+    logger.debug(f"读取nc文件: {path}")
     dataset = xr.open_dataset(path, **kwargs)
     if variable:
         dataset = dataset[variable]

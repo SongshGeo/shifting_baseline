@@ -5,11 +5,13 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+from functools import lru_cache
 from importlib import resources
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 import geopandas as gpd
+import xarray as xr
 import yaml  # type: ignore
 from loguru import logger
 from matplotlib import pyplot as plt
@@ -47,8 +49,7 @@ class _EarthSystemModel:
         self._dir: Path = check_data_dir(data_path)
         self._files: Dict[str, List[str]] = {}
         self.attrs: Dict[str, Any] = kwargs
-        if shp:
-            self.shp: gpd.GeoDataFrame = gpd.read_file(shp)
+        self._merged_data: Dict[str, XarrayData] = {}
 
     @property
     def name(self) -> str:
@@ -59,23 +60,6 @@ class _EarthSystemModel:
     def dir(self) -> Path:
         """数据目录"""
         return self._dir
-
-    def read_file(self, file_name: str, variable: VARS, **kwargs) -> XarrayData:
-        """读取文件"""
-        return read_nc(self.dir / file_name, variable=variable, **kwargs)
-
-    def clip_data(
-        self,
-        data: XarrayData,
-        shp: Optional[str | gpd.GeoDataFrame] = None,
-        **kwargs,
-    ) -> XarrayData:
-        """裁剪数据"""
-        if shp is None:
-            shp = self.shp
-        if isinstance(shp, str):
-            shp = gpd.read_file(shp)
-        return clip_data(data, shp, **kwargs)
 
     def search_variable(self, variable: VARS, **kwargs) -> List[str]:
         """搜索变量"""
@@ -88,6 +72,59 @@ class _EarthSystemModel:
             return files
         return self._files[variable]
 
+    def merge_data(self, variable: VARS, **kwargs) -> XarrayData:
+        """合并数据
+
+        Args:
+            variable: 变量
+            **kwargs: 传递给 `read_nc` 的其他参数
+
+        Returns:
+            合并后的数据
+        """
+        files = self.search_variable(variable)
+        if len(files) == 1:
+            return read_nc(
+                self.dir / files[0], variable=variable, use_cftime=True, **kwargs
+            )
+        logger.info(f"{self.name} 模型需合并 {len(files)} 个文件。")
+        xda = [
+            read_nc(self.dir / f, variable=variable, use_cftime=True, **kwargs)
+            for f in files
+        ]
+        return xr.concat(xda, dim="time").sortby("time")
+
+    @lru_cache
+    def merge_and_clip(
+        self,
+        variable: VARS,
+        shp: Optional[str | gpd.GeoDataFrame] = None,
+    ) -> XarrayData:
+        """合并并裁剪数据"""
+        xda = self.merge_data(variable)
+        if isinstance(shp, str):
+            shp = gpd.read_file(shp)
+        if shp is not None:
+            xda = clip_data(xda, shp)
+        return xda
+
+    def plot_series(self, variable: List[VARS], **kwargs):
+        """绘制时间序列图"""
+        len_var = len(variable)
+        fig, axes = plt.subplots(
+            nrows=len_var,
+            ncols=1,
+            figsize=(12, 3 * len_var),
+            tight_layout=True,
+        )
+        for ax, var in zip(axes, variable):
+            attrs = VARS_ATTRS[var]
+            xda = self.merge_and_clip(variable=var)
+            converted = convert_cmip_units(xda, var, attrs["output_units"])
+            plot_single_time_series(converted, ax=ax, attrs=attrs, **kwargs)
+        fig.suptitle(self.name)
+        plt.show()
+
 
 class MRIESM20(_EarthSystemModel):
     """MRI-ESM2-0 模型"""
@@ -95,23 +132,16 @@ class MRIESM20(_EarthSystemModel):
     def __init__(self, path: PathLike, **kwargs):
         super().__init__("MRI-ESM2-0", path, **kwargs)
 
-    def plot_series(self, variable: List[VARS], **kwargs):
-        """绘制时间序列图"""
-        len_var = len(variable)
-        _, axes = plt.subplots(
-            nrows=len_var,
-            ncols=1,
-            figsize=(12, 3 * len_var),
-            tight_layout=True,
-        )
-        for ax, var in zip(axes, variable):
-            files = self.search_variable(var)
-            attrs = VARS_ATTRS[var]
-            # TODO 目前只支持单个文件
-            if len(files) > 1:
-                raise ValueError(f"{self.name} 模型有多个 {var} 变量文件")
-            xda = self.read_file(files[0], variable=var, use_cftime=True)
-            clipped = self.clip_data(xda, self.shp)
-            converted = convert_cmip_units(clipped, var, attrs["output_units"])
-            plot_single_time_series(converted, ax=ax, attrs=attrs, **kwargs)
-        plt.show()
+
+class MIROCES2L(_EarthSystemModel):
+    """MIROC-ES2L 模型"""
+
+    def __init__(self, path: PathLike, **kwargs):
+        super().__init__("MIROC-ES2L", path, **kwargs)
+
+
+class ACCESSESM15(_EarthSystemModel):
+    """ACCESS-ESM1-5 模型"""
+
+    def __init__(self, path: PathLike, **kwargs):
+        super().__init__("ACCESS-ESM1-5", path, **kwargs)
