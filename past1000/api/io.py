@@ -109,7 +109,7 @@ def create_cmip_regex(
         r"(?P<model>{})".format(re.escape(model) if model else r"[\w-]+"),
         r"(?P<experiment>{})".format(experiment or r"[\w]+"),
         r"(?P<ensemble>{})".format(ensemble or r"[\w]+"),
-        r"[\d]{6}-[\d]{6}",
+        r"[\d]{4,}-[\d]{4,}",
     ]
     return r"_".join(pattern) + r"\.nc$"
 
@@ -164,6 +164,7 @@ def search_cmip_files(
 @click.option("--frequency", "-f", type=str, help="频率")
 @click.option("--experiment", "-e", type=str, help="实验名")
 @click.option("--ensemble", "-n", type=str, help="集合名")
+@click.option("--verbose", is_flag=True, help="是否显示详细信息")
 def cli(
     path: PathLike = Path.cwd(),
     model: Optional[str] = None,
@@ -171,11 +172,22 @@ def cli(
     frequency: Optional[str] = None,
     experiment: Optional[str] = None,
     ensemble: Optional[str] = None,
+    verbose: bool = False,
 ):
     """搜索CMIP文件。
 
     PATH: 要搜索的目录路径
     """
+    params = {
+        "模型": model,
+        "变量": variable,
+        "频率": frequency,
+        "实验": experiment,
+        "集合": ensemble,
+    }
+    for name, value in params.items():
+        if value:
+            logger.info(f"搜索{name}: {value}")
     files = search_cmip_files(
         path,
         model=model,
@@ -184,8 +196,9 @@ def cli(
         experiment=experiment,
         ensemble=ensemble,
     )
-    for file in files:
-        logger.info(file)
+    if verbose:
+        for file in files:
+            logger.info(file)
 
 
 if __name__ == "__main__":
