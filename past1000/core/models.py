@@ -23,6 +23,7 @@ from past1000.api.io import (
     search_cmip_files,
 )
 from past1000.ci.clip import clip_data
+from past1000.ci.spei import calc_single_spei
 from past1000.utils.units import convert_cmip_units
 from past1000.viz.plot import plot_single_time_series
 
@@ -71,7 +72,7 @@ class _EarthSystemModel:
 
     def get_variables(
         self, variable: VARS, create: bool = False, **kwargs
-    ) -> Optional[XarrayData]:
+    ) -> XarrayData:
         """获取变量数据"""
         if variable in self._merged_data:
             return self._merged_data[variable]
@@ -193,6 +194,19 @@ class _EarthSystemModel:
             plot_single_time_series(data, ax=ax, attrs=attrs, **kwargs)
         fig.suptitle(self.name)
         plt.show()
+
+    def compute_spei(self, **kwargs) -> xr.DataArray:
+        """计算 SPEI"""
+        return xr.apply_ufunc(
+            calc_single_spei,
+            self.get_variables("hfls").resample(time="ME").mean(),
+            self.get_variables("pr").resample(time="ME").mean(),
+            input_core_dims=[["time"], ["time"]],  # 输入数组的核心维度
+            output_core_dims=[["time"]],  # 输出数组的核心维度
+            vectorize=True,  # 自动向量化
+            dask="parallelized",  # 并行计算
+            output_dtypes=[float],  # 输出数据类型
+        )
 
 
 class MRIESM20(_EarthSystemModel):

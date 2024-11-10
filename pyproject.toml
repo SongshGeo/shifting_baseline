@@ -21,6 +21,10 @@ geopandas = "~1"
 pint-xarray = ">=0.4"
 nc-time-axis = ">=1.4"
 matplotkit = ">=0.1.0"
+# 使用 poetry run python -m pip install climate-indices 安装
+# 不知道为什么，使用 poetry 安装的 climate-indices 版本无法运行
+# 参考 https://climate-indices.readthedocs.io/en/latest/
+# climate-indices = ">=2.0.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
