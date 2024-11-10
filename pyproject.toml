@@ -22,7 +22,6 @@ pint-xarray = ">=0.4"
 nc-time-axis = ">=1.4"
 matplotkit = ">=0.1.0"
 
-
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
 allure-pytest = "^2.13.5"

@@ -5,10 +5,9 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
-from functools import lru_cache
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple, TypeAlias
 
 import geopandas as gpd
 import xarray as xr
@@ -27,7 +26,8 @@ from past1000.ci.clip import clip_data
 from past1000.utils.units import convert_cmip_units
 from past1000.viz.plot import plot_single_time_series
 
-VARS = Literal["pr", "tas"]
+VARS: TypeAlias = Literal["pr", "tas"]
+MULTI_VARS: TypeAlias = List[VARS] | Tuple[VARS, ...]
 
 # 读取字典
 _VARS = resources.files("config") / "variables.yaml"
@@ -42,14 +42,13 @@ class _EarthSystemModel:
         self,
         model_name: str,
         data_path: PathLike,
-        shp: Optional[PathLike] = None,
         **kwargs,
     ):
         self._name: str = model_name
         self._dir: Path = check_data_dir(data_path)
         self._files: Dict[str, List[str]] = {}
         self.attrs: Dict[str, Any] = kwargs
-        self._merged_data: Dict[str, XarrayData] = {}
+        self._merged_data: Dict[VARS, XarrayData] = {}
 
     @property
     def name(self) -> str:
@@ -60,6 +59,18 @@ class _EarthSystemModel:
     def dir(self) -> Path:
         """数据目录"""
         return self._dir
+
+    def get_variables(
+        self, variable: VARS, create: bool = False, **kwargs
+    ) -> Optional[XarrayData]:
+        """获取变量数据"""
+        if variable in self._merged_data:
+            return self._merged_data[variable]
+        if create:
+            return self.process_data(variable, **kwargs)
+        error_msg = f"{self.name} 模型还没有处理变量 {variable} 数据。"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     def search_variable(self, variable: VARS, **kwargs) -> List[str]:
         """搜索变量"""
@@ -72,7 +83,7 @@ class _EarthSystemModel:
             return files
         return self._files[variable]
 
-    def merge_data(self, variable: VARS, **kwargs) -> XarrayData:
+    def _merge_data(self, variable: VARS, **kwargs) -> XarrayData:
         """合并数据
 
         Args:
@@ -94,22 +105,56 @@ class _EarthSystemModel:
         ]
         return xr.concat(xda, dim="time").sortby("time")
 
-    @lru_cache
-    def merge_and_clip(
-        self,
-        variable: VARS,
-        shp: Optional[str | gpd.GeoDataFrame] = None,
+    def _clip_data(
+        self, xda: XarrayData, clip_by: Optional[str | gpd.GeoDataFrame] = None
     ) -> XarrayData:
-        """合并并裁剪数据"""
-        xda = self.merge_data(variable)
-        if isinstance(shp, str):
-            shp = gpd.read_file(shp)
-        if shp is not None:
-            xda = clip_data(xda, shp)
+        """裁剪数据"""
+        if isinstance(clip_by, str):
+            clip_by = gpd.read_file(clip_by)
+        if clip_by is not None:
+            return clip_data(xda, clip_by)
+        logger.warning("未提供裁剪数据，返回原始数据。")
         return xda
 
-    def plot_series(self, variable: List[VARS], **kwargs):
+    def _convert_units(
+        self,
+        xda: XarrayData,
+        variable: VARS,
+        convert_units: Optional[str] = None,
+    ) -> XarrayData:
+        """转换单位"""
+        if convert_units is None:
+            convert_units = VARS_ATTRS[variable]["output_units"]
+        xda = convert_cmip_units(xda, variable, convert_units)
+        return xda
+
+    def process_data(
+        self,
+        variable: VARS | MULTI_VARS,
+        clip_by: Optional[str | gpd.GeoDataFrame] = None,
+        convert_units: Optional[str] = None,
+    ) -> Optional[XarrayData]:
+        """处理数据"""
+        # 如果变量是列表，则递归处理每个变量
+        if isinstance(variable, (list, tuple)):
+            for v in variable:
+                self.process_data(v, clip_by, convert_units)
+            return None
+        if variable in self._merged_data:
+            return self._merged_data[variable]
+        # 合并数据
+        xda = self._merge_data(variable=variable)
+        # 裁剪数据
+        xda = self._clip_data(xda, clip_by)
+        # 转换单位
+        xda = self._convert_units(xda, variable, convert_units)
+        self._merged_data[variable] = xda
+        return xda
+
+    def plot_series(self, variable: VARS | MULTI_VARS, **kwargs):
         """绘制时间序列图"""
+        if isinstance(variable, str):
+            variable = [variable]
         len_var = len(variable)
         fig, axes = plt.subplots(
             nrows=len_var,
@@ -119,9 +164,8 @@ class _EarthSystemModel:
         )
         for ax, var in zip(axes, variable):
             attrs = VARS_ATTRS[var]
-            xda = self.merge_and_clip(variable=var)
-            converted = convert_cmip_units(xda, var, attrs["output_units"])
-            plot_single_time_series(converted, ax=ax, attrs=attrs, **kwargs)
+            data = self.get_variables(var)
+            plot_single_time_series(data, ax=ax, attrs=attrs, **kwargs)
         fig.suptitle(self.name)
         plt.show()
 
