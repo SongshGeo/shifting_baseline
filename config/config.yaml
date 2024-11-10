@@ -1,8 +1,12 @@
 defaults:
 - ds: mac
-- model: MRI-ESM2-0
+- model: ACCESS-ESM1-5
 - _self_
 
 freq: mon
-var: pr
-md: MRI-ESM2-0
+vars:
+  - pr
+  # - tas
+  - hfls
+  # - mrso
+var: hfls

@@ -28,6 +28,45 @@ def has_unit(numeric: Number | xr.DataArray) -> bool:
     return isinstance(numeric, pint.Quantity)
 
 
+# https://earthscience.stackexchange.com/questions/20733/fluxnet15-how-to-convert-latent-heat-flux-to-actual-evapotranspiration
+def hfls_to_evapo(
+    hfls: pint.Quantity,
+    time: TimeUnit = "day",
+) -> pint.Quantity:
+    """将潜热通量转换为实际蒸发量。
+
+    计算公式：E = LE / (ρw * λ)
+    其中：
+    - E: 蒸发量 (mm/day)
+    - LE: 潜热通量 (W/m²)
+    - λ: 水的汽化潜热 (≈ 2.45 MJ/kg)
+    - ρw: 水的密度 (1000 kg/m³)
+
+    Args:
+        hfls: 潜热通量，单位为 W/m²
+
+    Returns:
+        蒸发量，单位为 mm/day
+    """
+    # 确保输入单位正确
+    if not has_unit(hfls):
+        logger.warning("没有单位，自动添加单位W/m^2.")
+        hfls = hfls * ureg("W/m^2")
+    # 水的汽化潜热
+    lambda_water = 2.45 * ureg("MJ/kg")  # 约2.45 MJ/kg at 20°C
+    # 水的密度
+    rho_water = 1000 * ureg("kg/m^3")
+    # 转换为每日总量 (W = J/s)
+    daily_energy = hfls * 86400 * ureg("s/day")  # 转换为 J/(m²·day)
+    # 计算蒸发量 E = LE / (ρw * λ)
+    evap = daily_energy / (rho_water * lambda_water)
+    # 转换为mm/day (1 mm = 1 kg/m²)
+    unit = "mm/" + time
+    if isinstance(evap, pint.Quantity):
+        return evap.to(unit)
+    return evap.pint.to(unit)
+
+
 def pr_kg_to_mm(
     pr: pint.Quantity,
     time: TimeUnit = "second",
@@ -62,4 +101,6 @@ def convert_cmip_units(
     """
     if variable == "pr":
         data = pr_kg_to_mm(data)
+    if variable == "hfls":
+        data = hfls_to_evapo(data)
     return data.pint.quantify().pint.to(output_units)

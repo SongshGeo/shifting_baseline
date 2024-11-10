@@ -51,3 +51,20 @@ hurs:
   units: "%"
   output_units: "%"
   description: Relative humidity
+
+# https://earthscience.stackexchange.com/questions/20733/fluxnet15-how-to-convert-latent-heat-flux-to-actual-evapotranspiration
+# 2.45 MJ m-2 day-1 = 1 mm day-1
+hfls:
+  name: Evapo
+  freq: Amon
+  units: W m-2
+  output_units: mm/year
+  description: Evaporation heat flux
+
+# https://clipc-services.ceda.ac.uk/dreq/u/8c58644da8e357d61b70eac2a0afb4f9.html
+mrso:
+  name: soil_moisture
+  freq: Amon
+  units: kg m-2
+  output_units: mm
+  description: Soil moisture
