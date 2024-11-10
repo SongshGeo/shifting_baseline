@@ -7,7 +7,7 @@
 
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, TypeAlias
+from typing import Any, Dict, List, Literal, Optional, Sequence, TypeAlias
 
 import geopandas as gpd
 import xarray as xr
@@ -26,8 +26,17 @@ from past1000.ci.clip import clip_data
 from past1000.utils.units import convert_cmip_units
 from past1000.viz.plot import plot_single_time_series
 
-VARS: TypeAlias = Literal["pr", "tas"]
-MULTI_VARS: TypeAlias = List[VARS] | Tuple[VARS, ...]
+VARS: TypeAlias = Literal[
+    "pr",
+    "tas",
+    "hfls",
+    "rsd",
+    "rld",
+    "ps",
+    "sfcWind",
+    "mrso",
+]
+MULTI_VARS: TypeAlias = Sequence[VARS]
 
 # 读取字典
 _VARS = resources.files("config") / "variables.yaml"
@@ -68,7 +77,7 @@ class _EarthSystemModel:
             return self._merged_data[variable]
         if create:
             return self.process_data(variable, **kwargs)
-        error_msg = f"{self.name} 模型还没有处理变量 {variable} 数据。"
+        error_msg = f"{self.name} 模型还没有处理变量 {variable} 数据，请使用 `process_data` 方法处理数据。"
         logger.error(error_msg)
         raise ValueError(error_msg)
 
@@ -94,6 +103,10 @@ class _EarthSystemModel:
             合并后的数据
         """
         files = self.search_variable(variable)
+        if len(files) == 0:
+            error_msg = f"{self.name} 模型没有找到 {variable} 变量。"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
         if len(files) == 1:
             return read_nc(
                 self.dir / files[0], variable=variable, use_cftime=True, **kwargs
@@ -128,18 +141,12 @@ class _EarthSystemModel:
         xda = convert_cmip_units(xda, variable, convert_units)
         return xda
 
-    def process_data(
+    def _process_single_variable(
         self,
-        variable: VARS | MULTI_VARS,
+        variable: VARS,
         clip_by: Optional[str | gpd.GeoDataFrame] = None,
         convert_units: Optional[str] = None,
-    ) -> Optional[XarrayData]:
-        """处理数据"""
-        # 如果变量是列表，则递归处理每个变量
-        if isinstance(variable, (list, tuple)):
-            for v in variable:
-                self.process_data(v, clip_by, convert_units)
-            return None
+    ) -> XarrayData:
         if variable in self._merged_data:
             return self._merged_data[variable]
         # 合并数据
@@ -150,6 +157,20 @@ class _EarthSystemModel:
         xda = self._convert_units(xda, variable, convert_units)
         self._merged_data[variable] = xda
         return xda
+
+    def process_data(
+        self,
+        variable: VARS | MULTI_VARS,
+        clip_by: Optional[str | gpd.GeoDataFrame] = None,
+        unit_to: Optional[str] = None,
+    ) -> Optional[XarrayData]:
+        """处理数据"""
+        # 如果变量是列表，则递归处理每个变量
+        if isinstance(variable, str):
+            return self._process_single_variable(variable, clip_by, unit_to)
+        for v in variable:
+            self._process_single_variable(v, clip_by, unit_to)
+        return None
 
     def plot_series(self, variable: VARS | MULTI_VARS, **kwargs):
         """绘制时间序列图"""
@@ -162,6 +183,10 @@ class _EarthSystemModel:
             figsize=(12, 3 * len_var),
             tight_layout=True,
         )
+        # 如果只有一个变量，则将 axes 转换为列表
+        if len_var == 1:
+            axes = [axes]
+        # 绘制每个变量
         for ax, var in zip(axes, variable):
             attrs = VARS_ATTRS[var]
             data = self.get_variables(var)
