@@ -8,5 +8,5 @@ vars:
   - pr
   # - tas
   - hfls
-  # - mrso
-var: hfls
+  - mrso
+var: mrso
