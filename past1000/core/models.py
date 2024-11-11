@@ -39,6 +39,11 @@ VARS: TypeAlias = Literal[
     "mrso",
 ]
 MULTI_VARS: TypeAlias = Sequence[VARS]
+MODELS: TypeAlias = Literal[
+    "MRI-ESM2-0",
+    "MIROC-ES2L",
+    "ACCESS-ESM1-5",
+]
 
 # 读取字典
 _VARS = resources.files("config") / "variables.yaml"
@@ -51,18 +56,18 @@ class _EarthSystemModel:
 
     def __init__(
         self,
-        model_name: str,
+        model_name: MODELS,
         data_path: PathLike,
         **kwargs,
     ):
-        self._name: str = model_name
+        self._name: MODELS = model_name
         self._dir: Path = check_data_dir(data_path)
         self._files: Dict[str, List[str]] = {}
         self.attrs: Dict[str, Any] = kwargs
         self._merged_data: Dict[VARS, XarrayData] = {}
 
     @property
-    def name(self) -> str:
+    def name(self) -> MODELS:
         """模型名称"""
         return self._name
 
