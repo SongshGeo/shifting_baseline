@@ -26,9 +26,9 @@ def setup_logger() -> None:
         format=fmt,
     )
     logger.add(
-        "10days.log",
-        rotation="1 week",
-        retention="10 days",
+        "10days.{time:YYYY-MM-DD}.log",
+        rotation="1 day",
+        retention="1 week",
         level="DEBUG",
         format=fmt,
     )
