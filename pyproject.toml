@@ -26,6 +26,7 @@ matplotkit = ">=0.1.0"
 # 参考 https://climate-indices.readthedocs.io/en/latest/
 # climate-indices = ">=2.0.1"
 tqdm = "*"
+cartopy = ">=0.24.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
