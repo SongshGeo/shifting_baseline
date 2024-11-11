@@ -14,6 +14,7 @@ import xarray as xr
 import yaml  # type: ignore
 from loguru import logger
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
 from past1000.api.io import (
     PathLike,
@@ -115,7 +116,7 @@ class _EarthSystemModel:
         logger.info(f"{self.name} 模型需合并 {len(files)} 个文件。")
         xda = [
             read_nc(self.dir / f, variable=variable, use_cftime=True, **kwargs)
-            for f in files
+            for f in tqdm(files, desc=f"Reading {variable} files")
         ]
         return xr.concat(xda, dim="time").sortby("time")
 
