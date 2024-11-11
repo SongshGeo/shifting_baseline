@@ -4,7 +4,7 @@ pr:
   display_name: Precipitation
   freq: Amon
   units: kg m-2 s-1
-  output_units: mm/year
+  output_units: mm
   color: "#257180"
   description: Precipitation (includes both liquid and solid phases)
 
@@ -55,15 +55,17 @@ hurs:
 # https://earthscience.stackexchange.com/questions/20733/fluxnet15-how-to-convert-latent-heat-flux-to-actual-evapotranspiration
 # 2.45 MJ m-2 day-1 = 1 mm day-1
 hfls:
-  name: Evapo
+  name: evaporation_heat_flux
+  color: "#4B4376"
   freq: Amon
   units: W m-2
-  output_units: mm/year
+  output_units: mm
   description: Evaporation heat flux
 
 # https://clipc-services.ceda.ac.uk/dreq/u/8c58644da8e357d61b70eac2a0afb4f9.html
 mrso:
   name: soil_moisture
+  color: "#B55400"
   freq: Amon
   units: kg m-2
   output_units: mm

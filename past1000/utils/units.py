@@ -5,7 +5,7 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
-from typing import Literal, TypeAlias
+from typing import Literal, Optional, TypeAlias
 
 import pint
 import xarray as xr
@@ -16,9 +16,24 @@ from past1000.api.log import setup_logger
 
 setup_logger()
 
-WATER_DENSITY = 1000 * ureg("kg/m^3")
-TimeUnit: TypeAlias = Literal["second", "day", "month", "year"]
+TimeUnit: TypeAlias = Literal[
+    "second",
+    "minute",
+    "hour",
+    "day",
+    "month",
+    "year",
+]
 Number: TypeAlias = int | float
+WATER_DENSITY: pint.Quantity = 1000 * ureg("kg/m^3")
+SECONDS: dict[TimeUnit, Number] = {
+    "second": 1,
+    "minute": 60,
+    "hour": 60 * 60,
+    "day": 24 * 60 * 60,
+    "month": 365.2425 * 24 * 60 * 60 / 12,  # 平均月长度
+    "year": 365.2425 * 24 * 60 * 60,  # 公历年平均长度
+}
 
 
 def has_unit(numeric: Number | xr.DataArray) -> bool:
@@ -28,10 +43,46 @@ def has_unit(numeric: Number | xr.DataArray) -> bool:
     return isinstance(numeric, pint.Quantity)
 
 
+def _get_time_resolution(da: xr.DataArray) -> TimeUnit:
+    """获取 cftime 时间序列的分辨率。
+
+    Parameters
+    ----------
+    da : xr.DataArray
+        带有时间维度的数组
+
+    Returns
+    -------
+    TimeUnit
+        时间分辨率：'month', 'day', 'year' 等
+    """
+    if "time" not in da.dims:
+        raise ValueError(f"时间维度不存在: {da.dims}")
+    # 获取前两个时间点
+    times = da.time.values
+    if len(times) < 2:
+        raise ValueError(f"时间序列长度小于2: {da.time}")
+
+    # 计算时间差
+    dt = times[1] - times[0]
+
+    # 判断分辨率
+    if dt.days == 1:
+        return "day"
+    if dt.days >= 28 and dt.days <= 31:
+        return "month"
+    if dt.days >= 365 and dt.days <= 366:
+        return "year"
+    if dt.days * 24 == dt.total_seconds() / 3600:  # 整数小时
+        return "hour"
+    raise ValueError(f"无法确定时间分辨率: {dt}")
+
+
 # https://earthscience.stackexchange.com/questions/20733/fluxnet15-how-to-convert-latent-heat-flux-to-actual-evapotranspiration
 def hfls_to_evapo(
     hfls: Number | pint.Quantity,
-    time: TimeUnit = "day",
+    flux_frequency: TimeUnit = "day",
+    output_units: str = "mm",
 ) -> pint.Quantity:
     """将潜热通量转换为实际蒸发量。
 
@@ -49,24 +100,24 @@ def hfls_to_evapo(
     """
     # 确保输入单位正确
     if not has_unit(hfls):
-        logger.warning("没有单位，自动添加单位W/m^2.")
+        logger.warning("蒸散发数据没有单位，自动添加单位W/m^2.")
         hfls = hfls * ureg("W/m^2")
     # 水的汽化潜热
     lambda_water = 2.45 * ureg("MJ/kg")  # 约2.45 MJ/kg at 20°C
     # 转换为每日总量 (W = J/s)
-    daily_energy = hfls * 86400 * ureg("s/day")  # 转换为 J/(m²·day)
+    daily_energy = hfls * SECONDS[flux_frequency] * ureg("s")
     # 计算蒸发量 E = LE / (ρw * λ)
     evap = daily_energy / (WATER_DENSITY * lambda_water)
     # 转换为mm/day (1 mm = 1 kg/m²)
-    unit = "mm/" + time
     if isinstance(evap, pint.Quantity):
-        return evap.to(unit)
-    return evap.pint.to(unit)
+        return evap.to(output_units)
+    return evap.pint.to(output_units)
 
 
 def pr_kg_to_mm(
     pr: Number | pint.Quantity,
-    time: TimeUnit = "second",
+    flux_frequency: TimeUnit = "day",
+    output_units: str = "mm",
 ) -> pint.Quantity:
     """将以质量为单位的降水率转换为以体积为单位的降水强度。
 
@@ -77,14 +128,13 @@ def pr_kg_to_mm(
         pint.Quantity: 降水强度，单位为 mm/time。
     """
     if not has_unit(pr):
-        logger.warning("没有单位，自动添加单位kg/(m^2*s).")
+        logger.warning("降水数据没有单位，自动添加单位kg/(m^2*s).")
         pr = pr * ureg("kg/(m^2*s)")
 
-    volume = pr / WATER_DENSITY
-    unit = "mm/" + time
+    volume = pr / WATER_DENSITY * SECONDS[flux_frequency] * ureg("s")
     if isinstance(volume, pint.Quantity):
-        return volume.to(unit)
-    return volume.pint.to(unit)
+        return volume.to(output_units)
+    return volume.pint.to(output_units)
 
 
 def mrso_kg_to_mm(
@@ -92,7 +142,7 @@ def mrso_kg_to_mm(
 ) -> pint.Quantity:
     """将土壤水分转换为体积单位。"""
     if not has_unit(mrso):
-        logger.warning("没有单位，自动添加单位kg/m^2.")
+        logger.warning("土壤水分数据没有单位，自动添加单位kg/m^2.")
         mrso = mrso * ureg("kg/m^2")
     return mrso / WATER_DENSITY
 
@@ -100,15 +150,18 @@ def mrso_kg_to_mm(
 def convert_cmip_units(
     data: xr.DataArray,
     variable: str,
-    output_units: str,
+    unit_to: str,
+    flux_frequency: Optional[TimeUnit] = None,
 ) -> xr.DataArray:
     """
     转换CMIP数据单位。
     """
+    if flux_frequency is None:
+        flux_frequency = _get_time_resolution(data)
     if variable == "pr":
-        data = pr_kg_to_mm(data)
+        data = pr_kg_to_mm(data, flux_frequency)
     if variable == "hfls":
-        data = hfls_to_evapo(data)
+        data = hfls_to_evapo(data, flux_frequency)
     if variable == "mrso":
         data = mrso_kg_to_mm(data)
-    return data.pint.quantify().pint.to(output_units)
+    return data.pint.quantify().pint.to(unit_to)

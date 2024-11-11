@@ -135,12 +135,12 @@ class _EarthSystemModel:
         self,
         xda: XarrayData,
         variable: VARS,
-        convert_units: Optional[str] = None,
+        unit_to: Optional[str] = None,
     ) -> XarrayData:
         """转换单位"""
-        if convert_units is None:
-            convert_units = VARS_ATTRS[variable]["output_units"]
-        xda = convert_cmip_units(xda, variable, convert_units)
+        if unit_to is None:
+            unit_to = VARS_ATTRS[variable]["output_units"]
+        xda = convert_cmip_units(xda, variable, unit_to)
         return xda
 
     def _process_single_variable(
@@ -196,7 +196,7 @@ class _EarthSystemModel:
         fig.suptitle(self.name)
         plt.show()
 
-    def compute_spei(self, **kwargs) -> xr.DataArray:
+    def compute_spei(self) -> xr.DataArray:
         """计算 SPEI"""
         return xr.apply_ufunc(
             calc_single_spei,
