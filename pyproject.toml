@@ -27,6 +27,7 @@ matplotkit = ">=0.1.0"
 # climate-indices = ">=2.0.1"
 tqdm = "*"
 cartopy = ">=0.24.1"
+openpyxl = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
