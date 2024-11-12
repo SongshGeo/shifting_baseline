@@ -70,3 +70,12 @@ mrso:
   units: kg m-2
   output_units: mm
   description: Soil moisture
+
+# https://clipc-services.ceda.ac.uk/dreq/u/e0a0f457ec117b27ca8353b11bf9d4fa.html
+mrro:
+  name: runoff
+  color: "#008080"
+  freq: Amon
+  units: kg m-2 s-1
+  output_units: mm
+  description: Runoff

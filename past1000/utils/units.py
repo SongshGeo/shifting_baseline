@@ -114,7 +114,7 @@ def hfls_to_evapo(
     return evap.pint.to(output_units)
 
 
-def pr_kg_to_mm(
+def flux_kg_to_mm(
     pr: Number | pint.Quantity,
     flux_frequency: TimeUnit = "day",
     output_units: str = "mm",
@@ -137,7 +137,7 @@ def pr_kg_to_mm(
     return volume.pint.to(output_units)
 
 
-def mrso_kg_to_mm(
+def storage_kg_to_mm(
     mrso: Number | pint.Quantity,
 ) -> pint.Quantity:
     """将土壤水分转换为体积单位。"""
@@ -158,10 +158,10 @@ def convert_cmip_units(
     """
     if flux_frequency is None:
         flux_frequency = _get_time_resolution(data)
-    if variable == "pr":
-        data = pr_kg_to_mm(data, flux_frequency)
+    if variable in ("pr", "mrro"):
+        data = flux_kg_to_mm(data, flux_frequency)
     if variable == "hfls":
         data = hfls_to_evapo(data, flux_frequency)
     if variable == "mrso":
-        data = mrso_kg_to_mm(data)
+        data = storage_kg_to_mm(data)
     return data.pint.quantify().pint.to(unit_to)
