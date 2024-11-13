@@ -285,11 +285,13 @@ class _EarthSystemModel:
         fig.suptitle(self.name)
         plt.show()
 
-    def calc_spei(self) -> xr.DataArray:
+    def calc_spei(self, pet_freq: TimeUnit = "month") -> xr.DataArray:
         """计算 SPEI"""
         return xr.apply_ufunc(
             calc_single_spei,
-            self.get_variables("hfls").resample(time="ME").mean(),
+            self.calc_pet(input_freq=pet_freq, output_freq="month")
+            .resample(time="ME")
+            .mean(),
             self.get_variables("pr").resample(time="ME").mean(),
             input_core_dims=[["time"], ["time"]],  # 输入数组的核心维度
             output_core_dims=[["time"]],  # 输出数组的核心维度
