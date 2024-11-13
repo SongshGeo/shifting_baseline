@@ -25,14 +25,16 @@ TimeUnit: TypeAlias = Literal[
     "year",
 ]
 Number: TypeAlias = int | float
+YEAR_DAYS: Number = 365.2425
+MONTH_DAYS: Number = YEAR_DAYS / 12
 WATER_DENSITY: pint.Quantity = 1000 * ureg("kg/m^3")
 SECONDS: dict[TimeUnit, Number] = {
     "second": 1,
     "minute": 60,
     "hour": 60 * 60,
     "day": 24 * 60 * 60,
-    "month": 365.2425 * 24 * 60 * 60 / 12,  # 平均月长度
-    "year": 365.2425 * 24 * 60 * 60,  # 公历年平均长度
+    "month": MONTH_DAYS * 24 * 60 * 60,
+    "year": YEAR_DAYS * 24 * 60 * 60,
 }
 
 

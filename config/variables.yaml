@@ -17,6 +17,20 @@ tas:
   output_units: degC
   description: Air temperature
 
+tasmin:
+  name: minimum_air_temperature
+  freq: Amon
+  units: K
+  output_units: degC
+  description: Minimum air temperature
+
+tasmax:
+  name: maximum_air_temperature
+  freq: Amon
+  units: K
+  output_units: degC
+  description: Maximum air temperature
+
 sfcWind:
   name: wind_speed
   freq: Amon

@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, TypeAlias
 import geopandas as gpd
 import pandas as pd
 import xarray as xr
+import xclim.indices as xci
 import yaml  # type: ignore
 from loguru import logger
 from matplotlib import pyplot as plt
@@ -23,10 +24,17 @@ from past1000.api.io import (
     check_data_dir,
     read_nc,
     search_cmip_files,
+    write_nc,
 )
 from past1000.ci.clip import clip_data
 from past1000.ci.spei import calc_single_spei
-from past1000.utils.units import convert_cmip_units
+from past1000.utils.units import (
+    MONTH_DAYS,
+    YEAR_DAYS,
+    TimeUnit,
+    convert_cmip_units,
+    flux_kg_to_mm,
+)
 from past1000.viz.plot import plot_single_time_series
 
 VARS: TypeAlias = Literal[
@@ -38,6 +46,10 @@ VARS: TypeAlias = Literal[
     "ps",
     "sfcWind",
     "mrso",
+    "mrro",
+    "tasmin",
+    "tasmax",
+    "hurs",
 ]
 MULTI_VARS: TypeAlias = Sequence[VARS]
 MODELS: TypeAlias = Literal[
@@ -59,6 +71,7 @@ class _EarthSystemModel:
         self,
         model_name: MODELS,
         data_path: PathLike,
+        out_path: PathLike = "output",
         **kwargs,
     ):
         self._name: MODELS = model_name
@@ -66,6 +79,10 @@ class _EarthSystemModel:
         self._files: Dict[str, List[str]] = {}
         self.attrs: Dict[str, Any] = kwargs
         self._merged_data: Dict[VARS, XarrayData] = {}
+        self._out_dir: Path = check_data_dir(
+            self.folder / out_path,
+            create=True,
+        )
 
     @property
     def name(self) -> MODELS:
@@ -73,28 +90,46 @@ class _EarthSystemModel:
         return self._name
 
     @property
-    def dir(self) -> Path:
+    def folder(self) -> Path:
         """数据目录"""
         return self._dir
 
+    @property
+    def out_dir(self) -> Path:
+        """输出目录"""
+        return self._out_dir
+
     def get_variables(
-        self, variable: VARS, create: bool = False, **kwargs
+        self,
+        variable: VARS,
+        create: bool = False,
+        **kwargs,
     ) -> XarrayData:
         """获取变量数据"""
         if variable in self._merged_data:
             return self._merged_data[variable]
         if create:
             return self.process_data(variable, **kwargs)
-        error_msg = f"{self.name} 模型还没有处理变量 {variable} 数据，请使用 `process_data` 方法处理数据。"
+        error_msg = (
+            f"{self.name} 模型没有缓存的变量 {variable}，请使用 `process_data` 方法处理数据，"
+            "并设置 `cache=True`。"
+        )
         logger.error(error_msg)
         raise ValueError(error_msg)
 
-    def search_variable(self, variable: VARS, **kwargs) -> List[str]:
+    def search_variable(
+        self,
+        variable: VARS,
+        **kwargs,
+    ) -> List[str]:
         """搜索变量"""
         if variable not in self._files:
             logger.info(f"{self.name}模型首次搜索 {variable} 变量")
             files = search_cmip_files(
-                self.dir, model=self.name, variable=variable, **kwargs
+                self.folder,
+                model=self.name,
+                variable=variable,
+                **kwargs,
             )
             self._files[variable] = files
             return files
@@ -117,11 +152,11 @@ class _EarthSystemModel:
             raise ValueError(error_msg)
         if len(files) == 1:
             return read_nc(
-                self.dir / files[0], variable=variable, use_cftime=True, **kwargs
+                self.folder / files[0], variable=variable, use_cftime=True, **kwargs
             )
         logger.info(f"{self.name} 模型需合并 {len(files)} 个文件。")
         xda = [
-            read_nc(self.dir / f, variable=variable, use_cftime=True, **kwargs)
+            read_nc(self.folder / f, variable=variable, use_cftime=True, **kwargs)
             for f in tqdm(files, desc=f"Reading {variable} files")
         ]
         return xr.concat(xda, dim="time").sortby("time")
@@ -157,6 +192,8 @@ class _EarthSystemModel:
         variable: VARS,
         clip_by: Optional[str | gpd.GeoDataFrame] = None,
         unit_to: str | bool = True,
+        save: bool = False,
+        cache: bool = True,
     ) -> XarrayData:
         if variable in self._merged_data:
             return self._merged_data[variable]
@@ -167,7 +204,10 @@ class _EarthSystemModel:
         # 转换单位
         if unit_to:
             xda = self._convert_units(xda, variable, unit_to)
-        self._merged_data[variable] = xda
+        if save:
+            write_nc(xda, self.out_dir, variable, self.name)
+        if cache:
+            self._merged_data[variable] = xda
         return xda
 
     def check_variables(
@@ -196,6 +236,8 @@ class _EarthSystemModel:
         variable: VARS | MULTI_VARS,
         clip_by: Optional[str | gpd.GeoDataFrame] = None,
         unit_to: str | Dict[VARS, str | bool] | bool = True,
+        save: bool = False,
+        cache: bool = True,
     ) -> Optional[XarrayData]:
         """处理数据"""
         check_vars = self.check_variables(variable, raise_error=False)
@@ -210,9 +252,15 @@ class _EarthSystemModel:
                 unit = unit_to[variable]
             else:
                 unit = unit_to
-            return self._process_single_variable(variable, clip_by, unit)
+            return self._process_single_variable(
+                variable,
+                clip_by,
+                unit,
+                save,
+                cache,
+            )
         for v in variable:
-            self.process_data(v, clip_by, unit_to)
+            self.process_data(v, clip_by, unit_to, save, cache)
         return None
 
     def plot_series(self, variable: VARS | MULTI_VARS, **kwargs):
@@ -237,7 +285,7 @@ class _EarthSystemModel:
         fig.suptitle(self.name)
         plt.show()
 
-    def compute_spei(self) -> xr.DataArray:
+    def calc_spei(self) -> xr.DataArray:
         """计算 SPEI"""
         return xr.apply_ufunc(
             calc_single_spei,
@@ -250,23 +298,27 @@ class _EarthSystemModel:
             output_dtypes=[float],  # 输出数据类型
         )
 
-
-class MRIESM20(_EarthSystemModel):
-    """MRI-ESM2-0 模型"""
-
-    def __init__(self, path: PathLike, **kwargs):
-        super().__init__("MRI-ESM2-0", path, **kwargs)
-
-
-class MIROCES2L(_EarthSystemModel):
-    """MIROC-ES2L 模型"""
-
-    def __init__(self, path: PathLike, **kwargs):
-        super().__init__("MIROC-ES2L", path, **kwargs)
-
-
-class ACCESSESM15(_EarthSystemModel):
-    """ACCESS-ESM1-5 模型"""
-
-    def __init__(self, path: PathLike, **kwargs):
-        super().__init__("ACCESS-ESM1-5", path, **kwargs)
+    def calc_pet(
+        self,
+        input_freq: TimeUnit = "month",
+        output_freq: TimeUnit = "month",
+    ) -> xr.DataArray:
+        """计算PET"""
+        days = {
+            "day": 1,
+            "month": MONTH_DAYS,
+            "year": YEAR_DAYS,
+        }
+        tasmin = self.get_variables("tasmin").pint.dequantify(format="unit")
+        tasmax = self.get_variables("tasmax").pint.dequantify(format="unit")
+        tas = self.get_variables("tas").pint.dequantify(format="unit")
+        pet = (
+            xci.potential_evapotranspiration(
+                tasmin=tasmin,
+                tasmax=tasmax,
+                tas=tas,
+                method="HG85",
+            )
+            * days[input_freq]
+        )
+        return flux_kg_to_mm(pet, flux_frequency=output_freq)

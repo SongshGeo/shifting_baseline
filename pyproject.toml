@@ -28,6 +28,8 @@ matplotkit = ">=0.1.0"
 tqdm = "*"
 cartopy = ">=0.24.1"
 openpyxl = "*"
+xclim = "^0.53.2"
+cf-xarray = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
