@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Sequence, TypeAlias
 
 import geopandas as gpd
+import pandas as pd
 import xarray as xr
 import yaml  # type: ignore
 from loguru import logger
@@ -140,19 +141,22 @@ class _EarthSystemModel:
         self,
         xda: XarrayData,
         variable: VARS,
-        unit_to: Optional[str] = None,
+        unit_to: str | bool = True,
     ) -> XarrayData:
         """转换单位"""
-        if unit_to is None:
-            unit_to = VARS_ATTRS[variable]["output_units"]
-        xda = convert_cmip_units(xda, variable, unit_to)
-        return xda
+        if unit_to is False:
+            return xda
+        if unit_to is True:
+            unit = VARS_ATTRS[variable]["output_units"]
+        else:
+            unit = unit_to
+        return convert_cmip_units(xda, variable, unit)
 
     def _process_single_variable(
         self,
         variable: VARS,
         clip_by: Optional[str | gpd.GeoDataFrame] = None,
-        convert_units: Optional[str] = None,
+        unit_to: str | bool = True,
     ) -> XarrayData:
         if variable in self._merged_data:
             return self._merged_data[variable]
@@ -161,22 +165,54 @@ class _EarthSystemModel:
         # 裁剪数据
         xda = self._clip_data(xda, clip_by)
         # 转换单位
-        xda = self._convert_units(xda, variable, convert_units)
+        if unit_to:
+            xda = self._convert_units(xda, variable, unit_to)
         self._merged_data[variable] = xda
         return xda
+
+    def check_variables(
+        self,
+        variables: VARS | MULTI_VARS,
+        raise_error: bool = True,
+    ) -> pd.Series:
+        """检查变量是否存在"""
+        if isinstance(variables, str):
+            variables = [variables]
+        result = pd.Series(index=variables, dtype=bool)
+        for v in variables:
+            files = self.search_variable(v)
+            if len(files) == 0:
+                if raise_error:
+                    msg = f"{self.name} 模型没有找到 {v} 变量。"
+                    logger.error(msg)
+                    raise ValueError(msg)
+                result[v] = False
+            else:
+                result[v] = True
+        return result
 
     def process_data(
         self,
         variable: VARS | MULTI_VARS,
         clip_by: Optional[str | gpd.GeoDataFrame] = None,
-        unit_to: Optional[str] = None,
+        unit_to: str | Dict[VARS, str | bool] | bool = True,
     ) -> Optional[XarrayData]:
         """处理数据"""
+        check_vars = self.check_variables(variable, raise_error=False)
+        if not check_vars.all():
+            msg = (
+                f"{self.name} 模型缺少变量: {check_vars[check_vars is False].index.tolist()}"
+            )
+            logger.warning(msg)
         # 如果变量是列表，则递归处理每个变量
         if isinstance(variable, str):
-            return self._process_single_variable(variable, clip_by, unit_to)
+            if isinstance(unit_to, dict):
+                unit = unit_to[variable]
+            else:
+                unit = unit_to
+            return self._process_single_variable(variable, clip_by, unit)
         for v in variable:
-            self._process_single_variable(v, clip_by, unit_to)
+            self.process_data(v, clip_by, unit_to)
         return None
 
     def plot_series(self, variable: VARS | MULTI_VARS, **kwargs):

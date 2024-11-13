@@ -7,12 +7,13 @@
 
 from typing import Any, Callable, Dict, Generic, List, TypeVar
 
+import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
 from past1000.api.io import Path, PathLike
 
-from .models import MODELS, _EarthSystemModel
+from .models import MODELS, MULTI_VARS, VARS, _EarthSystemModel
 
 M = TypeVar("M", bound=_EarthSystemModel)
 
@@ -86,3 +87,12 @@ class ModelComparisonExperiment(Generic[M]):
                 logger.info(f"应用函数 {func.__name__} 到模型 {model.name}, 参数包括: {kwargs}")
                 results[model.name] = func(model, **kwargs)  # 对于普通函数，传入 model
         return results
+
+    def check_variables(self, variables: VARS | MULTI_VARS) -> pd.DataFrame:
+        """检查变量是否存在"""
+        check_vars_list = []
+        for model in self.models:
+            check_vars = model.check_variables(variables, raise_error=False)
+            check_vars.name = model.name
+            check_vars_list.append(check_vars)
+        return pd.concat(check_vars_list, axis=1)
