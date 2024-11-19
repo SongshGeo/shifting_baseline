@@ -9,3 +9,10 @@ shp: /Users/songshgeo/Documents/Datasets/黄河流域矢量图/空间范围/huan
 
 # 千年旱涝地图集数据
 atlas: "/Users/songshgeo/Documents/Datasets/中国历史千年旱涝数据/中国千年区域极端旱涝地图集（表格） - 杨煜达 主编.xlsx"
+
+
+spei:
+  folder: "/Users/songshgeo/Documents/Datasets/黄河流域SPEI干旱指数"
+  pet: "month_pet_0.1degree.nc"
+  pr: "month_pre_0.1degree.nc"
+  pattern: "spei_penman/spei_spei_{dist}_{freq}.nc"
