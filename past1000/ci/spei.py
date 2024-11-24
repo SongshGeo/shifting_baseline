@@ -5,7 +5,7 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
-from typing import Dict, Literal, Tuple, TypeAlias
+from typing import Literal, Tuple, TypeAlias
 
 import numpy as np
 import pandas as pd
@@ -16,25 +16,8 @@ from climate_indices.indices import Distribution  # 导入分布类型枚举
 
 DistributionType: TypeAlias = Literal["pearson", "gamma"]
 
-SPEI_LEVEL: Dict[Tuple[float, float], int] = {
-    (-np.inf, -1.5): 5,
-    (-1.5, -1.0): 4,
-    (-1.0, 1.0): 3,
-    (1.0, 1.5): 2,
-    (1.5, np.inf): 1,
-}
-
-LEVEL_CATE: Dict[int, str] = {
-    0: "No data",
-    1: "Very wet",
-    2: "Wet",
-    3: "Normal",
-    4: "Drought",
-    5: "Very drought",
-}
-
 # 创建分类
-BINS = [-np.inf, -1.5, -1.0, 1.0, 1.5, np.inf]
+BINS = [-np.inf, -1.17, -0.33, 0.33, 1.17, np.inf]
 LEVELS = [5, 4, 3, 2, 1]
 LABELS = ["Severe drought", "Moderate drought", "Normal", "Wet", "Very wet"]
 
@@ -47,7 +30,7 @@ def calc_single_spei(
     pr: np.ndarray,
     pet: np.ndarray,
     scale: int = 1,
-    distribution: DistributionType = "gamma",
+    distribution: DistributionType = "pearson",
     years: Tuple[int, int, int] = (850, 850, 1850),
 ) -> np.ndarray:
     """根据气候序列计算 SPEI
@@ -68,7 +51,7 @@ def calc_single_spei(
         distribution:
             分布类型，可选 "pearson" 或 "gamma"。
             gamma 为 Gamma 分布，pearson 为 PearsonIII 分布。
-            常用 gamma 分布。
+            常用 PearsonIII 分布。
         years:
             数据起始年份、校准期起始年份、校准期结束年份。
             默认 (850, 850, 1850)。
