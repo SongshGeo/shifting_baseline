@@ -5,9 +5,10 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+from functools import partial
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Sequence, TypeAlias
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, TypeAlias
 
 import geopandas as gpd
 import pandas as pd
@@ -27,11 +28,12 @@ from past1000.api.io import (
     write_nc,
 )
 from past1000.ci.clip import clip_data
-from past1000.ci.spei import calc_single_spei
+from past1000.ci.spei import DistributionType, calc_single_spei, spei_to_level
 from past1000.utils.units import (
     MONTH_DAYS,
     YEAR_DAYS,
     TimeUnit,
+    _get_time_resolution,
     convert_cmip_units,
     flux_kg_to_mm,
 )
@@ -98,6 +100,14 @@ class _EarthSystemModel:
     def out_dir(self) -> Path:
         """输出目录"""
         return self._out_dir
+
+    @property
+    def time_resolutions(self) -> Dict[VARS, TimeUnit]:
+        """获取变量时间分辨率"""
+        res: Dict[VARS, TimeUnit] = {}
+        for k, da in self._merged_data.items():
+            res[k] = _get_time_resolution(da)
+        return res
 
     def get_variables(
         self,
@@ -285,20 +295,48 @@ class _EarthSystemModel:
         fig.suptitle(self.name)
         plt.show()
 
-    def calc_spei(self, pet_freq: TimeUnit = "month") -> xr.DataArray:
-        """计算 SPEI"""
-        return xr.apply_ufunc(
-            calc_single_spei,
-            self.calc_pet(input_freq=pet_freq, output_freq="month")
+    def calc_spei(
+        self,
+        to_level: bool = True,
+        scale: int = 1,
+        distribution: DistributionType = "gamma",
+        years: Tuple[int, int, int] = (850, 850, 1850),
+    ) -> xr.DataArray:
+        """计算 SPEI
+
+        Args:
+            pet_freq: PET 频率
+            scale: SPEI 计算的尺度
+            distribution: 分布类型
+        """
+        # 计算 PET
+        pet = (
+            self.calc_pet(
+                input_freq=self.time_resolutions["pr"],
+                output_freq="month",
+            )
             .resample(time="ME")
-            .mean(),
-            self.get_variables("pr").resample(time="ME").mean(),
-            input_core_dims=[["time"], ["time"]],  # 输入数组的核心维度
-            output_core_dims=[["time"]],  # 输出数组的核心维度
-            vectorize=True,  # 自动向量化
-            dask="parallelized",  # 并行计算
-            output_dtypes=[float],  # 输出数据类型
+            .mean()
         )
+        # 计算 SPEI
+        spei = xr.apply_ufunc(
+            partial(
+                calc_single_spei,
+                scale=scale,
+                distribution=distribution,
+                years=years,
+            ),
+            self.get_variables("pr").resample(time="ME").mean(),
+            pet,
+            input_core_dims=[["time"], ["time"]],
+            output_core_dims=[["time"]],
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[float],
+        )
+        if to_level:
+            return spei_to_level(spei)
+        return spei
 
     def calc_pet(
         self,

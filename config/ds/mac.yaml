@@ -8,7 +8,9 @@ folder: /Volumes/CMIP6/past1000
 shp: /Users/songshgeo/Documents/Datasets/黄河流域矢量图/空间范围/huang_huai_hai_merged.shp
 
 # 千年旱涝地图集数据
-atlas: "/Users/songshgeo/Documents/Datasets/中国历史千年旱涝数据/中国千年区域极端旱涝地图集（表格） - 杨煜达 主编.xlsx"
+atlas:
+  file: "/Users/songshgeo/Documents/Datasets/中国历史千年旱涝数据/中国千年区域极端旱涝地图集（表格） - 杨煜达 主编.xlsx"
+  json: "/Users/songshgeo/Documents/Datasets/中国历史千年旱涝数据/huabei_cities.geojson"
 
 
 spei:
