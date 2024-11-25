@@ -299,7 +299,7 @@ class _EarthSystemModel:
         self,
         to_level: bool = True,
         scale: int = 1,
-        distribution: DistributionType = "gamma",
+        distribution: DistributionType = "pearson",
         years: Tuple[int, int, int] = (850, 850, 1850),
     ) -> xr.DataArray:
         """计算 SPEI
@@ -309,6 +309,7 @@ class _EarthSystemModel:
             scale: SPEI 计算的尺度
             distribution: 分布类型
         """
+        pr = self.get_variables("pr").resample(time="ME").mean()
         # 计算 PET
         pet = (
             self.calc_pet(
@@ -318,6 +319,8 @@ class _EarthSystemModel:
             .resample(time="ME")
             .mean()
         )
+        # 对齐时间，删除不匹配的时间
+        pr, pet = xr.align(pr, pet, join="inner")
         # 计算 SPEI
         spei = xr.apply_ufunc(
             partial(
@@ -326,7 +329,7 @@ class _EarthSystemModel:
                 distribution=distribution,
                 years=years,
             ),
-            self.get_variables("pr").resample(time="ME").mean(),
+            pr,
             pet,
             input_core_dims=[["time"], ["time"]],
             output_core_dims=[["time"]],
@@ -351,12 +354,10 @@ class _EarthSystemModel:
         }
         tasmin = self.get_variables("tasmin").pint.dequantify(format="unit")
         tasmax = self.get_variables("tasmax").pint.dequantify(format="unit")
-        tas = self.get_variables("tas").pint.dequantify(format="unit")
         pet = (
             xci.potential_evapotranspiration(
                 tasmin=tasmin,
                 tasmax=tasmax,
-                tas=tas,
                 method="HG85",
             )
             * days[input_freq]

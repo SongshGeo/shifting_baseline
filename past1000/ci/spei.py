@@ -5,14 +5,16 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
-from typing import Literal, Tuple, TypeAlias
+from typing import Literal, Optional, Tuple, TypeAlias
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
 from climate_indices import indices
 from climate_indices.compute import Periodicity  # 导入周期类型枚举
 from climate_indices.indices import Distribution  # 导入分布类型枚举
+from scipy.stats import kendalltau
 
 DistributionType: TypeAlias = Literal["pearson", "gamma"]
 
@@ -88,10 +90,15 @@ def spei_to_level(spei: xr.DataArray) -> xr.DataArray:
     )
 
 
-def vectorize_summary(data: np.ndarray, axis=None) -> np.ndarray:
+def vectorize_summary(
+    data: np.ndarray,
+    method: Literal["mean", "drought"] = "mean",
+    axis=None,
+) -> np.ndarray:
     """向量化统计年度干旱特征"""
+    func = {"mean": mean_drought_level, "drought": drought_summary}
     return xr.apply_ufunc(
-        drought_summary,
+        func[method],
         data,
         vectorize=True,
         input_core_dims=[["time"]],
@@ -99,7 +106,7 @@ def vectorize_summary(data: np.ndarray, axis=None) -> np.ndarray:
     )
 
 
-def drought_summary(data: np.ndarray, axis=None, **kwargs):
+def drought_summary(data: np.ndarray, **kwargs):
     """统计年度干旱特征
 
     Args:
@@ -110,6 +117,8 @@ def drought_summary(data: np.ndarray, axis=None, **kwargs):
     Returns:
         int: 最显著的干旱等级
     """
+    if np.isnan(data).all():
+        return np.nan
 
     # 计算各等级的月数
     counts = pd.Series(data.flatten()).value_counts()
@@ -128,7 +137,86 @@ def drought_summary(data: np.ndarray, axis=None, **kwargs):
         return 2
     if moderate_wets - moderate_droughts > 0:
         return 4
+    return 3
 
+
+def mean_drought_level(data: np.ndarray, **kwargs) -> float:
+    """计算平均干旱等级"""
     if np.isnan(data).all():
         return np.nan
-    return 3
+    return np.mean(data).round(0)
+
+
+def get_city_lon_lat(city, data):
+    """获取城市经纬度"""
+    row = data.loc[city]
+    return row.geometry.x, row.geometry.y
+
+
+def get_ESM_time_series(city, xda, gdf, method="nearest"):
+    """获取ESM干旱等级"""
+    lon, lat = get_city_lon_lat(city, gdf)
+    # 1~5 转化为 -2~2
+    level = xda.sel(lon=lon, lat=lat, method=method).to_pandas()
+    level = level.rename_axis(index="year").rename(lambda x: x.year)
+    level.name = city + "_ESM"
+    return level - 3
+
+
+def get_real_time_series(city, df):
+    """获取实际干旱等级"""
+    return df.loc[:, city] - 3
+
+
+def match_levels(predicted, history) -> pd.DataFrame:
+    """将预测的干旱等级与实际干旱等级匹配"""
+    data = pd.concat([predicted, history], axis=1)
+    data.columns = ["ESM", "Records"]
+    return data
+
+
+def calc_kendall(data, model_col="ESM", record_col="Records"):
+    """计算 Kendall's tau
+
+    :param data: pd.DataFrame
+    :param model_col: str, 预测干旱等级列名
+    :param record_col: str, 实际干旱等级列名
+    """
+    # 1. 计算 Kendall's tau（适合等级数据）
+    tau, p_value = kendalltau(
+        data[model_col],
+        data[record_col],
+        nan_policy="omit",
+        variant="b",
+        alternative="two-sided",
+    )
+    return tau, p_value
+
+
+def calc_kendall_for_all_cities(
+    xda: xr.DataArray,
+    gdf: gpd.GeoDataFrame,
+    df: pd.DataFrame,
+    col_name: Optional[str] = None,
+):
+    """计算所有城市的 Kendall's tau
+
+    Args:
+        index: 城市列表
+        xda: ESM 干旱等级数据
+        gdf: 城市经纬度数据
+        df: 实际干旱等级数据
+    """
+    result = pd.DataFrame()
+    if col_name is None:
+        cities = gdf.index
+    else:
+        cities = gdf[col_name]
+    for city in cities:
+        level = get_ESM_time_series(city, xda, gdf)
+        real_level = get_real_time_series(city, df)
+        data = match_levels(level, real_level)
+        corr, p_value = calc_kendall(data)
+        result.loc[city, "corr"] = corr
+        result.loc[city, "p_value"] = p_value
+    return result.reset_index(names="city")

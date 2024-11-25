@@ -6,14 +6,14 @@ defaults:
 freq: mon
 vars:
   - pr
-  - tas
+  # - tas
   - tasmin
   - tasmax
-  - hfls
-  - mrso
-  - mrro
+  # - hfls
+  # - mrso
+  # - mrro
   # - rsd
   # - rld
-  - sfcWind
-  - hurs
+  # - sfcWind
+  # - hurs
 var: mrso

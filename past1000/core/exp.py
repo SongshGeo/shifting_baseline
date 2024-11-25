@@ -39,7 +39,7 @@ class ModelComparisonExperiment(Generic[M]):
         """模型列表"""
         return list(self._models.values())
 
-    def get_data_path(self, model_name: str, freq: str) -> Path:
+    def get_data_path(self, model_name: MODELS, freq: str) -> Path:
         """获取数据路径
 
         Args:
