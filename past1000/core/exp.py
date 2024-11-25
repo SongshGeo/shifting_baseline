@@ -5,15 +5,16 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
-from typing import Any, Callable, Dict, Generic, List, TypeVar
+from itertools import product
+from typing import Any, Callable, Dict, Generic, List, Sequence, TypeVar
 
+import numpy as np
 import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
 from past1000.api.io import Path, PathLike
-
-from .models import MODELS, MULTI_VARS, VARS, _EarthSystemModel
+from past1000.core.models import MODELS, MULTI_VARS, VARS, _EarthSystemModel
 
 M = TypeVar("M", bound=_EarthSystemModel)
 
@@ -96,3 +97,27 @@ class ModelComparisonExperiment(Generic[M]):
             check_vars.name = model.name
             check_vars_list.append(check_vars)
         return pd.concat(check_vars_list, axis=1)
+
+    def batch_apply(
+        self,
+        func: Callable[[_EarthSystemModel], Any],
+        iter_vars: Dict[str, Sequence[Any]],
+        value_name: str = "value",
+        **kwargs,
+    ) -> pd.DataFrame:
+        """批量应用函数"""
+        results: List[pd.DataFrame] = []
+        for model, var_name in product(self.models, iter_vars):
+            for var_value in iter_vars[var_name]:
+                kwargs[var_name] = var_value
+                res = func(model, **kwargs)
+                if isinstance(res, (np.ndarray, list)):
+                    res = pd.DataFrame(res, columns=[value_name])
+                elif isinstance(res, (pd.Series, pd.DataFrame)):
+                    res = pd.DataFrame(res)
+                else:
+                    raise ValueError(f"函数 {func.__name__} 返回值类型不支持.")
+                res["model"] = model.name
+                res[var_name] = var_value
+                results.append(res)
+        return pd.concat(results).reset_index(drop=True)
