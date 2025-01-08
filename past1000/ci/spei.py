@@ -5,6 +5,7 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+import warnings
 from typing import Literal, Optional, Tuple, TypeAlias
 
 import geopandas as gpd
@@ -62,6 +63,7 @@ def calc_single_spei(
         np.ndarray: 月尺度的 SPEI 值。
     """
     if np.all(np.isnan(pr)) or np.all(np.isnan(pet)):
+        warnings.warn("All nan data, return nan")
         return np.full_like(pr, np.nan)
     start_year, calibration_start_year, calibration_end_year = years
 
@@ -175,7 +177,11 @@ def match_levels(predicted, history) -> pd.DataFrame:
     return data
 
 
-def calc_kendall(data, model_col="ESM", record_col="Records"):
+def calc_kendall(
+    data: pd.DataFrame,
+    model_col: str = "ESM",
+    record_col: str = "Records",
+) -> Tuple[float, float]:
     """计算 Kendall's tau
 
     :param data: pd.DataFrame
