@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import xarray as xr
+from hydra import compose, initialize
 
 DATA_DIR = Path("tests/data")
 
@@ -40,3 +41,11 @@ def expected_spei_dict_fixture():
             expected_spei = xr.open_dataarray(data_path)
             expected_spei_dict[(dist, scale)] = expected_spei
     return expected_spei_dict
+
+
+@pytest.fixture(name="cfg")
+def fixture_cfg():
+    """配置文件"""
+    with initialize(config_path="config"):
+        cfg = compose(config_name="test_config.yaml")
+    return cfg

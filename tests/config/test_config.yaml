@@ -1,0 +1,10 @@
+ds:
+  root: "~/Documents"
+  folder: "~/Downloads"
+
+test:
+  a: ${ds.root}  # "~/Documents"
+  b: data
+
+test2:
+  a: ${test.a}/${test.b}  # "~/Documents/data"
