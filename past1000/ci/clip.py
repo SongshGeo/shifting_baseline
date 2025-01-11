@@ -8,14 +8,8 @@
 import geopandas as gpd
 import rioxarray
 import xarray as xr
-from loguru import logger
 
 from past1000.api.io import write_geo_attrs
-from past1000.api.log import setup_logger
-
-setup_logger()
-
-logger.debug(rioxarray.show_versions())
 
 
 def clip_data(
@@ -46,4 +40,4 @@ def clip_data(
 
 
 if __name__ == "__main__":
-    pass
+    rioxarray.show_versions()

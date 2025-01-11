@@ -1,0 +1,18 @@
+# 将原始数据进行处理，并保存到本地
+name: "数据预处理"
+
+# 输入原始数据目录
+input: "${ds.cmip6}"
+# CMIP6 数据存储的子目录模式
+subdir_pattern: "{freq}/{model}"
+
+# 输出目录：根目录下的 data 文件夹
+output: "${ds.root}/data"
+
+# 裁剪范围：黄河流域矢量图
+shp: ${ds.data}/黄河流域矢量图/空间范围/huang_huai_hai_merged.shp
+
+# 处理流程
+pipeline:
+  # 数据处理
+  - batch_process_and_save_by_config

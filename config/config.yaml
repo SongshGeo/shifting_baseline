@@ -1,9 +1,11 @@
 defaults:
 - ds: mac
-- model: ACCESS-ESM1-5
+- how: process
 - _self_
 
+# 数据频率
 freq: mon
+# 变量
 vars:
   - pr
   # - tas
@@ -16,4 +18,11 @@ vars:
   # - rld
   # - sfcWind
   # - hurs
-var: pr
+
+models:
+  - ACCESS-ESM1-5
+  - MIROC-ES2L
+  - MRI-ESM2-0
+
+log:
+  std: WARNING

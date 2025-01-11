@@ -12,10 +12,6 @@ import xarray as xr
 from loguru import logger
 from pint_xarray import unit_registry as ureg
 
-from past1000.api.log import setup_logger
-
-setup_logger()
-
 TimeUnit: TypeAlias = Literal[
     "second",
     "minute",

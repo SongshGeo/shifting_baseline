@@ -12,7 +12,11 @@ import sys
 from loguru import logger
 
 
-def setup_logger() -> None:
+def setup_logger(
+    std_level: str = "WARNING",
+    file_level: str = "DEBUG",
+    file_name: str = "10days.{time:YYYY-MM-DD}.log",
+) -> None:
     """设置日志记录器"""
     fmt = (
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
@@ -22,19 +26,20 @@ def setup_logger() -> None:
     logger.remove()
     logger.add(
         sys.stderr,
-        level="ERROR",
+        level=std_level,
         format=fmt,
     )
     logger.add(
-        "10days.{time:YYYY-MM-DD}.log",
+        file_name,
         rotation="1 day",
         retention="1 week",
-        level="DEBUG",
+        level=file_level,
         format=fmt,
     )
-    logger.info("新一次日志记录")
+    logger.info(f"新一次运行，日志输出等级: {std_level}")
+    logger.info(f"日志文件名: {file_name}，记录等级: {file_level}")
 
 
 if __name__ == "__main__":
-    setup_logger()
+    setup_logger(std_level="DEBUG", file_level="DEBUG")
     logger.info("Hello, World!")

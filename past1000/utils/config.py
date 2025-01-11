@@ -25,7 +25,8 @@ def format_by_config(config: DictConfig, string: Optional[str] = None) -> str:
         raise ValueError("config 必须是 OmegaConf 配置对象")
 
     if string is None:
-        return OmegaConf.resolve(config)
+        OmegaConf.resolve(config)
+        return config
 
     pattern = r"\$\{([^}]+)\}"
     paths = re.findall(pattern, string)

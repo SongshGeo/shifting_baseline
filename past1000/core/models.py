@@ -8,7 +8,7 @@
 from functools import partial
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, TypeAlias
+from typing import Dict, List, Literal, Optional, Sequence, Tuple, TypeAlias
 
 import geopandas as gpd
 import pandas as pd
@@ -75,33 +75,24 @@ class _EarthSystemModel:
         _name (MODELS): 模型名称
         _dir (Path): 数据存储目录
         _files (Dict[str, List[str]]): 变量文件映射字典
-        attrs (Dict[str, Any]): 模型属性
         _merged_data (Dict[VARS, XarrayData]): 已处理的数据缓存
-        _out_dir (Path): 输出目录
 
     Args:
         model_name (MODELS): 模型名称，必须是预定义的模型之一
         data_path (PathLike): 数据存储路径
-        out_path (PathLike, optional): 输出路径. 默认为 "output"
-        **kwargs: 其他模型属性
     """
+
+    callable_attrs = ["process_data", "save_data"]
 
     def __init__(
         self,
         model_name: MODELS,
         data_path: PathLike,
-        out_path: PathLike = "output",
-        **kwargs,
     ):
         self._name: MODELS = model_name
         self._dir: Path = check_data_dir(data_path)
         self._files: Dict[str, List[str]] = {}
-        self.attrs: Dict[str, Any] = kwargs
         self._merged_data: Dict[VARS, XarrayData] = {}
-        self._out_dir: Path = check_data_dir(
-            self.folder / out_path,
-            create=True,
-        )
 
     @property
     def name(self) -> MODELS:
@@ -112,11 +103,6 @@ class _EarthSystemModel:
     def folder(self) -> Path:
         """数据目录"""
         return self._dir
-
-    @property
-    def out_dir(self) -> Path:
-        """输出目录"""
-        return self._out_dir
 
     @property
     def time_resolutions(self) -> Dict[VARS, TimeUnit]:
@@ -219,7 +205,6 @@ class _EarthSystemModel:
         variable: VARS,
         clip_by: Optional[str | gpd.GeoDataFrame] = None,
         unit_to: str | bool = True,
-        save: bool = False,
         cache: bool = True,
     ) -> XarrayData:
         if variable in self._merged_data:
@@ -231,8 +216,6 @@ class _EarthSystemModel:
         # 转换单位
         if unit_to:
             xda = self._convert_units(xda, variable, unit_to)
-        if save:
-            write_nc(xda, self.out_dir, variable, self.name)
         if cache:
             self._merged_data[variable] = xda
         return xda
@@ -263,7 +246,6 @@ class _EarthSystemModel:
         variable: VARS | MULTI_VARS,
         clip_by: Optional[str | gpd.GeoDataFrame] = None,
         unit_to: str | Dict[VARS, str | bool] | bool = True,
-        save: bool = False,
         cache: bool = True,
     ) -> Optional[XarrayData]:
         """处理模型变量数据
@@ -278,7 +260,6 @@ class _EarthSystemModel:
                 - 当为dict时，为每个变量指定转换单位
                 - 当为True时，使用默认的输出单位
                 - 当为False时，不进行单位转换
-            save: 是否保存处理后的数据
             cache: 是否缓存处理后的数据
 
         Returns:
@@ -303,11 +284,10 @@ class _EarthSystemModel:
                 variable,
                 clip_by,
                 unit,
-                save,
                 cache,
             )
         for v in variable:
-            self.process_data(v, clip_by, unit_to, save, cache)
+            self.process_data(v, clip_by, unit_to, cache)
         return None
 
     def plot_series(self, variable: VARS | MULTI_VARS, **kwargs) -> None:
@@ -432,3 +412,23 @@ class _EarthSystemModel:
             * days[input_freq]
         )
         return flux_kg_to_mm(pet, flux_frequency=output_freq)
+
+    def save_data(self, path: PathLike) -> None:
+        """保存数据
+
+        将模型中所有缓存的数据保存到指定路径。
+        命名规则为：{model_name}_{variable}_{frequency}_{time_range}.nc
+
+        Args:
+            path: 保存路径
+        """
+        path = check_data_dir(path, create=True)
+        for var, data in self._merged_data.items():
+            data = data.pint.dequantify()
+            write_nc(
+                data=data,
+                path=path,
+                variable=var,
+                model=self.name,
+                frequency=self.time_resolutions[var],
+            )

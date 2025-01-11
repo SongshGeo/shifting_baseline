@@ -18,8 +18,6 @@ from past1000.api.log import setup_logger
 PathLike: TypeAlias = str | Path
 XarrayData: TypeAlias = xr.Dataset | xr.DataArray
 
-setup_logger()
-
 
 def check_data_dir(
     path: Optional[PathLike] = None,
@@ -108,7 +106,7 @@ def create_cmip_regex(
         r"(?P<frequency>{})".format(frequency or r"[\w]+"),
         r"(?P<model>{})".format(re.escape(model) if model else r"[\w-]+"),
         r"(?P<experiment>{})".format(experiment or r"[\w]+"),
-        r"(?P<ensemble>{})".format(ensemble or r"[\w]+"),
+        r"(?P<ensemble>{})".format(ensemble or r"[\w\d]+"),
         r"[\d]{4,}-[\d]{4,}",
     ]
     return r"_".join(pattern) + r"\.nc$"
@@ -174,9 +172,9 @@ def write_nc(
 
     # 如果没有提供时间范围，从数据中提取
     if time_range is None:
-        start_year = str(data.time.dt.year.min().values)
-        end_year = str(data.time.dt.year.max().values)
-        time_range = f"{start_year}-{end_year}"
+        start_year = int(data.time.dt.year.min().values)
+        end_year = int(data.time.dt.year.max().values)
+        time_range = f"{start_year:04d}-{end_year:04d}"
 
     # 构建CMIP格式的文件名
     filename = f"{variable}_{frequency}_{model}_{experiment}_{ensemble}_{time_range}.nc"
@@ -257,4 +255,5 @@ def cli(
 
 
 if __name__ == "__main__":
+    setup_logger(std_level="INFO")
     cli()

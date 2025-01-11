@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, Generic, List, Sequence, TypeVar
 import numpy as np
 import pandas as pd
 from loguru import logger
+from omegaconf import DictConfig
 from tqdm import tqdm
 
 from past1000.api.io import Path, PathLike
@@ -122,7 +123,7 @@ class ModelComparisonExperiment(Generic[M]):
 
     def apply(
         self,
-        func: Callable[[_EarthSystemModel], Any],
+        func: Callable[[_EarthSystemModel], Any] | str,
         **kwargs,
     ) -> Dict[MODELS, Any]:
         """对所有模型应用指定函数
@@ -141,8 +142,15 @@ class ModelComparisonExperiment(Generic[M]):
         """
         results: Dict[MODELS, Any] = {}
         for model in tqdm(self.models):
-            logger.info(f"应用函数 {func.__name__} 到模型 {model.name}, 参数包括: {kwargs}")
-            results[model.name] = func(model, **kwargs)  # 对于普通函数，传入 model
+            # 如果 func 是字符串，则视为模型方法
+            if isinstance(func, str):
+                if func in model.callable_attrs:
+                    results[model.name] = getattr(model, func)(**kwargs)
+                else:
+                    logger.error(f"模型 {model.name} 没有找到方法 {func}.")
+            else:
+                logger.debug(f"应用函数 {func.__name__} 到模型 {model.name}, 参数包括: {kwargs}")
+                results[model.name] = func(model, **kwargs)  # 对于普通函数，传入 model
         return results
 
     def check_variables(self, variables: VARS | MULTI_VARS) -> pd.DataFrame:
@@ -207,3 +215,60 @@ class ModelComparisonExperiment(Generic[M]):
                 res[var_name] = var_value
                 results.append(res)
         return pd.concat(results).reset_index(drop=True)
+
+
+def batch_process_and_save_models(
+    folder: PathLike,
+    subdir_pattern: str,
+    freq: str,
+    variables: VARS | MULTI_VARS,
+    models: List[_EarthSystemModel],
+    clip_by: PathLike,
+    save_path: PathLike,
+):
+    """将每个模型处理后的数据合并到一起"""
+    logger.info(f"CMIP6 模型数据处理开始，数据目录: {folder}.")
+    exp: ModelComparisonExperiment = ModelComparisonExperiment(
+        folder=folder,
+        subdir_pattern=subdir_pattern,
+        freq=freq,
+    )
+    logger.info(f"使用模型: {models}.")
+    models = exp.add_model(*models)  # 添加模型
+    logger.info(f"检查变量: {variables}.")
+    df = exp.check_variables(variables=variables)  # 检查变量
+    logger.debug(df)  # 打印变量检查结果
+    logger.info(f"处理数据并应用裁剪范围: {clip_by}.")
+    exp.apply(
+        "process_data",
+        variable=variables,
+        cache=True,
+        clip_by=clip_by,
+    )
+    exp.apply("save_data", path=save_path)
+    logger.info(f"数据处理完成，保存到 {save_path}.")
+
+
+def batch_process_and_save_by_config(cfg: DictConfig | None = None):
+    """根据配置文件批量处理模型数据并保存。"""
+    if cfg is None:
+        raise ValueError("cfg 不能为空")
+    process_cfg = cfg.how
+    # 获取模型
+    models = cfg.models
+    # 获取变量
+    variables = cfg.vars
+    # 获取输出路径
+    batch_process_and_save_models(
+        folder=process_cfg.input,
+        subdir_pattern=process_cfg.subdir_pattern,
+        freq=cfg.freq,
+        variables=variables,
+        models=models,
+        clip_by=process_cfg.shp,
+        save_path=process_cfg.output,
+    )
+
+
+if __name__ == "__main__":
+    batch_process_and_save_by_config()
