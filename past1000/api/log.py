@@ -22,7 +22,7 @@ def setup_logger() -> None:
     logger.remove()
     logger.add(
         sys.stderr,
-        level="INFO",
+        level="ERROR",
         format=fmt,
     )
     logger.add(

@@ -67,7 +67,24 @@ with open(Path(str(_VARS)), "r", encoding="utf-8") as f:
 
 
 class _EarthSystemModel:
-    """地球系统模式类"""
+    """地球系统模式类
+
+    该类用于处理和分析地球系统模型的数据，包括数据读取、处理、单位转换和可视化等功能。
+
+    Attributes:
+        _name (MODELS): 模型名称
+        _dir (Path): 数据存储目录
+        _files (Dict[str, List[str]]): 变量文件映射字典
+        attrs (Dict[str, Any]): 模型属性
+        _merged_data (Dict[VARS, XarrayData]): 已处理的数据缓存
+        _out_dir (Path): 输出目录
+
+    Args:
+        model_name (MODELS): 模型名称，必须是预定义的模型之一
+        data_path (PathLike): 数据存储路径
+        out_path (PathLike, optional): 输出路径. 默认为 "output"
+        **kwargs: 其他模型属性
+    """
 
     def __init__(
         self,
@@ -249,7 +266,27 @@ class _EarthSystemModel:
         save: bool = False,
         cache: bool = True,
     ) -> Optional[XarrayData]:
-        """处理数据"""
+        """处理模型变量数据
+
+        该方法用于处理单个或多个变量的数据，包括数据合并、裁剪和单位转换等操作。
+
+        Args:
+            variable: 需要处理的变量名称或变量列表
+            clip_by: 用于裁剪数据的地理范围，可以是GeoJSON文件路径或GeoDataFrame对象
+            unit_to: 单位转换设置
+                - 当为str时，指定转换的目标单位
+                - 当为dict时，为每个变量指定转换单位
+                - 当为True时，使用默认的输出单位
+                - 当为False时，不进行单位转换
+            save: 是否保存处理后的数据
+            cache: 是否缓存处理后的数据
+
+        Returns:
+            处理后的数据数组，如果处理多个变量则返回None
+
+        Raises:
+            ValueError: 当请求的变量不存在时
+        """
         check_vars = self.check_variables(variable, raise_error=False)
         if not check_vars.all():
             msg = (
@@ -273,8 +310,18 @@ class _EarthSystemModel:
             self.process_data(v, clip_by, unit_to, save, cache)
         return None
 
-    def plot_series(self, variable: VARS | MULTI_VARS, **kwargs):
-        """绘制时间序列图"""
+    def plot_series(self, variable: VARS | MULTI_VARS, **kwargs) -> None:
+        """绘制变量的时间序列图
+
+        Args:
+            variable: 要绘制的变量名称或变量列表
+            **kwargs: 传递给plot_single_time_series的其他参数
+
+        Note:
+            - 单个变量时绘制单张图
+            - 多个变量时绘制多子图
+            - 图表标题会使用模型名称
+        """
         if isinstance(variable, str):
             variable = [variable]
         len_var = len(variable)
@@ -302,12 +349,20 @@ class _EarthSystemModel:
         distribution: DistributionType = "pearson",
         years: Tuple[int, int, int] = (850, 850, 1850),
     ) -> xr.DataArray:
-        """计算 SPEI
+        """计算标准化降水蒸发指数 (SPEI)
 
         Args:
-            pet_freq: PET 频率
-            scale: SPEI 计算的尺度
-            distribution: 分布类型
+            to_level: 是否将SPEI值转换为干旱等级
+            scale: SPEI计算的时间尺度（月）
+            distribution: 概率分布类型，可选 "pearson"、"gamma" 等
+            years: 用于拟合分布的年份范围，格式为(起始年,校准起始年,校准结束年)
+
+        Returns:
+            包含SPEI值的数据数组
+
+        Note:
+            计算需要降水量(pr)和最高最低温度(tasmax, tasmin)数据
+            如果to_level=True，返回的是干旱等级而不是SPEI值
         """
         pr = self.get_variables("pr").resample(time="ME").mean()
         # 计算 PET
@@ -346,7 +401,21 @@ class _EarthSystemModel:
         input_freq: TimeUnit = "month",
         output_freq: TimeUnit = "month",
     ) -> xr.DataArray:
-        """计算PET"""
+        """计算潜在蒸发蒸腾量 (PET)
+
+        使用Hargreaves方法计算潜在蒸发蒸腾量。
+
+        Args:
+            input_freq: 输入数据的时间频率 ('day', 'month', 'year')
+            output_freq: 输出数据的时间频率 ('day', 'month', 'year')
+
+        Returns:
+            包含PET值的数据数组，单位为毫米
+
+        Note:
+            计算基于最高温度(tasmax)和最低温度(tasmin)
+            结果会根据指定的时间频率进行单位转换
+        """
         days = {
             "day": 1,
             "month": MONTH_DAYS,

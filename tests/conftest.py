@@ -36,7 +36,7 @@ def expected_spei_dict_fixture():
     expected_spei_dict = {}
     for dist in ["gamma", "pearson"]:
         for scale in [1, 3, 6, 12]:
-            data_path = DATA_DIR / "expected" / f"spei_{dist}_{scale: 02d}.nc"
+            data_path = DATA_DIR / "expected" / f"spei_{dist}_{scale:02d}.nc"
             expected_spei = xr.open_dataarray(data_path)
             expected_spei_dict[(dist, scale)] = expected_spei
     return expected_spei_dict
