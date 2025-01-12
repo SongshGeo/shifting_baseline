@@ -4,19 +4,17 @@ root: /Users/songshgeo/Documents/VSCode/past1000
 cmip6: /Volumes/CMIP6/past1000
 # 其它数据文件夹
 data: /Users/songshgeo/Documents/Datasets
+# 重建数据
+noaa: ${ds.data}/东亚古气候重建数据
 
 # 千年旱涝地图集数据
 atlas:
   file: ${ds.data}/中国历史千年旱涝数据/中国千年区域极端旱涝地图集（表格） - 杨煜达 主编.xlsx
-  json: ${ds.data}/中国历史千年旱涝数据/huabei_cities.geojson
-
+  shp: ${ds.data}/中国历史千年旱涝数据/point.shp
+  region: 华北地区
 
 spei:
   folder: ${ds.data}/黄河流域SPEI干旱指数
   pet: ${ds.spei.folder}/month_pet_0.1degree.nc
   pr: ${ds.spei.folder}/month_pre_0.1degree.nc
   pattern: ${ds.spei.folder}/spei_penman/spei_spei_{dist}_{freq}.nc
-
-
-# 自然重建数据
-yr_streamflow: ${ds.data}/黄河附近的古气候数据/data-1/pub/data/paleo/treering/reconstructions/asia/china/yellow2019flow.txt

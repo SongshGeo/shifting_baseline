@@ -14,7 +14,7 @@ from past1000.api.io import write_geo_attrs
 
 def clip_data(
     data: xr.DataArray,
-    shp: gpd.GeoDataFrame,
+    shp: gpd.GeoDataFrame | str,
     crs: str = "epsg:4326",
     **kwargs,
 ) -> xr.DataArray:
@@ -23,13 +23,15 @@ def clip_data(
 
     Args:
         data (xr.DataArray): 数据
-        shp (gpd.GeoDataFrame): 矢量数据
+        shp (gpd.GeoDataFrame | str): 矢量数据，或矢量数据路径（可用 gpd.read_file 读取）
         crs (str, optional): 目标坐标系. Defaults to "epsg:4326".
         **kwargs: 其他参数
 
     Returns:
         xr.DataArray: 裁剪后的数据
     """
+    if isinstance(shp, str):
+        shp = gpd.read_file(shp)
     data.rio.write_crs(crs, inplace=True)
     xda = data.rio.clip(
         shp.geometry.values,

@@ -147,7 +147,7 @@ class ModelComparisonExperiment(Generic[M]):
                 if func in model.callable_attrs:
                     results[model.name] = getattr(model, func)(**kwargs)
                 else:
-                    logger.error(f"模型 {model.name} 没有找到方法 {func}.")
+                    raise ValueError(f"模型 {model.name} 没有找到方法 {func}.")
             else:
                 logger.debug(f"应用函数 {func.__name__} 到模型 {model.name}, 参数包括: {kwargs}")
                 results[model.name] = func(model, **kwargs)  # 对于普通函数，传入 model

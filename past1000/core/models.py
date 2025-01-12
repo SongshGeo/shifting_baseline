@@ -82,7 +82,7 @@ class _EarthSystemModel:
         data_path (PathLike): 数据存储路径
     """
 
-    callable_attrs = ["process_data", "save_data"]
+    callable_attrs = ["process_data", "save_data", "calc_spei"]
 
     def __init__(
         self,
@@ -174,17 +174,6 @@ class _EarthSystemModel:
         ]
         return xr.concat(xda, dim="time").sortby("time")
 
-    def _clip_data(
-        self, xda: XarrayData, clip_by: Optional[str | gpd.GeoDataFrame] = None
-    ) -> XarrayData:
-        """裁剪数据"""
-        if isinstance(clip_by, str):
-            clip_by = gpd.read_file(clip_by)
-        if clip_by is not None:
-            return clip_data(xda, clip_by)
-        logger.warning("未提供裁剪数据，返回原始数据。")
-        return xda
-
     def _convert_units(
         self,
         xda: XarrayData,
@@ -212,7 +201,8 @@ class _EarthSystemModel:
         # 合并数据
         xda = self._merge_data(variable=variable)
         # 裁剪数据
-        xda = self._clip_data(xda, clip_by)
+        if clip_by is not None:
+            xda = clip_data(xda, clip_by)
         # 转换单位
         if unit_to:
             xda = self._convert_units(xda, variable, unit_to)
