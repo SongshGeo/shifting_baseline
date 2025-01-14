@@ -126,7 +126,7 @@ class ProcessRecon:
         if isinstance(data, DataArray):
             data.drop_vars("spatial_ref", errors="ignore").to_netcdf(path)
         elif isinstance(data, (DataFrame, Series)):
-            data.to_csv(path)
+            data.to_csv(path, index=False)
         else:
             raise ValueError(f"未知数据类型: {type(data)}")
 

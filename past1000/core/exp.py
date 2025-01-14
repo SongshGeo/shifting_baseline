@@ -5,22 +5,25 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+from functools import partial
 from itertools import product
 from typing import Any, Callable, Dict, Generic, List, Sequence, TypeVar
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 from loguru import logger
 from omegaconf import DictConfig
 from tqdm import tqdm
 
 from past1000.api.io import Path, PathLike
+from past1000.ci.spei import vectorize_summary
 from past1000.core.models import MODELS, MULTI_VARS, VARS, _EarthSystemModel
 
 M = TypeVar("M", bound=_EarthSystemModel)
 
 
-class ModelComparisonExperiment(Generic[M]):
+class ComparingCMIP(Generic[M]):
     """地球系统模型对比实验类
 
     该类用于管理和比较多个地球系统模型的数据，支持批量处理和分析。
@@ -228,7 +231,7 @@ def batch_process_and_save_models(
 ):
     """将每个模型处理后的数据合并到一起"""
     logger.info(f"CMIP6 模型数据处理开始，数据目录: {folder}.")
-    exp: ModelComparisonExperiment = ModelComparisonExperiment(
+    exp: ComparingCMIP = ComparingCMIP(
         folder=folder,
         subdir_pattern=subdir_pattern,
         freq=freq,
@@ -268,6 +271,29 @@ def batch_process_and_save_by_config(cfg: DictConfig | None = None):
         clip_by=process_cfg.shp,
         save_path=process_cfg.output,
     )
+
+
+def compare_spei(spei_dict: dict[MODELS, xr.DataArray]) -> pd.DataFrame:
+    """比较 SPEI"""
+    avg_levels = pd.DataFrame()
+    for model, spei in spei_dict.items():
+        partial_func = partial(vectorize_summary)
+        annual_spei = spei.resample(time="YE").apply(func=partial_func)
+        mode = annual_spei.groupby("time").mean(dim=["lat", "lon"])
+        series = mode.to_dataframe(name="level")["level"]
+        series.index = series.index.year
+        avg_levels[model] = series
+    return avg_levels
+
+
+def calc_spei_in_batch(cfg: DictConfig | None = None) -> dict[MODELS, xr.DataArray]:
+    """批量计算 SPEI"""
+    if cfg is None:
+        raise ValueError("cfg 不能为空")
+    exp: ComparingCMIP = ComparingCMIP(cfg.how.input)
+    exp.add_model(*cfg.models)
+    exp.apply(func="process_data", variable=cfg.vars)
+    return exp.apply("calc_spei", to_level=True)
 
 
 if __name__ == "__main__":

@@ -5,15 +5,13 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
-from functools import partial
 from importlib import resources
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Sequence, Tuple, TypeAlias
+from typing import Dict, List, Literal, Optional, Sequence, TypeAlias
 
 import geopandas as gpd
 import pandas as pd
 import xarray as xr
-import xclim.indices as xci
 import yaml  # type: ignore
 from loguru import logger
 from matplotlib import pyplot as plt
@@ -28,15 +26,7 @@ from past1000.api.io import (
     write_nc,
 )
 from past1000.ci.clip import clip_data
-from past1000.ci.spei import DistributionType, calc_single_spei, spei_to_level
-from past1000.utils.units import (
-    MONTH_DAYS,
-    YEAR_DAYS,
-    TimeUnit,
-    _get_time_resolution,
-    convert_cmip_units,
-    flux_kg_to_mm,
-)
+from past1000.utils.units import TimeUnit, _get_time_resolution, convert_cmip_units
 from past1000.viz.plot import plot_single_time_series
 
 VARS: TypeAlias = Literal[
@@ -94,6 +84,15 @@ class _EarthSystemModel:
         self._files: Dict[str, List[str]] = {}
         self._merged_data: Dict[VARS, XarrayData] = {}
 
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        return f"{self.name}"
+
+    def __getitem__(self, item: VARS) -> XarrayData:
+        return self.get_variables(item)
+
     @property
     def name(self) -> MODELS:
         """模型名称"""
@@ -137,7 +136,7 @@ class _EarthSystemModel:
     ) -> List[str]:
         """搜索变量"""
         if variable not in self._files:
-            logger.info(f"{self.name}模型首次搜索 {variable} 变量")
+            logger.debug(f"{self.name}模型首次搜索 {variable} 变量")
             files = search_cmip_files(
                 self.folder,
                 model=self.name,
@@ -167,7 +166,7 @@ class _EarthSystemModel:
             return read_nc(
                 self.folder / files[0], variable=variable, use_cftime=True, **kwargs
             )
-        logger.info(f"{self.name} 模型需合并 {len(files)} 个文件。")
+        logger.debug(f"{self.name} 模型需合并 {len(files)} 个文件。")
         xda = [
             read_nc(self.folder / f, variable=variable, use_cftime=True, **kwargs)
             for f in tqdm(files, desc=f"Reading {variable} files")
@@ -311,97 +310,6 @@ class _EarthSystemModel:
             plot_single_time_series(data, ax=ax, attrs=attrs, **kwargs)
         fig.suptitle(self.name)
         plt.show()
-
-    def calc_spei(
-        self,
-        to_level: bool = True,
-        scale: int = 1,
-        distribution: DistributionType = "pearson",
-        years: Tuple[int, int, int] = (850, 850, 1850),
-    ) -> xr.DataArray:
-        """计算标准化降水蒸发指数 (SPEI)
-
-        Args:
-            to_level: 是否将SPEI值转换为干旱等级
-            scale: SPEI计算的时间尺度（月）
-            distribution: 概率分布类型，可选 "pearson"、"gamma" 等
-            years: 用于拟合分布的年份范围，格式为(起始年,校准起始年,校准结束年)
-
-        Returns:
-            包含SPEI值的数据数组
-
-        Note:
-            计算需要降水量(pr)和最高最低温度(tasmax, tasmin)数据
-            如果to_level=True，返回的是干旱等级而不是SPEI值
-        """
-        pr = self.get_variables("pr").resample(time="ME").mean()
-        # 计算 PET
-        pet = (
-            self.calc_pet(
-                input_freq=self.time_resolutions["pr"],
-                output_freq="month",
-            )
-            .resample(time="ME")
-            .mean()
-        )
-        # 对齐时间，删除不匹配的时间
-        pr, pet = xr.align(pr, pet, join="inner")
-        # 计算 SPEI
-        spei = xr.apply_ufunc(
-            partial(
-                calc_single_spei,
-                scale=scale,
-                distribution=distribution,
-                years=years,
-            ),
-            pr,
-            pet,
-            input_core_dims=[["time"], ["time"]],
-            output_core_dims=[["time"]],
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[float],
-        )
-        if to_level:
-            return spei_to_level(spei)
-        return spei
-
-    def calc_pet(
-        self,
-        input_freq: TimeUnit = "month",
-        output_freq: TimeUnit = "month",
-    ) -> xr.DataArray:
-        """计算潜在蒸发蒸腾量 (PET)
-
-        使用Hargreaves方法计算潜在蒸发蒸腾量。
-
-        Args:
-            input_freq: 输入数据的时间频率 ('day', 'month', 'year')
-            output_freq: 输出数据的时间频率 ('day', 'month', 'year')
-
-        Returns:
-            包含PET值的数据数组，单位为毫米
-
-        Note:
-            计算基于最高温度(tasmax)和最低温度(tasmin)
-            结果会根据指定的时间频率进行单位转换
-        """
-        days = {
-            "day": 1,
-            "month": MONTH_DAYS,
-            "year": YEAR_DAYS,
-        }
-        tasmin = self.get_variables("tasmin").pint.dequantify(format="unit")
-        tasmax = self.get_variables("tasmax").pint.dequantify(format="unit")
-        pet = (
-            xci.potential_evapotranspiration(
-                tasmin=tasmin,
-                tasmax=tasmax,
-                method="HG85",
-            )
-            * days[input_freq]
-        )
-        return flux_kg_to_mm(pet, flux_frequency=output_freq)
 
     def save_data(self, path: PathLike) -> None:
         """保存数据
