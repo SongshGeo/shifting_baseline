@@ -9,17 +9,26 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Literal
+from itertools import product
+from typing import TYPE_CHECKING, Callable, List, Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from hydra import main
+from omegaconf import DictConfig
 
+from past1000 import filters
+from past1000.api.mc import combine_reconstructions
+from past1000.api.series import HistoricalRecords
 from past1000.ci.corr import calc_corr
+from past1000.data import load_nat_data
+from past1000.utils.calc import detrend_with_nan
+from past1000.utils.config import get_output_dir
 from past1000.viz.plot import plot_corr_heatmap
 
 if TYPE_CHECKING:
-    from past1000.types import CorrFunc
+    from past1000.types import CorrFunc, FilterSide
 
 
 def compare_corr(
@@ -151,7 +160,7 @@ def experiment_corr_2d(
     data2: pd.Series,
     corr_method: CorrFunc = "pearson",
     time_slice: slice = slice(None),
-    filter_side: Literal["both", "left", "right"] = "both",
+    filter_side: FilterSide = "both",
     filter_func: Callable | None = None,
     sample_threshold: float = 1,
     std_offset: float = 0.2,
@@ -224,5 +233,65 @@ def experiment_corr_2d(
     return filtered_df, r_benchmark, ax
 
 
+@main(config_path="../config", config_name="config", version_base=None)
+def compare(cfg: DictConfig | None = None):
+    """
+    对比两个序列的相关性，并绘制相关性热图
+    """
+    assert cfg is not None
+    fig, axs = plt.subplots(2, 2, figsize=(7, 5), tight_layout=True)
+    axs = axs.flatten()
+    compare_cfg = cfg.how
+    # 实验参数
+    slice1 = slice(*compare_cfg.slice1)
+    slice2 = slice(*compare_cfg.slice2)
+    filter_sides: List[FilterSide] = ["right", "both"]
+    change_parameters = product([slice1, slice2], filter_sides)
+    detrend = compare_cfg.detrend
+
+    # 数据
+    history_mean = HistoricalRecords(
+        shp_path=cfg.ds.atlas.shp,
+        data_path=cfg.ds.atlas.file,
+        symmetrical_level=True,
+    ).to_series(how="mean")
+    datasets, uncertainties = load_nat_data(
+        folder=cfg.ds.noaa,
+        includes=cfg.ds.includes,
+        index_name="year",
+        start_year=1000,
+        standardize=True,
+    )
+    combined, _ = combine_reconstructions(datasets, uncertainties)
+    if detrend:
+        data1 = detrend_with_nan(history_mean)
+        data2 = detrend_with_nan(combined["mean"])
+    else:
+        data1 = history_mean
+        data2 = combined["mean"]
+
+    filter_func = getattr(filters, compare_cfg["filter_func"])
+    # 四次对比实验
+    for i, (slice_now, filter_side) in enumerate(change_parameters):
+        ax = axs[i]
+        df, r_benchmark, ax = experiment_corr_2d(
+            data1=data1,
+            data2=data2,
+            filter_func=filter_func,
+            time_slice=slice_now,
+            filter_side=filter_side,
+            ax=ax,
+            **compare_cfg.experiment,
+        )
+        ax.set_title(
+            f"{slice_now.start}-{slice_now.stop} AD. {filter_side}, r={r_benchmark:.3f}"
+        )
+        ax.locator_params(axis="both", nbins=9)  # x轴最多9个主刻度
+        ax.tick_params(axis="both", rotation=0)
+    out_path = get_output_dir()
+    fig.savefig(out_path / "compare.png")
+    return df
+
+
 if __name__ == "__main__":
-    pass
+    compare()

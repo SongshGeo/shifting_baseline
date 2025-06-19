@@ -13,3 +13,4 @@ if TYPE_CHECKING:
     from typing import Literal
 
     CorrFunc = Literal["pearson", "kendall", "spearman"]
+    FilterSide = Literal["both", "left", "right"]

@@ -9,8 +9,10 @@ from functools import partial
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 import xclim.indices as xci
+from scipy.signal import detrend
 
 from past1000.ci.spei import DistributionType, calc_single_spei, spei_to_level
 
@@ -142,3 +144,21 @@ def get_coords(mask: np.ndarray) -> list[tuple[int, ...]]:
     if coords[0].size == 0:
         return []
     return list(zip(*coords))
+
+
+def detrend_with_nan(data: pd.Series) -> pd.Series:
+    """
+    去除数据中的 NaN 值，并进行去趋势处理。
+
+    Args:
+        data: 输入数据
+
+    Returns:
+        np.ndarray: 去趋势处理后的数据
+    """
+    dropped_nan_data = data.dropna()
+    detrended_data = pd.Series(
+        detrend(dropped_nan_data.values),
+        index=dropped_nan_data.index,
+    ).reindex(data.index)
+    return detrended_data

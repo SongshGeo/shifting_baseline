@@ -6,8 +6,10 @@
 # Website: https://cv.songshgeo.com/
 
 import re
+from pathlib import Path
 from typing import Optional
 
+import hydra
 from omegaconf import DictConfig, OmegaConf
 
 
@@ -39,3 +41,8 @@ def format_by_config(config: DictConfig, string: Optional[str] = None) -> str:
         result = result.replace(f"${{{path}}}", str(value))
 
     return result
+
+
+def get_output_dir() -> Path:
+    """获取输出目录"""
+    return Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)

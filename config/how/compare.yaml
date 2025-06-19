@@ -1,0 +1,12 @@
+detrend: true
+filter_func: calc_std_deviation
+slice1: [1469, 1659]
+slice2: [1659, 1949]
+slice3: [1949, 2010]
+
+experiment:
+  corr_method: kendall
+  penalty: false
+  n_diff_w: 5
+  std_offset: 0.1
+  p_threshold: 0.05
