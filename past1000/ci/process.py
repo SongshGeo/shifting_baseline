@@ -8,17 +8,22 @@
 """处理任何历史重建数据的管道
 """
 
+from __future__ import annotations
+
 import inspect
 from pathlib import Path
-from typing import Any, Callable, Dict, List
+from typing import TYPE_CHECKING, Any, Callable, Dict, List
 
+import xarray as xr
+from geo_dskit.utils.clip import clip_data
 from loguru import logger
 from omegaconf import DictConfig
 from pandas import DataFrame, Series, read_csv
 from xarray import DataArray, open_dataarray
 
-from past1000.api.io import PathLike
-from past1000.ci.clip import clip_data
+if TYPE_CHECKING:
+    from past1000.api.io import PathLike
+
 
 __all__ = [
     "clip_data",
@@ -28,8 +33,8 @@ __all__ = [
 ]
 
 
-def convert_time_axis(ds, begin_year=1470):
-    """转换时间轴为实际年份
+def convert_time_axis(ds: xr.Dataset, begin_year: int = 1470) -> xr.Dataset:
+    """转换时间轴为实际年份，并保留时间属性信息
 
     Args:
         ds: 包含时间轴的 xarray Dataset
@@ -43,7 +48,7 @@ def convert_time_axis(ds, begin_year=1470):
     ds = ds.assign_coords(time=actual_years)
     # 保留时间属性信息
     ds.time.attrs["units"] = "year"
-    ds.time.attrs["original_units"] = "years since 1470-1-1"
+    ds.time.attrs["original_units"] = f"years since {begin_year}-1-1"
     return ds
 
 

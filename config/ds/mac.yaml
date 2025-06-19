@@ -21,3 +21,14 @@ spei:
   pet: ${ds.spei.folder}/month_pet_0.1degree.nc
   pr: ${ds.spei.folder}/month_pre_0.1degree.nc
   pattern: ${ds.spei.folder}/spei_penman/spei_spei_{dist}_{freq}.nc
+
+includes:
+  - "hexi2019scpdsi"
+  - "qinling2016precip"
+  - "shanxi2015precip"
+  - "tan2011precip-noaa"
+  - "xu2023-asm"
+  # - "yellow2019flow"
+  # - "yellow2020flow"
+  - "north-china-precip2010"
+  - "north-china-temp-precip2011"

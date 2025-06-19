@@ -7,6 +7,8 @@
 
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 import xarray as xr
 from hydra import compose, initialize
@@ -46,6 +48,13 @@ def expected_spei_dict_fixture():
 @pytest.fixture(name="cfg")
 def fixture_cfg():
     """配置文件"""
-    with initialize(config_path="config"):
+    with initialize(config_path="config", version_base=None):
         cfg = compose(config_name="test_config.yaml")
     return cfg
+
+
+@pytest.fixture(name="series")
+def fixture_series():
+    """用来测试的系列数据包含1000个数据，每年有一个随机的[-4, 4]的数，但符合正态分布，0 是正常值"""
+    data = np.random.normal(0, 1, size=1000).clip(-4, 4)
+    return pd.Series(data, index=np.arange(850, 1850))

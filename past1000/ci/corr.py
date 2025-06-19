@@ -8,32 +8,34 @@
 """
 计算两个数据集之间的相关系数
 """
-from typing import Dict, List, Literal, Optional, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Literal, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import xarray as xr
 from rasterio.enums import Resampling
+from scipy import stats
 
-from past1000.api.series import HistoricalRecords, classify_by_std
-from past1000.core.models import _EarthSystemModel
+if TYPE_CHECKING:
+    from past1000.types import CorrFunc
 
 
-def summer_precipitation(model: _EarthSystemModel):
-    """获取夏季（6-8月）降水量
+def summer_precipitation(pr_data: xr.DataArray):
+    """获取夏季（6-8月）降水量 # TODO: 6-9月
 
     Args:
-        model: 模型对象
+        data: 数据集
 
     Returns:
         xr.DataArray: 夏季降水量数据，每年都是 3 个月数据的和
     """
-    pr = model["pr"]
-    basin_mask = pr.isel(time=0).notnull()
+    basin_mask = pr_data.isel(time=0).notnull()
     # 选择 6-8 月的数据
     return (
-        pr.sel(time=pr.time.dt.month.isin([6, 7, 8]))
+        pr_data.sel(time=pr_data.time.dt.month.isin([6, 7, 8]))
         .groupby("time.year")
         .sum(dim="time", skipna=True)
         .where(basin_mask)
@@ -132,86 +134,60 @@ def plot_corr(df: pd.DataFrame) -> None:
     """绘制相关系数"""
     dataplot = sns.heatmap(
         df.corr(numeric_only=True),
-        cmap="YlGnBu",
+        cmap="vlag",
         annot=True,
+        annot_kws={"size": 8},
+        fmt=".1f",
+        vmin=-1,
+        vmax=1,
+        cbar_kws={"shrink": 0.8},
     )
     dataplot.set_title("Correlation Coefficient")
     return dataplot
 
 
-def process_exp_data(
-    datasets: Dict[str, xr.DataArray],
-    var_name: str,
-) -> List[pd.DataFrame]:
-    """处理CMIP数据，转化为标准差等级"""
-    cmip_summer_pr = []
-    for model, da in datasets.items():
-        tmp_df = da.mean(dim=["lat", "lon"]).to_dataframe()
-        tmp_df = tmp_df.drop("spatial_ref", axis=1).rename({var_name: model}, axis=1)
-        ser = classify_by_std(tmp_df)
-        cmip_summer_pr.append(ser)
-    return cmip_summer_pr
+def effective_sample_size(n, arr1, arr2):
+    acf1 = arr1.autocorr(lag=1)
+    acf2 = arr2.autocorr(lag=1)
+    # 如果自相关无法计算，直接返回1
+    if np.isnan(acf1) or np.isnan(acf2):
+        return 1
+    denom = 1 + acf1 * acf2
+    if denom == 0:
+        return 1
+    neff = n * (1 - acf1 * acf2) / denom
+    # 防止neff为负或为nan
+    if not np.isfinite(neff) or neff <= 0:
+        return 1
+    return int(neff)
 
 
 def calc_corr(
-    data: xr.DataArray,
-    models: List[_EarthSystemModel],
-    vars: List[str],
-) -> pd.DataFrame:
-    """计算相关系数"""
-    pass
-
-
-def process_historical_data(
-    shp_path: str,
-    data_path: str,
-    how: Literal["mean", "mode"] = "mean",
-) -> pd.DataFrame:
-    """处理历史数据"""
-    records = HistoricalRecords(shp_path=shp_path, data_path=data_path)
-    # TODO 这里需要处理缺失值？这里目前画图的时候不显示
-    if how == "mean":
-        data = np.mean(records, axis=1)
-    elif how == "mode":
-        data = records.mode(axis=1)[0]
+    arr1: pd.Series,
+    arr2: pd.Series,
+    how: CorrFunc = "pearson",
+    penalty: bool = False,
+) -> tuple[float, float, int]:
+    """计算两个序列之间的相关系数"""
+    # 确保两个序列都是数值类型
+    arr1 = pd.to_numeric(arr1, errors="coerce")
+    arr2 = pd.to_numeric(arr2, errors="coerce")
+    # 使用pandas的isna()方法
+    mask = ~arr1.isna() & ~arr2.isna()
+    n = mask.sum()
+    # 计算相关系数
+    valid_arr1 = arr1[mask]
+    valid_arr2 = arr2[mask]
+    if how == "pearson":
+        r, p = stats.pearsonr(valid_arr1, valid_arr2)
+    elif how == "kendall":
+        r, p = stats.kendalltau(valid_arr1, valid_arr2)
+    elif how == "spearman":
+        r, p = stats.spearmanr(valid_arr1, valid_arr2)
     else:
-        raise ValueError(f"Invalid how value: {how}")
-    data.name = f"historical_{how}"
-    return data
-
-
-def process_nc_data(
-    path: str,
-) -> pd.DataFrame:
-    """处理nc数据"""
-    # TODO 这里变成除了 time 之外的维度
-    data = xr.open_dataarray(path).mean(dim=["lat", "lon"])
-    return data.to_dataframe()
-
-
-def process_csv_data(
-    path: str,
-) -> pd.DataFrame:
-    """处理csv数据"""
-    return pd.read_csv(path, index_col=0)
-
-
-def process_recon_data(
-    path: str,
-    dtype: Literal["nc", "csv"] = "nc",
-    var_names_map: Dict[str, str] | None = None,
-    to_level: bool = True,
-) -> pd.DataFrame:
-    """处理重建数据"""
-    if var_names_map is None:
-        var_names_map = {}
-    if dtype == "nc":
-        data = process_nc_data(path)
-    elif dtype == "csv":
-        data = process_csv_data(path)
-    else:
-        raise ValueError(f"Invalid dtype value: {dtype}")
-    data = data.rename(var_names_map, axis=1)
-    if to_level:
-        return classify_by_std(data)
-    return data
+        raise ValueError(f"无效的相关系数计算方法: {how}")
+    if penalty:
+        neff = effective_sample_size(n, valid_arr1, valid_arr2)
+        penalty = np.sqrt(neff / n)
+        r = r * penalty
+    return r, p, n

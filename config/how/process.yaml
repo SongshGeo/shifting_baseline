@@ -10,7 +10,8 @@ subdir_pattern: "{freq}/{model}"
 output: "${ds.root}/data"
 
 # 裁剪范围：黄河流域矢量图
-shp: ${ds.data}/黄河流域矢量图/空间范围/huang_huai_hai_merged.shp
+shp: ${ds.data}/黄河流域矢量图/空间范围/huai_hai.shp  # 仅仅裁剪黄河下游
+# shp: ${ds.data}/黄河流域矢量图/空间范围/huang_huai_hai_merged.shp  # 裁剪黄河全流域
 
 # 自然重建数据
 recon:
