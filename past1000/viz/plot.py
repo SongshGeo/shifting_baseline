@@ -21,6 +21,8 @@ from sklearn.metrics import ConfusionMatrixDisplay, cohen_kappa_score
 
 from past1000.utils.calc import get_coords
 
+TICK_LABELS = ["SD", "MD", "N", "MW", "SW"]
+
 
 @with_axes(figsize=(12, 3))
 def plot_single_time_series(
@@ -85,7 +87,6 @@ def plot_confusion_matrix(
     """
     assert isinstance(ax, Axes), "ax must be an instance of Axes"
     labels = [-2, -1, 0, 1, 2]
-    ticklabels = ["SD", "MD", "N", "MW", "SW"]
     # TODO: 简化这个逻辑
     if isinstance(y_true, pd.Series) and isinstance(y_pred, pd.Series) and dropna:
         combined = pd.concat([y_true, y_pred], axis=1).dropna(axis=0)
@@ -103,11 +104,11 @@ def plot_confusion_matrix(
         y_pred=y_pred,
         display_labels=labels,
         ax=ax,
-        cmap=plt.cm.Blues,
-        normalize="pred",
+        cmap=plt.cm.Reds,
+        # normalize="pred",
     )
-    ax.set_xticklabels(ticklabels)
-    ax.set_yticklabels(ticklabels)
+    ax.set_xticklabels(TICK_LABELS)
+    ax.set_yticklabels(TICK_LABELS)
 
     kappa = cohen_kappa_score(
         y_true,
