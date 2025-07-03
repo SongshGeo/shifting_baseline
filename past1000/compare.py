@@ -8,6 +8,7 @@
 """对比两个序列的相关性"""
 from __future__ import annotations
 
+import logging
 from functools import partial
 from itertools import product
 from typing import TYPE_CHECKING, Callable, List, Literal
@@ -20,15 +21,17 @@ from omegaconf import DictConfig
 
 from past1000 import filters
 from past1000.api.mc import combine_reconstructions
-from past1000.api.series import HistoricalRecords
 from past1000.ci.corr import calc_corr
-from past1000.data import load_nat_data
+from past1000.data import HistoricalRecords, load_nat_data
 from past1000.utils.calc import detrend_with_nan
 from past1000.utils.config import get_output_dir
 from past1000.viz.plot import plot_corr_heatmap
 
 if TYPE_CHECKING:
-    from past1000.types import CorrFunc, FilterSide
+    from past1000.core.types import CorrFunc, FilterSide
+
+# A logger for this file
+log = logging.getLogger(__name__)
 
 
 def compare_corr(
@@ -188,6 +191,8 @@ def experiment_corr_2d(
     Returns:
         tuple[pd.DataFrame, float, plt.Axes]: 过滤后的相关性系数，基准相关性系数，绘图轴
     """
+    log.info("开始计算相关性 %s，时间切片: %s", corr_method, time_slice)
+    # TODO pearson 系数还需要再核对一下为什么不能运行
     # 计算基准相关系数
     base_corr = compare_corr(
         data1.loc[time_slice],
@@ -195,7 +200,7 @@ def experiment_corr_2d(
         corr_method=corr_method,
     )
     r_benchmark = base_corr[0]
-
+    log.info("基准相关系数: %.5f", r_benchmark)
     windows = np.arange(2, 100, 2)
     min_periods = np.arange(2, 50, 1)
     windows_mesh, min_periods_mesh = np.meshgrid(windows, min_periods)
@@ -220,7 +225,6 @@ def experiment_corr_2d(
         sample_threshold=sample_threshold,
         p_threshold=p_threshold,
     )
-
     filtered_df = pd.DataFrame(filtered, index=min_periods, columns=windows)
     ax = plot_corr_heatmap(
         filtered=filtered_df,
@@ -229,7 +233,6 @@ def experiment_corr_2d(
         ax=ax,
     )
     ax.set_title(f"{corr_method.capitalize()} Corr. Coef.")
-    print(f"r_benchmark: {r_benchmark:.5f}")
     return filtered_df, r_benchmark, ax
 
 

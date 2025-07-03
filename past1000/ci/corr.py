@@ -20,7 +20,7 @@ from rasterio.enums import Resampling
 from scipy import stats
 
 if TYPE_CHECKING:
-    from past1000.types import CorrFunc
+    from past1000.core.types import CorrFunc
 
 
 def summer_precipitation(pr_data: xr.DataArray):
