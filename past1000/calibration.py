@@ -10,8 +10,7 @@ from hydra import main
 from omegaconf import DictConfig
 
 from past1000.api.mc import combine_reconstructions
-from past1000.api.series import HistoricalRecords
-from past1000.data import load_nat_data
+from past1000.data import HistoricalRecords, load_nat_data
 from past1000.filters import classify
 from past1000.utils.config import get_output_dir
 from past1000.viz.plot import plot_confusion_matrix
