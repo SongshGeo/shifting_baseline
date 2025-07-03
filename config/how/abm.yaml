@@ -1,0 +1,11 @@
+repeat: 10
+
+min_period: 5
+years: 300
+max_age: 40
+loss_rate: 0.4
+new_agents: 5
+min_age: 10
+
+corr_method: kendall
+filter_side: right
