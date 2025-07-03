@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional, Tuple
@@ -14,6 +15,7 @@ from typing import TYPE_CHECKING, Literal, Optional, Tuple
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from fitter import Fitter, get_common_distributions
 from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
 from geo_dskit.utils.path import filter_files, get_files
 
@@ -23,6 +25,35 @@ from past1000.core.constants import GRADE_VALUES, STD_THRESHOLDS, Region
 
 if TYPE_CHECKING:
     from geo_dskit.core.types import PathLike
+
+log = logging.getLogger(__name__)
+# 常用的分布
+common_distributions = get_common_distributions()
+common_distributions.append("t")
+
+
+def check_distribution(
+    data: pd.Series | pd.DataFrame,
+    only_best: bool = True,
+) -> pd.DataFrame | pd.Series:
+    """检查数据分布"""
+    if isinstance(data, pd.DataFrame):
+        results = []
+        for col in data.columns:
+            best = check_distribution(data[col], only_best=True)
+            best["best_dist"] = best.name
+            best.name = col
+            results.append(best)
+        results = pd.concat(results, axis=1).T
+        return results
+    f = Fitter(data.dropna().values, distributions=common_distributions)
+    f.fit()
+    summary = f.summary(clf=False, plot=False)
+    best = summary.iloc[0]
+    log.info("最佳分布: %s", best)
+    if only_best:
+        return best
+    return summary
 
 
 def load_nat_data(
@@ -44,6 +75,9 @@ def load_nat_data(
         datasets (pd.DataFrame): 数据
         uncertainties (pd.DataFrame): 不确定性
     """
+    includes_str = ", ".join(includes)
+    log.info("开始加载自然数据，文件夹: %s，包含: %s，开始年份: %s", folder, includes_str, start_year)
+
     datasets = []
     uncertainties = []
     # 匹配包含included中任意一个字符串的文件
