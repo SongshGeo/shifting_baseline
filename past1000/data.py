@@ -19,9 +19,9 @@ from fitter import Fitter, get_common_distributions
 from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
 from geo_dskit.utils.path import filter_files, get_files
 
-from past1000.api.mc import standardize_both
-from past1000.ci.corr import calc_corr
-from past1000.core.constants import GRADE_VALUES, STD_THRESHOLDS, Region
+from past1000.constants import GRADE_VALUES, STD_THRESHOLDS, Region
+from past1000.mc import standardize_both
+from past1000.utils.calc import calc_corr
 
 if TYPE_CHECKING:
     from geo_dskit.core.types import PathLike

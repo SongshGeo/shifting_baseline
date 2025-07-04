@@ -5,129 +5,18 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
-from functools import partial, reduce
-from typing import Tuple
+from __future__ import annotations
+
+from functools import reduce
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-import xarray as xr
-import xclim.indices as xci
+from scipy import stats
 from scipy.signal import detrend
 
-from past1000.ci.spei import DistributionType, calc_single_spei, spei_to_level
-
-# from past1000.core.models import _EarthSystemModel
-# from past1000.utils.units import (
-#     MONTH_DAYS,
-#     YEAR_DAYS,
-#     TimeUnit,
-#     flux_kg_to_mm,
-#     has_unit,
-# )
-
-
-# def calc_pet(
-#     tasmin: xr.DataArray,
-#     tasmax: xr.DataArray,
-#     input_freq: TimeUnit = "month",
-#     output_freq: TimeUnit = "month",
-# ) -> xr.DataArray:
-#     """计算潜在蒸发蒸腾量 (PET)
-
-#     使用Hargreaves方法计算潜在蒸发蒸腾量。
-
-#     Args:
-#         input_freq: 输入数据的时间频率 ('day', 'month', 'year')
-#         output_freq: 输出数据的时间频率 ('day', 'month', 'year')
-
-#     Returns:
-#         包含PET值的数据数组，单位为毫米
-
-#     Note:
-#         计算基于最高温度(tasmax)和最低温度(tasmin)
-#         结果会根据指定的时间频率进行单位转换
-#     """
-#     days = {
-#         "day": 1,
-#         "month": MONTH_DAYS,
-#         "year": YEAR_DAYS,
-#     }
-#     if has_unit(tasmin):
-#         tasmin = tasmin.pint.dequantify(format="unit")
-#     if has_unit(tasmax):
-#         tasmax = tasmax.pint.dequantify(format="unit")
-#     pet_per_unit = xci.potential_evapotranspiration(
-#         tasmin=tasmin,
-#         tasmax=tasmax,
-#         method="HG85",
-#     )
-#     pet = pet_per_unit * days[input_freq]
-#     return flux_kg_to_mm(pet, flux_frequency=output_freq)
-
-
-# def calc_spei(
-#     pr: xr.DataArray,
-#     pet: xr.DataArray,
-#     to_level: bool = True,
-#     scale: int = 1,
-#     distribution: DistributionType = "pearson",
-#     years: Tuple[int, int, int] = (850, 850, 1850),
-# ) -> xr.DataArray:
-#     """计算标准化降水蒸发指数 (SPEI)
-
-#     Args:
-#         to_level: 是否将SPEI值转换为干旱等级
-#         scale: SPEI计算的时间尺度（月）
-#         distribution: 概率分布类型，可选 "pearson"、"gamma" 等
-#         years: 用于拟合分布的年份范围，格式为(起始年,校准起始年,校准结束年)
-
-#     Returns:
-#         包含SPEI值的数据数组
-
-#     Note:
-#         计算需要降水量(pr)和最高最低温度(tasmax, tasmin)数据
-#         如果to_level=True，返回的是干旱等级而不是SPEI值
-#     """
-#     # 如果输入数据是日尺度，则需要先月平均：
-#     pr = pr.resample(time="ME").mean()
-#     pet = pet.resample(time="ME").mean()
-
-#     # 对齐时间，删除不匹配的时间
-#     pr, pet = xr.align(pr, pet, join="inner")
-#     # 计算 SPEI
-#     spei = xr.apply_ufunc(
-#         partial(
-#             calc_single_spei,
-#             scale=scale,
-#             distribution=distribution,
-#             years=years,
-#         ),
-#         pr,
-#         pet,
-#         input_core_dims=[["time"], ["time"]],
-#         output_core_dims=[["time"]],
-#         vectorize=True,
-#         dask="parallelized",
-#         output_dtypes=[float],
-#     )
-#     if to_level:
-#         return spei_to_level(spei)
-#     return spei
-
-
-# def calc_spei_for_model(model: _EarthSystemModel):
-#     """计算模型SPEI"""
-#     # 检查模型是否包含所需变量
-#     model.check_variables(variables=["pr", "tasmin", "tasmax"])
-#     pr = model["pr"]
-#     # 计算 PET
-#     pet = calc_pet(
-#         tasmin=model["tasmin"],
-#         tasmax=model["tasmax"],
-#         input_freq=model.time_resolutions["pr"],
-#         output_freq="month",
-#     )
-#     return calc_spei(pr, pet)
+if TYPE_CHECKING:
+    from past1000.utils.types import CorrFunc
 
 
 def get_coords(mask: np.ndarray) -> list[tuple[int, ...]]:
@@ -136,6 +25,11 @@ def get_coords(mask: np.ndarray) -> list[tuple[int, ...]]:
 
     Args:
         mask: 布尔数组
+
+    Examples:
+        >>> mask = np.array([[True, False, True], [False, True, False]])
+        >>> get_coords(mask)
+        [(0, 0), (0, 2), (1, 1)]
 
     Returns:
         list[tuple[int, ...]]: 符合条件的坐标列表
@@ -146,7 +40,7 @@ def get_coords(mask: np.ndarray) -> list[tuple[int, ...]]:
     return list(zip(*coords))
 
 
-def detrend_with_nan(data: pd.Series) -> pd.Series:
+def detrend_with_nan(data: pd.Series, **kwargs) -> pd.Series:
     """
     去除数据中的 NaN 值，并进行去趋势处理。
 
@@ -157,19 +51,27 @@ def detrend_with_nan(data: pd.Series) -> pd.Series:
         np.ndarray: 去趋势处理后的数据
     """
     dropped_nan_data = data.dropna()
-    detrended_data = pd.Series(
-        detrend(dropped_nan_data.values),
+    detrend_data = pd.Series(
+        detrend(dropped_nan_data.values, **kwargs),
         index=dropped_nan_data.index,
     ).reindex(data.index)
-    return detrended_data
+    return detrend_data
 
 
-def get_significance_stars(p_value):
+def get_significance_stars(p_value: float) -> str:
     """
     根据 p 值决定添加什么星号
+
+    Args:
+        p_value: p 值，0-1 之间
+
+    Returns:
+        str: 星号
     """
     if pd.isna(p_value):
         return ""
+    if not 0 <= p_value <= 1:
+        raise ValueError(f"p must be between 0 and 1, but got {p_value}")
     if p_value < 0.05:
         return "**"  # p < 0.05, 两个星号
     if p_value < 0.1:
@@ -230,3 +132,63 @@ def fill_star_matrix(p_values: pd.DataFrame, values: pd.DataFrame) -> pd.DataFra
                 stars = get_significance_stars(p_value)
                 annot_labels.loc[idx, col] = f"{value:.2f}{stars}"  # 格式：数值+星号
     return annot_labels
+
+
+def effective_sample_size(n, arr1, arr2):
+    """计算有效样本量
+    计算公式：
+    neff = n * (1 - acf1 * acf2) / (1 + acf1 * acf2)
+    其中，n 是样本量，acf1 和 acf2 是两个序列的自相关系数。参考：https://www.cnblogs.com/yongh/p/11060111.html
+
+    Args:
+        n: 样本量
+        arr1: 序列1
+        arr2: 序列2
+
+    Returns:
+        int: 有效样本量
+    """
+    acf1 = arr1.autocorr(lag=1)
+    acf2 = arr2.autocorr(lag=1)
+    # 如果自相关无法计算，直接返回1
+    if np.isnan(acf1) or np.isnan(acf2):
+        return 1
+    denom = 1 + acf1 * acf2
+    if denom == 0:
+        return 1
+    neff = n * (1 - acf1 * acf2) / denom
+    # 防止neff为负或为nan
+    if not np.isfinite(neff) or neff <= 0:
+        return 1
+    return int(neff)
+
+
+def calc_corr(
+    arr1: pd.Series,
+    arr2: pd.Series,
+    how: CorrFunc = "pearson",
+    penalty: bool = False,
+) -> tuple[float, float, int]:
+    """计算两个序列之间的相关系数"""
+    # 确保两个序列都是数值类型
+    arr1 = pd.to_numeric(arr1, errors="coerce")
+    arr2 = pd.to_numeric(arr2, errors="coerce")
+    # 使用pandas的isna()方法
+    mask = ~arr1.isna() & ~arr2.isna()
+    n = mask.sum()
+    # 计算相关系数
+    valid_arr1 = arr1[mask]
+    valid_arr2 = arr2[mask]
+    if how == "pearson":
+        r, p = stats.pearsonr(valid_arr1, valid_arr2)
+    elif how == "kendall":
+        r, p = stats.kendalltau(valid_arr1, valid_arr2)
+    elif how == "spearman":
+        r, p = stats.spearmanr(valid_arr1, valid_arr2)
+    else:
+        raise ValueError(f"无效的相关系数计算方法: {how}")
+    if penalty:
+        neff = effective_sample_size(n, valid_arr1, valid_arr2)
+        penalty = np.sqrt(neff / n)
+        r = r * penalty
+    return r, p, n

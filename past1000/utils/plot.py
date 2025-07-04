@@ -19,9 +19,8 @@ from matplotlib.axes import Axes
 from scipy.stats import kendalltau
 from sklearn.metrics import ConfusionMatrixDisplay, cohen_kappa_score
 
+from past1000.constants import LEVELS, TICK_LABELS
 from past1000.utils.calc import get_coords
-
-TICK_LABELS = ["SD", "MD", "N", "MW", "SW"]
 
 
 @with_axes(figsize=(12, 3))
@@ -86,7 +85,6 @@ def plot_confusion_matrix(
             kwargs for ConfusionMatrixDisplay.from_predictions
     """
     assert isinstance(ax, Axes), "ax must be an instance of Axes"
-    labels = [-2, -1, 0, 1, 2]
     # TODO: 简化这个逻辑
     if isinstance(y_true, pd.Series) and isinstance(y_pred, pd.Series) and dropna:
         combined = pd.concat([y_true, y_pred], axis=1).dropna(axis=0)
@@ -102,7 +100,7 @@ def plot_confusion_matrix(
     ConfusionMatrixDisplay.from_predictions(
         y_true=y_true,
         y_pred=y_pred,
-        display_labels=labels,
+        display_labels=LEVELS,
         ax=ax,
         cmap=plt.cm.Reds,
         # normalize="pred",
@@ -113,7 +111,7 @@ def plot_confusion_matrix(
     kappa = cohen_kappa_score(
         y_true,
         y_pred,
-        labels=labels,
+        labels=LEVELS,
         weights="quadratic",
         **kwargs,
     )
@@ -246,4 +244,48 @@ def plot_corr_heatmap(
         ax.axvline(point[1], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
         ax.axhline(point[0], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
     ax.legend(loc="lower left", fontsize=8)
+    return ax
+
+
+@with_axes(figsize=(3, 2.5))
+def enhanced_corr_plot(
+    df: pd.DataFrame,
+    ax: Optional[Axes] = None,
+    **kwargs,
+) -> None:
+    """绘制增强相关系数热图
+
+    Args:
+        df: pd.DataFrame
+            输入数据。
+        ax: matplotlib.axes.Axes
+            绘图的Axes对象。
+        **kwargs: dict
+            kwargs for sns.heatmap
+            cmap: 颜色映射
+            annot: 是否显示注释
+            annot_kws: 注释的样式
+            fmt: 注释的格式
+            vmin: 颜色映射的最小值
+            vmax: 颜色映射的最大值
+            cbar_kws: 颜色条的样式
+            square: 是否将热图的单元格设置为正方形
+
+    Returns:
+        ax: matplotlib.axes.Axes
+            绘图的Axes对象。
+    """
+    assert isinstance(ax, Axes), "ax must be an instance of Axes"
+    default_kwargs = {
+        "cmap": "vlag",
+        "annot": True,
+        "annot_kws": {"size": 8},
+        "fmt": ".1f",
+        "vmin": -1,
+        "vmax": 1,
+        "cbar_kws": {"shrink": 0.8},
+    }
+    default_kwargs.update(kwargs)
+    sns.heatmap(df.corr(numeric_only=True), ax=ax, **default_kwargs)
+    ax.set_title("Correlation Coefficient")
     return ax

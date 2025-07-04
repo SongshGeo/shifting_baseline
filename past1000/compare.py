@@ -20,15 +20,14 @@ from hydra import main
 from omegaconf import DictConfig
 
 from past1000 import filters
-from past1000.api.mc import combine_reconstructions
-from past1000.ci.corr import calc_corr
 from past1000.data import HistoricalRecords, load_nat_data
-from past1000.utils.calc import detrend_with_nan
+from past1000.mc import combine_reconstructions
+from past1000.utils.calc import calc_corr, detrend_with_nan
 from past1000.utils.config import get_output_dir
-from past1000.viz.plot import plot_corr_heatmap
+from past1000.utils.plot import plot_corr_heatmap
 
 if TYPE_CHECKING:
-    from past1000.core.types import CorrFunc, FilterSide
+    from past1000.utils.types import CorrFunc, FilterSide
 
 # A logger for this file
 log = logging.getLogger(__name__)

@@ -9,11 +9,11 @@ import pandas as pd
 from hydra import main
 from omegaconf import DictConfig
 
-from past1000.api.mc import combine_reconstructions
 from past1000.data import HistoricalRecords, load_nat_data
 from past1000.filters import classify
+from past1000.mc import combine_reconstructions
 from past1000.utils.config import get_output_dir
-from past1000.viz.plot import plot_confusion_matrix
+from past1000.utils.plot import plot_confusion_matrix
 
 
 @main(config_path="../config", config_name="config", version_base=None)

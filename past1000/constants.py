@@ -13,8 +13,10 @@ from __future__ import annotations
 from typing import Literal, TypeAlias
 
 GRADE_VALUES: list[int] = [5, 4, 3, 2, 1]  # 原始等级值
-STD_THRESHOLDS: list[float] = [-1.17, -0.33, 0, 0.33, 1.17]  # 标准差阈值
-
+STD_THRESHOLDS: list[float] = [-1.17, -0.33, 0, 0.33, 1.17]  # 标准差阈值 - 5
+THRESHOLDS: list[float] = [-1.17, -0.33, 0.33, 1.17]  # 阈值 - 4
+LEVELS: list[int] = [-2, -1, 0, 1, 2]  # 等级值
+TICK_LABELS: list[str] = ["SD", "MD", "N", "MW", "SW"]
 
 Region: TypeAlias = Literal[
     "华北地区",
@@ -44,3 +46,5 @@ STAGE_LABELS = [
     f"Stage 3: {STAGE2}-{END}\nRetention Rate 80%",
     f"Stage 4: {END}-2020\nRetention Rate 80%",
 ]
+
+MAX_AGE: int = 40

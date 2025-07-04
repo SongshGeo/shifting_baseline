@@ -15,11 +15,9 @@ from omegaconf import DictConfig
 from scipy.stats import mode, norm
 
 from past1000.compare import compare_corr_2d
+from past1000.constants import MAX_AGE, THRESHOLDS
 from past1000.filters import calc_std_deviation, classify
 from past1000.utils.config import get_output_dir
-
-MAX_AGE = 40
-THRESHOLDS = [-1.17, -0.33, 0.33, 1.17]
 
 
 class Model(MainModel):

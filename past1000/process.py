@@ -15,18 +15,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List
 
 import xarray as xr
-from geo_dskit.utils.clip import clip_data
 from loguru import logger
 from omegaconf import DictConfig
 from pandas import DataFrame, Series, read_csv
 from xarray import DataArray, open_dataarray
 
 if TYPE_CHECKING:
-    from past1000.api.io import PathLike
+    from geo_dskit.utils.types import PathLike
 
 
 __all__ = [
-    "clip_data",
     "open_dataarray",
     "read_csv",
     "convert_time_axis",
