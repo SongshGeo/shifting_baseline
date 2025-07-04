@@ -21,7 +21,7 @@ from pandas import DataFrame, Series, read_csv
 from xarray import DataArray, open_dataarray
 
 if TYPE_CHECKING:
-    from geo_dskit.utils.types import PathLike
+    from geo_dskit.core.types import PathLike
 
 
 __all__ = [

@@ -102,7 +102,7 @@ def plot_confusion_matrix(
         y_pred=y_pred,
         display_labels=LEVELS,
         ax=ax,
-        cmap=plt.cm.Reds,
+        cmap="Reds",
         # normalize="pred",
     )
     ax.set_xticklabels(TICK_LABELS)

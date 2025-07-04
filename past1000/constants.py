@@ -17,6 +17,13 @@ STD_THRESHOLDS: list[float] = [-1.17, -0.33, 0, 0.33, 1.17]  # 标准差阈值 -
 THRESHOLDS: list[float] = [-1.17, -0.33, 0.33, 1.17]  # 阈值 - 4
 LEVELS: list[int] = [-2, -1, 0, 1, 2]  # 等级值
 TICK_LABELS: list[str] = ["SD", "MD", "N", "MW", "SW"]
+VERBOSE_LABELS: list[str] = [
+    "Very dry",
+    "Moderate dry",
+    "Normal",
+    "Moderate wet",
+    "Very wet",
+]
 
 Region: TypeAlias = Literal[
     "华北地区",

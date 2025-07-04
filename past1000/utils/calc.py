@@ -134,7 +134,7 @@ def fill_star_matrix(p_values: pd.DataFrame, values: pd.DataFrame) -> pd.DataFra
     return annot_labels
 
 
-def effective_sample_size(n, arr1, arr2):
+def effective_sample_size(n: int, arr1: pd.Series, arr2: pd.Series) -> int:
     """计算有效样本量
     计算公式：
     neff = n * (1 - acf1 * acf2) / (1 + acf1 * acf2)
