@@ -15,3 +15,4 @@ if TYPE_CHECKING:
     CorrFunc = Literal["pearson", "kendall", "spearman"]
     FilterSide = Literal["both", "left", "right"]
     DistributionType = Literal["pearson", "gamma"]
+    HistoricalAggregateType = Literal["mean", "median", "mode"]

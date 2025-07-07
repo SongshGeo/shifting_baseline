@@ -7,8 +7,10 @@
 
 from __future__ import annotations
 
+from itertools import product
 from typing import Optional
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -16,11 +18,9 @@ import seaborn as sns
 import xarray as xr
 from matplotkit import with_axes
 from matplotlib.axes import Axes
-from scipy.stats import kendalltau
-from sklearn.metrics import ConfusionMatrixDisplay, cohen_kappa_score
 
 from past1000.constants import LEVELS, TICK_LABELS
-from past1000.utils.calc import get_coords
+from past1000.utils.calc import fill_star_matrix, get_coords
 
 
 @with_axes(figsize=(12, 3))
@@ -64,12 +64,11 @@ def plot_single_time_series(
 
 @with_axes(figsize=(4, 3.5))
 def plot_confusion_matrix(
-    y_true: pd.Series | np.ndarray,
-    y_pred: pd.Series | np.ndarray,
+    cm_df: pd.DataFrame,
+    title: str | None = None,
     ax: Optional[Axes] = None,
-    dropna: bool = False,
     **kwargs,
-) -> None:
+) -> Axes:
     """绘制混淆矩阵
 
     Args:
@@ -82,47 +81,56 @@ def plot_confusion_matrix(
         dropna: bool
             Whether to drop NA values
         **kwargs: dict
-            kwargs for ConfusionMatrixDisplay.from_predictions
+            kwargs for seaborn.heatmap
+
+    Returns:
+        Axes: 返回 axes 对象
     """
     assert isinstance(ax, Axes), "ax must be an instance of Axes"
-    # TODO: 简化这个逻辑
-    if isinstance(y_true, pd.Series) and isinstance(y_pred, pd.Series) and dropna:
-        combined = pd.concat([y_true, y_pred], axis=1).dropna(axis=0)
-        y_true = combined.iloc[:, 0]
-        y_pred = combined.iloc[:, 1]
-    y_true = np.asarray(y_true)
-    y_pred = np.asarray(y_pred)
-    if dropna:
-        mask = ~np.isnan(y_true) & ~np.isnan(y_pred)
-        y_true = y_true[mask]
-        y_pred = y_pred[mask]
+    assert isinstance(cm_df, pd.DataFrame), "cm_df must be a pandas DataFrame"
 
-    ConfusionMatrixDisplay.from_predictions(
-        y_true=y_true,
-        y_pred=y_pred,
-        display_labels=LEVELS,
-        ax=ax,
+    # 构造对角线 mask
+    mask = np.eye(len(cm_df), dtype=bool)
+    zero_mask = cm_df == 0
+
+    # 绘制热力图，mask 掉对角线
+    sns.heatmap(
+        cm_df,
+        annot=True,  # 先不显示数字
+        fmt="d",
         cmap="Reds",
-        # normalize="pred",
-    )
-    ax.set_xticklabels(TICK_LABELS)
-    ax.set_yticklabels(TICK_LABELS)
-
-    kappa = cohen_kappa_score(
-        y_true,
-        y_pred,
-        labels=LEVELS,
-        weights="quadratic",
+        ax=ax,
+        square=True,
+        linewidths=2,
+        linecolor="white",
+        cbar_kws={"shrink": 0.6, "label": "Mismatches"},
+        mask=mask | zero_mask,  # 对角线不显示颜色
         **kwargs,
     )
 
-    # 3. 计算 Kendall's Tau
-    tau, p_value = kendalltau(y_true, y_pred)
+    # 手动在对角线上写黑色数字
+    for i in range(len(cm_df)):
+        value = cm_df.iloc[i, i]
+        if value == 0:
+            continue
+        ax.text(
+            i + 0.5,
+            i + 0.5,  # 热力图格子中心
+            f"{value:d}",
+            ha="center",
+            va="center",
+            color="black",
+            fontsize=9,
+            fontweight="bold",
+        )
 
-    title = f"Kappa: {kappa:.2f}, Kendall's Tau: {tau:.2f}"
-    if p_value < 0.05:
-        title += "**"
-    ax.set_title(title)
+    ax.grid(True, linestyle=":", color="gray", alpha=0.3)
+    ax.set_xticklabels(TICK_LABELS)
+    ax.set_yticklabels(TICK_LABELS)
+    ax.set_xlabel("Natural")
+    ax.set_ylabel("Recorded")
+    if title is not None:
+        ax.set_title(title, fontsize=9)
     return ax
 
 
@@ -288,4 +296,137 @@ def enhanced_corr_plot(
     default_kwargs.update(kwargs)
     sns.heatmap(df.corr(numeric_only=True), ax=ax, **default_kwargs)
     ax.set_title("Correlation Coefficient")
+    return ax
+
+
+@with_axes(figsize=(2, 3.5))
+def plot_mismatch_matrix(
+    actual_diff_aligned: pd.DataFrame,
+    p_value_matrix: pd.DataFrame,
+    false_count_matrix: pd.DataFrame,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    """绘制不匹配矩阵
+
+    Args:
+        actual_diff_aligned: pd.DataFrame
+            实际差异矩阵
+        p_value_matrix: pd.DataFrame
+            显著性矩阵
+        false_count_matrix: pd.DataFrame
+            不匹配矩阵
+        ax: Optional[Axes]
+            绘图的Axes对象。
+
+    Returns:
+        Axes: 返回 axes 对象
+    """
+    assert isinstance(ax, Axes), "ax must be an instance of Axes"
+
+    def is_significant(p_value: float) -> bool:
+        if np.isnan(p_value):
+            return False
+        return p_value < 0.1
+
+    # 1. 设置渐变色和归一化
+    vmax = np.nanmax(np.abs(actual_diff_aligned.values))
+    cmap = mpl.cm.coolwarm  # 或 mpl.cm.RdBu
+    norm = mpl.colors.Normalize(vmin=-vmax, vmax=vmax)
+
+    for l1, l2 in product(LEVELS, LEVELS):
+        value = actual_diff_aligned.loc[l1, l2]
+        p_value = p_value_matrix.loc[l1, l2]
+        false_count = false_count_matrix.loc[l1, l2]
+        color = cmap(norm(value))
+        lw = false_count * 0.5
+        alpha = 0.9 if is_significant(p_value) else 0.3
+        ax.plot([0, 1], [l2, l1], lw=lw, color=color, alpha=alpha)
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(-2.5, 2.5)
+    ax.set_yticks(np.arange(-2, 2.1, 1))
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["Natural", "Recorded"])
+    ax.set_yticklabels(TICK_LABELS)
+    sns.despine(ax=ax, left=False, right=False, top=False, bottom=False)
+
+    # 2. 创建渐变色 colorbar，横向放在上方
+    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+
+    cbar = plt.colorbar(
+        sm, ax=ax, orientation="horizontal", pad=0.18, fraction=0.15, alpha=0.8
+    )
+    # cbar.set_label('Standardized difference', labelpad=8, fontsize=10, loc='center')
+    cbar.ax.xaxis.set_label_position("bottom")  # 标签放到上方
+    cbar.ax.set_xlabel("Std. diff. between last/current")
+
+    # 不显示轴线
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(True)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["left"].set_visible(True)
+
+    # 同时显示 y 轴左侧和右侧坐标刻度、注释
+    ax.yaxis.set_ticks_position("both")
+    ax.yaxis.set_tick_params(which="both", direction="in")
+    ax.yaxis.grid(True, linestyle="--", alpha=0.8, color="black")
+
+    ax.text(
+        0.5, 2.5, "Expected diff. = 0", color="gray", fontsize=9, ha="center", va="top"
+    )
+    ax.set_xlabel("Recorded level diff.")
+
+    return ax
+
+
+@with_axes(figsize=(3, 2.5))
+def heatmap_with_annot(
+    matrix: pd.DataFrame,
+    p_value: pd.DataFrame | None = None,
+    annot: pd.DataFrame | None = None,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    """以热力图的形式绘制不匹配情况前后对比图
+
+    Args:
+        actual_diff: pd.DataFrame
+            实际差异矩阵
+        p_value: pd.DataFrame
+            显著性矩阵
+        annot: pd.DataFrame
+            注释矩阵
+        ax: Optional[Axes]
+    """
+    assert isinstance(ax, Axes), "ax must be an instance of Axes"
+    # 如果 p_value 不为 None，但 annot 为 None，则自动生成注释矩阵
+    if p_value is not None and annot is None:
+        annot = fill_star_matrix(p_value, matrix)
+    # 如果 p_value 和 annot 都为 None，则抛出错误
+    elif p_value is None and annot is None:
+        raise ValueError("p_value and annot must be provided together")
+    # 否则不执行任何操作，绘制热力图
+    sns.heatmap(
+        matrix,
+        annot=annot,  # 使用我们自定义的标签矩阵
+        fmt="s",  # "s" 表示我们提供的是字符串格式
+        cmap="coolwarm",
+        square=True,
+        ax=ax,
+        linewidths=0.5,
+        # 给颜色条加个标签
+        cbar_kws={"label": "Standardized difference"},
+        center=0,
+        linecolor="lightgray",
+    )
+
+    ax.set_title("False Estimation")
+    ax.set_xlabel("Classified")
+    ax.set_ylabel("Expect")
+    ax.set_xticklabels(TICK_LABELS)
+    ax.set_yticklabels(TICK_LABELS)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+    ax.set_xlabel("Natural data")
+    ax.set_ylabel("Historical data")
     return ax

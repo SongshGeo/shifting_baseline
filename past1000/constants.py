@@ -16,6 +16,8 @@ GRADE_VALUES: list[int] = [5, 4, 3, 2, 1]  # 原始等级值
 STD_THRESHOLDS: list[float] = [-1.17, -0.33, 0, 0.33, 1.17]  # 标准差阈值 - 5
 THRESHOLDS: list[float] = [-1.17, -0.33, 0.33, 1.17]  # 阈值 - 4
 LEVELS: list[int] = [-2, -1, 0, 1, 2]  # 等级值
+LEVELS_PROB: list[float] = [0.1, 0.25, 0.30, 0.25, 0.1]  # 等级值
+
 TICK_LABELS: list[str] = ["SD", "MD", "N", "MW", "SW"]
 VERBOSE_LABELS: list[str] = [
     "Very dry",

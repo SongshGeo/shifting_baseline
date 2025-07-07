@@ -26,6 +26,8 @@ from past1000.utils.calc import calc_corr
 if TYPE_CHECKING:
     from geo_dskit.core.types import PathLike
 
+    from past1000.utils.types import HistoricalAggregateType
+
 log = logging.getLogger(__name__)
 # 常用的分布
 common_distributions = get_common_distributions()
@@ -213,7 +215,7 @@ class HistoricalRecords:
 
     def to_series(
         self,
-        how: Literal["mean", "median"] = "mean",
+        how: HistoricalAggregateType = "mean",
         interpolate: str | None = None,
         inplace: bool = False,
         name: str | None = None,
