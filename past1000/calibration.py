@@ -54,6 +54,7 @@ def analyze_misclassification_pivot(
     expect_col: str = "expect",
     classified_col: str = "classified",
     diff_col: str = "diff",
+    default_val: float = np.nan,
 ) -> pd.DataFrame:
     """
     使用 pandas pivot_table 分析被错判组合的平均 diff
@@ -72,7 +73,16 @@ def analyze_misclassification_pivot(
         index=expect_col,
         columns=classified_col,
         aggfunc="mean",  # 计算平均值
-        fill_value=np.nan,
+        fill_value=default_val,  # 先填充为 NaN
+    )
+
+    # 确保所有可能的组合都存在，并用默认值填充
+    all_levels = sorted(df[expect_col].unique())
+    all_columns = sorted(df[classified_col].unique())
+
+    # 重新索引确保所有组合都存在
+    pivot_matrix = pivot_matrix.reindex(
+        index=all_levels, columns=all_columns, fill_value=default_val
     )
 
     return pivot_matrix
@@ -128,7 +138,7 @@ def analyze_mismatch(
             "expect": historical_data,
             "classified": classify(natural_data),
         }
-    )
+    ).dropna()
     checked_df = check_estimation(df)
     diff_m = analyze_misclassification_pivot(checked_df)
 

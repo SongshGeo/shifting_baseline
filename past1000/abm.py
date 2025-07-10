@@ -6,10 +6,11 @@
 # Website: https://cv.songshgeo.com/
 
 from collections import deque
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
-from abses import Actor, Experiment, MainModel
+from abses import Actor, MainModel
 from hydra import main
 from omegaconf import DictConfig
 from scipy.stats import mode, norm
@@ -19,126 +20,175 @@ from past1000.constants import MAX_AGE, THRESHOLDS
 from past1000.filters import calc_std_deviation, classify
 from past1000.utils.config import get_output_dir
 
+if TYPE_CHECKING:
+    from past1000.utils.types import CorrFunc
+
 
 class Model(MainModel):
-    """模型
-    在世界上，有一定数量的气候观察者，他们根据自己的感知记录极端气候事件。
-    我们观察他们的集体记录，并与实际的气候极端情况进行对比。
+    """Agent-based climate event model.
+
+    Simulates a world with climate observers who record extreme climate events based on their perception.
+    The collective records are compared with actual climate extremes.
+
+    Attributes:
+        _max_age (int): Maximum age of an observer.
+        _new_agents (int): Number of new agents per step.
+        _min_age (int): Minimum age for recording events.
+        _mode_cache (Optional[pd.Series]): Cached mode results for current tick.
+        _mode_cache_tick (int): Tick at which mode cache was generated.
+        _last_event_years (dict): Cache for last occurrence year of each event level.
+        final_corr (Optional[pd.Series]): Final correlation results.
+        spin_up_years (int): Spin-up years for agent initialization.
+        _years (int): Total simulation years.
+        _climate (np.ndarray): Climate time series.
+        _archive (dict[int, list[int]]): Archive of recorded events per year.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # 创建一个气候序列，表现为正态分布，有些小概率的极端事件
-        years = self.p.get("years", 100)
-        self._climate = np.random.normal(0, 1, years)
-        # 一个记录极端气候事件的列表，可以理解为气候观察者的集体记忆
-        self._archive: dict[int, list[int]] = {i: [] for i in range(years)}
-        self._years = years
-        self._max_age = self.p.get("max_age", 40)
-        self._new_agents = self.p.get("new_agents", 10)
-        self._mode_cache = None
-        self._mode_cache_tick = -1  # 记录缓存是在哪个时间点生成的
-        # 新增一个缓存，用于存储每个级别最后一次出现的年份
-        self._last_event_years = {}
-        self.final_corr = None
+        years: int = self.p.get("years", 100)
+        self._max_age: int = self.p.get("max_age", 40)
+        self._new_agents: int = self.p.get("new_agents", 10)
+        self._min_age: int = self.p.get("min_age", 10)
+        self._mode_cache: Optional[pd.Series] = None
+        self._mode_cache_tick: int = -1
+        self._last_event_years: dict[int, int] = {}
+        self.final_corr: Optional[pd.Series] = None
+        self.spin_up_years: int = self._new_agents * (self._max_age - self._min_age + 1)
+        self._years: int = years + self.spin_up_years
+        self._climate: np.ndarray = np.random.normal(0, 1, self._years)
+        self._archive: dict[int, list[int]] = {i: [] for i in range(self._years)}
 
     @property
     def climate(self) -> float:
-        """Current climate"""
-        # 返回当前时刻的气候值
+        """Current climate value at the current tick.
+
+        Returns:
+            float: Current climate value.
+        """
         return self._climate[self.time.tick]
 
     @property
     def climate_series(self) -> pd.Series:
-        """Climate series"""
+        """Full climate time series.
+
+        Returns:
+            pd.Series: Climate values indexed by year.
+        """
         return pd.Series(self._climate, index=range(self._years))
 
     @property
     def historical_mean(self) -> pd.Series:
-        """Historical mean of climate"""
+        """Historical mean of recorded events per year.
+
+        Returns:
+            pd.Series: Mean of recorded events for each year.
+        """
         return pd.Series({k: np.mean(v) for k, v in self._archive.items()})
 
     @property
     def classified(self) -> pd.Series:
-        """Classified climate"""
-        # 对气候序列进行分类，返回一个理论分类结果的 Series
+        """Classified climate series.
+
+        Returns:
+            pd.Series: Classified climate values.
+        """
         return classify(self._climate)
 
     @property
     def estimation(self) -> pd.DataFrame:
-        """Estimation of climate"""
+        """Estimation DataFrame containing value, expected (mode), and classified series.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns 'value', 'expect', and 'classified'.
+        """
         value = self.climate_series
-        expect = self.mode
+        # expect = self.mode
+        expect = self.rounded_mean
         classified = self.classified
-        return pd.DataFrame(
-            {
-                "value": value,
-                "expect": expect,
-                "classified": classified,
-            }
+        return (
+            pd.DataFrame(
+                {
+                    "value": value,
+                    "expect": expect,
+                    "classified": classified,
+                }
+            )
+            .loc[self.spin_up_years :]
+            .dropna()
         )
 
     @property
     def mode(self) -> pd.Series:
-        """Mode of climate. Results are cached per tick."""
-        # 如果当前 tick 的 mode 已经计算过，直接返回缓存
+        """Mode of recorded events per year, cached per tick.
+
+        Returns:
+            pd.Series: Mode of recorded events for each year.
+        """
         if self._mode_cache_tick == self.time.tick:
             return self._mode_cache
-
-        # 否则，重新计算
-        current_archive = {k: v for k, v in self._archive.items() if v}  # 只计算非空列表
+        current_archive = {k: v for k, v in self._archive.items() if v}
         result = pd.Series({k: mode(v)[0] for k, v in current_archive.items()})
-
-        # 更新缓存和时间戳
         self._mode_cache = result
         self._mode_cache_tick = self.time.tick
         return result
 
+    @property
+    def rounded_mean(self) -> pd.Series:
+        """Rounded mean of recorded events per year, cached per tick.
+
+        Returns:
+            pd.Series: Rounded mean of recorded events for each year.
+        """
+        current_archive = {k: v for k, v in self._archive.items() if v}
+        return pd.Series({k: round(np.mean(v)) for k, v in current_archive.items()})
+
     def write_down(self, extreme: int) -> None:
-        """记录极端气候事件"""
-        loss_rate = self.p.get("loss_rate", 0.2)
+        """Record an extreme climate event for the current tick.
+
+        Args:
+            extreme (int): The classified extreme event level.
+        """
+        loss_rate: float = self.p.get("loss_rate", 0.2)
         if np.random.random() < loss_rate:
             return
         self._archive[self.time.tick].append(extreme)
-        # 当数据写入时，清除缓存，确保下次调用 mode 时会重新计算
-        # 注意：因为我们的缓存是按 tick 记录的，所以这里其实可以不清除
-        # 但如果逻辑变复杂，主动清除缓存是好习惯
-        # self._mode_cache_tick = -1
+        # Cache is tick-based, so no need to clear unless logic changes.
 
     def step(self) -> None:
-        # 在所有 Agent 行动之前，先更新一次全局信息
+        """Advance the model by one tick: update global info, spawn new agents, and step all agents."""
         self.update_last_event_years()
-
         if self.time.tick == self._years - 1:
             self.running = False
         self.agents.new(ClimateObserver, self._new_agents, max_age=self._max_age)
         self.agents.do("step")
 
-    def update_last_event_years(self):
-        """
-        （在每个时间步开始时调用）
-        更新并缓存每个气候级别最后一次被记录的年份。
-        """
-        current_mode = self.mode
+    def update_last_event_years(self) -> None:
+        """Update and cache the last occurrence year for each event level (called at each step)."""
+        # current_mode = self.mode
+        current_mode = self.rounded_mean
         if current_mode.empty:
             return
-        # 找到当前所有出现过的级别
         unique_levels = current_mode.unique()
         for level in unique_levels:
-            # 找到该 level 最后一次出现的 index (年份)
             last_year = current_mode[current_mode == level].last_valid_index()
-            # 更新到缓存中
             self._last_event_years[level] = last_year
 
-    def get_last_event_year_for_level(self, level: int) -> int | None:
-        """Agent 可以调用的接口，直接从缓存获取结果"""
+    def get_last_event_year_for_level(self, level: int) -> Optional[int]:
+        """Get the last year a specific event level was recorded (for agent use).
+
+        Args:
+            level (int): The event level to query.
+        Returns:
+            Optional[int]: The last year this level was recorded, or None if never.
+        """
         return self._last_event_years.get(level, None)
 
     def end(self) -> None:
-        """保存估计结果"""
-        min_period = self.p.get("min_period", 2)
-        filter_side = self.p.get("filter_side", "right")
-        corr_method = self.p.get("corr_method", "kendall")
+        """Save estimation results and compute final correlations."""
+        min_period: int = self.p.get("min_period", 2)
+        filter_side: str = self.p.get("filter_side", "right")
+        corr_method: CorrFunc = self.p.get("corr_method", "kendall")
         self.estimation.to_csv(self.outpath / f"estimation_{self.run_id}.csv")
         windows = np.arange(2, 100)
         min_periods = np.repeat(min_period, 98)
@@ -159,48 +209,83 @@ class Model(MainModel):
 
 
 class ClimateObserver(Actor):
-    """气候观察者
+    """Climate observer agent.
 
-    气候观察者会对极端气候事件有所观察、感知、记录。
-    由于经验有限，他们只能基于自己的记忆，对气候事件进行粗略的分类（如：极端干旱、极端湿润等）。
-    由于记异略常的特性，他们更倾向于记录极端气候事件，而不是正常气候年份。
+    Observes, perceives, and records extreme climate events based on personal memory and collective memory (mode).
+    More likely to record extreme events than normal years.
+
+    Attributes:
+        _memory (deque): Personal memory of extreme events.
+        age (int): Observer's age.
+        _max_age (int): Maximum age for the observer.
+        _min_age (int): Minimum age to start recording events.
     """
 
-    def __init__(self, *args, max_age=MAX_AGE, **kwargs):
+    def __init__(self, *args, max_age: int = MAX_AGE, **kwargs):
         super().__init__(*args, **kwargs)
-        # 一个记录极端气候事件的列表，可以理解为气候观察者的个人记忆
-        self._memory = deque(maxlen=max_age)
-        # 记录观察者年龄，只有观察者年龄大于 10 时，才有可能记录极端气候事件
+        self._memory: deque = deque(maxlen=max_age)
         self.age: int = 1
-        self._max_age = max_age
-        self._min_age = self.p.get("min_age", 10)
+        self._max_age: int = max_age
+        self._min_age: int = self.p.get("min_age", 10)
 
     @property
     def memory(self) -> np.ndarray:
-        """Memory of extreme climate events"""
-        # 返回一个数组，记录了观察者记忆中的极端气候事件
+        """Personal memory of extreme climate events.
+
+        Returns:
+            np.ndarray: Array of remembered climate values.
+        """
         return np.array(self._memory)
 
     @property
     def classified(self) -> pd.Series:
-        """Classified climate"""
-        # 对观察者记忆中的极端气候事件进行分类，返回一个理论分类结果的 Series
+        """Classified memory of extreme events.
+
+        Returns:
+            pd.Series: Classified memory values.
+        """
         return classify(self.memory)
 
-    def write_down(self, event: float) -> bool:
-        """记录极端气候事件"""
-        # 计算事件的绝对值，并使用正态分布的生存函数（1-CDF）来计算事件发生的概率
-        prob = norm.sf(abs(event))
-        # 如果随机数小于 1 - 事件发生的概率，则记录该事件
-        return np.random.random() < 1 - prob
+    def write_down(
+        self,
+        event: float,
+        scale: float = 1,
+        f0: float = 0.1,
+    ) -> bool:
+        """Decide whether to record an extreme event based on the 'negativity bias' principle.
 
-    def perception(self, climate: float) -> int:
-        """感知气候变化的 Z-score"""
-        z = (climate - self.memory.mean()) / self.memory.std()
-        return z
+        Args:
+            event (float): Standardized z-score of the event.
+            scale (float): Scale for the z-score; higher means less likely to record.
+            f0 (float): Baseline probability to record the event (0 < f0 < 0.5).
+        Returns:
+            bool: Whether the event is recorded.
+        Raises:
+            ValueError: If f0 is not between 0 and 0.5.
+        """
+        if f0 > 0.5 or f0 < 0:
+            raise ValueError("f0 must be between 0 and 0.5")
+        prob = norm.sf(abs(event), scale=scale)
+        return np.random.random() < f0 + 0.5 - prob
+
+    def perception(self, climate: float) -> float:
+        """Perceive the z-score of the current climate relative to memory.
+
+        Args:
+            climate (float): Current climate value.
+        Returns:
+            float: Z-score of the current climate.
+        """
+        return (climate - self.memory.mean()) / self.memory.std()
 
     def judge_extreme(self, z: float) -> int:
-        """判断是否为极端气候事件"""
+        """Classify the z-score as an extreme event level.
+
+        Args:
+            z (float): Z-score of the event.
+        Returns:
+            int: Classified event level.
+        """
         if z > THRESHOLDS[3]:
             return 2
         if z > THRESHOLDS[2]:
@@ -211,78 +296,64 @@ class ClimateObserver(Actor):
             return -2
         return 0
 
-    def rejudge_based_on_mode(self, init_judgment: int) -> int:
-        """
-        基于群体的集体记忆 (mode)，重新评估自己对气候事件的判断。
+    def rejudge_based_on_mode(
+        self,
+        init_judgment: int,
+        x0: float = 0.05,
+        k: float = 27.72,
+    ) -> int:
+        """Re-evaluate judgment based on collective memory (mode).
 
-        逻辑：
-        1. 观察者做出一个基于个人记忆的初步判断 (init_judgment)。
-        2. 他去"查阅史书"（model.mode），寻找之前的与他初步判断同级别的最后一次记录。
-        3. 如果找到了，他比较当前的气候与那时的气候。
-        4. 如果当前气候比那时更"极端"（更冷或更热），他有一定概率
-           会加剧或减弱自己的判断。
-
-        Parameters:
-        -----------
-        init_judgment : int
-            观察者基于个人记忆做出的初步判断。
-
+        Args:
+            init_judgment (int): Initial judgment based on personal memory.
+            x0 (float): Offset for sigmoid probability.
+            k (float): Steepness for sigmoid probability.
         Returns:
-        --------
-        int
-            经过集体记忆修正后的最终判断。
+            int: Final judgment after possible adjustment.
         """
-        # 直接向 Model 查询结果，无需自己计算
         last_event_year = self.model.get_last_event_year_for_level(init_judgment)
-
-        # 如果历史上没有同级别的记载，我只能相信自己的初步判断
-        if last_event_year is None or last_event_year >= self.model.time.tick:
-            # 增加一个判断，确保不会引用到未来的数据（虽然不太可能发生）
+        if last_event_year is None:
             return init_judgment
-
-        # 获取那时和现在的气候数据
+        if (self.time.tick - self.age) > last_event_year:
+            return init_judgment
         climate_then = self.model.climate_series.loc[last_event_year]
-        climate_now = self.model.climate  # 当前气候
-
-        # 计算差异
+        climate_now = self.model.climate
         diff = climate_now - climate_then
-
-        # 差异越大，越有可能调整判断。我们用 sigmoid 函数来平滑这个概率
-        # sigmoid(0) = 0.5, diff 越大，概率越接近1
-        prob_to_adjust = 1 / (1 + np.exp(-abs(diff)))
-
-        # 如果随机数表明不需要调整，则坚持原判
+        prob_to_adjust = 1 / (1 + np.exp(-k * (np.abs(diff) - x0)))
         if self.random.random() > prob_to_adjust:
             return init_judgment
-
-        # 根据差异的方向进行调整
-        if diff > 0.1:
+        if diff > 0:
             return min(init_judgment + 1, 2)
-        if diff < -0.1:
+        if diff < 0:
             return max(init_judgment - 1, -2)
         return init_judgment
 
-    def step(self):
-        """更新状态"""
+    def step(self) -> None:
+        """Update observer state: age, memory, and possibly record an event."""
         self.age += 1
         climate = self.model.climate
         self._memory.append(climate)
         if self.age < self._min_age:
             return
         z = self.perception(climate)
-        # 如果观察者准备记录极端气候事件，则在全局记录该事件
         if self.write_down(z):
             extreme = self.judge_extreme(z)
-            extreme = self.rejudge_based_on_mode(extreme)
+            if self.model.p.get("rejudge", True):
+                extreme = self.rejudge_based_on_mode(extreme)
             self.model.write_down(extreme)
-        # 如果观察者年龄大于最大年龄，则死亡
         if self.age > self._max_age:
             self.die()
 
 
 @main(config_path="../config", config_name="config", version_base=None)
-def repeat_run(cfg: DictConfig | None = None):
-    """重复运行模型"""
+def repeat_run(cfg: Optional[DictConfig] = None) -> None:
+    """Run the model multiple times and save correlation results.
+
+    Args:
+        cfg (Optional[DictConfig]): Configuration object.
+    Raises:
+        AssertionError: If cfg is None.
+    """
     assert cfg is not None, "cfg is None"
     path = get_output_dir()
     final_corr_datasets = []
