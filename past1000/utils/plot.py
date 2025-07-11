@@ -193,16 +193,20 @@ def plot_corr_heatmap(
         annot=False,
         linewidths=0.05,
         linecolor="white",
-        vmin=v_min,  # 让基准值在中间
-        # vmin=r_benchmark,  # 让基准值在最下面
+        vmin=v_min,
         vmax=v_max,
-        cbar_kws={"shrink": 0.8},
+        cbar_kws={
+            "shrink": 0.4,  # 缩小 colorbar
+            # "location": "bottom",  # 移到上方
+            "pad": 0.05,  # 调整间距
+        },
         ax=ax,
         square=True,
         **kwargs,
     )
     ax.set_xlabel("Window Size")
-    ax.set_ylabel("Minimum Periods")
+    ax.set_ylabel("Minimum Samples")
+
     # 设置边框
     sns.despine(
         ax=ax,
@@ -212,31 +216,36 @@ def plot_corr_heatmap(
         bottom=False,
         trim=False,
     )
-    ax.locator_params(axis="both", nbins=9)  # x轴最多7个主刻度
+    ax.locator_params(axis="both", nbins=9)
+
     if r_benchmark is not None:
         # 获取 colorbar 对象
         cbar = ax.collections[0].colorbar
-        # 添加水平参考线
-        cbar.ax.axhline(y=r_benchmark, color="black", linewidth=2)  # 在中间位
+        # 添加垂直参考线（因为现在是水平的colorbar）
+        cbar.ax.axhline(y=r_benchmark, color="black", linewidth=2)
         cbar.ax.set_yticks(np.linspace(v_min, v_max, 5))
         # 2位小数点
         cbar.ax.set_yticklabels([f"{v:.2f}" for v in np.linspace(v_min, v_max, 5)])
-    min_period = filtered.index.values.min()
-    max_period = filtered.index.values.max()
-    min_window = filtered.columns.values.min()
-    max_window = filtered.columns.values.max()
-    ax.plot(
-        [min_window, max_period],
-        [min_period, max_window],
-        color="black",
-        linestyle=":",
-        linewidth=1,
-        label="window = period",
-    )
+
+    # 绘制对角线
+    # min_period = filtered.index.values.min()
+    # max_period = filtered.index.values.max()
+    # min_window = filtered.columns.values.min()
+    # max_window = filtered.columns.values.max()
+    # ax.plot(
+    #     [min_window, max_period],
+    #     [min_period, max_window],
+    #     color="black",
+    #     linestyle=":",
+    #     linewidth=1,
+    #     label="window = period",
+    # )
+
+    # 标记最大值点
     std_value = np.nanstd(filtered)
     lower_bound = v_max - std_offset * std_value
     points = get_coords(filtered >= lower_bound)
-    # points = get_coords(filtered == max_value)
+
     for i, point in enumerate(points):
         if i == 0:
             ax.scatter(
@@ -251,7 +260,15 @@ def plot_corr_heatmap(
             ax.scatter(point[1], point[0], s=10, c="r", alpha=0.8)
         ax.axvline(point[1], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
         ax.axhline(point[0], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
-    ax.legend(loc="lower left", fontsize=8)
+
+    # 将图例移到上方
+    ax.legend(
+        loc="lower right",
+        bbox_to_anchor=(0.5, 1.15),  # 移到图的上方
+        ncol=2,  # 水平排列
+        fontsize=8,
+        frameon=False,  # 去掉边框
+    )
     return ax
 
 

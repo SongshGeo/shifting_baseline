@@ -201,7 +201,7 @@ def experiment_corr_2d(
     r_benchmark = base_corr[0]
     log.info("基准相关系数: %.5f", r_benchmark)
     windows = np.arange(2, 100, 2)
-    min_periods = np.arange(2, 50, 1)
+    min_periods = np.arange(2, 20, 1)
     windows_mesh, min_periods_mesh = np.meshgrid(windows, min_periods)
 
     # 计算相关系数
