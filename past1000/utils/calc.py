@@ -176,6 +176,8 @@ def calc_corr(
     # 使用pandas的isna()方法
     mask = ~arr1.isna() & ~arr2.isna()
     n = mask.sum()
+    if n <= 2:
+        return np.nan, np.nan, n
     # 计算相关系数
     valid_arr1 = arr1[mask]
     valid_arr2 = arr2[mask]

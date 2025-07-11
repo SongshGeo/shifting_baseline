@@ -41,7 +41,7 @@ Region: TypeAlias = Literal[
 START = 1000
 STAGE1 = 1469
 STAGE2 = 1659
-END = 1949
+END = 1870
 STAGES_BINS: list[int] = [START, STAGE1, STAGE2, END, 2021]
 LABELS = [
     f"{START}-{STAGE1}",
@@ -49,11 +49,7 @@ LABELS = [
     f"{STAGE2}-{END}",
     f"{END}-2021",
 ]
-STAGE_LABELS = [
-    f"Stage 1: {START}-{STAGE1}\nRetention Rate 25.17%",
-    f"Stage 2: {STAGE1}-{STAGE2}\nRetention Rate 66.46%",
-    f"Stage 3: {STAGE2}-{END}\nRetention Rate 80%",
-    f"Stage 4: {END}-2020\nRetention Rate 80%",
-]
+# 保留率
+RETENTION_RATES = [25.17, 66.46, 80, 80]
 
 MAX_AGE: int = 40

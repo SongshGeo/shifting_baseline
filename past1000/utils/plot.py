@@ -331,7 +331,8 @@ def plot_mismatch_matrix(
     # 1. 设置渐变色和归一化
     vmax = np.nanmax(np.abs(actual_diff_aligned.values))
     cmap = mpl.cm.coolwarm  # 或 mpl.cm.RdBu
-    norm = mpl.colors.Normalize(vmin=-vmax, vmax=vmax)
+    # 归一化，使用幂函数归一化，gamma=0.5 使得颜色分布更均匀
+    norm = mpl.colors.PowerNorm(gamma=0.5, vmin=-vmax, vmax=vmax)
 
     for l1, l2 in product(LEVELS, LEVELS):
         value = actual_diff_aligned.loc[l1, l2]
@@ -339,7 +340,7 @@ def plot_mismatch_matrix(
         false_count = false_count_matrix.loc[l1, l2]
         color = cmap(norm(value))
         lw = false_count * 0.5
-        alpha = 0.9 if is_significant(p_value) else 0.3
+        alpha = 0.9 if is_significant(p_value) else 0.4
         ax.plot([0, 1], [l2, l1], lw=lw, color=color, alpha=alpha)
 
     ax.set_xlim(0, 1)
@@ -355,7 +356,7 @@ def plot_mismatch_matrix(
     sm.set_array([])
 
     cbar = plt.colorbar(
-        sm, ax=ax, orientation="horizontal", pad=0.18, fraction=0.15, alpha=0.8
+        sm, ax=ax, orientation="horizontal", pad=0.18, fraction=0.15, alpha=0.4
     )
     # cbar.set_label('Standardized difference', labelpad=8, fontsize=10, loc='center')
     cbar.ax.xaxis.set_label_position("bottom")  # 标签放到上方

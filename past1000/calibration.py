@@ -17,7 +17,7 @@ from scipy.stats import kendalltau, norm
 from sklearn.metrics import cohen_kappa_score, confusion_matrix
 from tqdm.auto import tqdm
 
-from past1000.constants import LEVELS, LEVELS_PROB, TICK_LABELS
+from past1000.constants import END, LEVELS, LEVELS_PROB, TICK_LABELS
 from past1000.data import HistoricalRecords, load_nat_data
 from past1000.filters import classify
 from past1000.mc import combine_reconstructions
@@ -140,7 +140,9 @@ def analyze_mismatch(
         }
     ).dropna()
     checked_df = check_estimation(df)
-    diff_m = analyze_misclassification_pivot(checked_df)
+    diff_m = analyze_misclassification_pivot(checked_df).reindex(
+        index=LEVELS, columns=LEVELS
+    )
 
     # 对角线为 0，因为是判断正确的位置，其他为实际差异
     false_count_m = pd.DataFrame(
@@ -187,18 +189,18 @@ def calibrate(cfg: DictConfig | None = None) -> pd.DataFrame:
     """
     assert isinstance(cfg, DictConfig), "cfg must be an instance of DictConfig"
     # 获取切片
-    slice_ = slice(cfg.how.start_year, cfg.how.end_year)
+    slice_ = slice(END, 2021)
     # 1. 读取自然数据和不确定性
     datasets, uncertainties = load_nat_data(
         folder=cfg.ds.noaa,
         includes=cfg.ds.includes,
         index_name="year",
-        start_year=cfg.how.start_year,
+        start_year=END,
     )
     combined, _ = combine_reconstructions(
         reconstructions=datasets,
         uncertainties=uncertainties,
-        standardize=cfg.how.standardize,
+        standardize=True,
     )  # 用 Bayesian 方法合并自然数据和不确定性
     history = HistoricalRecords(
         shp_path=cfg.ds.atlas.shp,
@@ -210,12 +212,12 @@ def calibrate(cfg: DictConfig | None = None) -> pd.DataFrame:
         inplace=True,
         interpolate=None,
         name="historical_mean",
-        how="mode",
+        how="mean",
     )
     # 处理缺失值
     natural, historical = dropna_series(
-        combined["mean"].loc[slice_],
-        history.data.loc[slice_],
+        classify(combined["mean"].loc[slice_]),
+        history.data.loc[slice_].astype(float).round(0),
     )
     cm_df = notna_confusion_matrix(
         y_true=natural,

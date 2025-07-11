@@ -214,14 +214,14 @@ def combine_reconstructions(
 
 def plot_combined_reconstruction(combined, data):
     """绘制整合后的重建序列及其不确定性"""
-    _, ax = plt.subplots(figsize=(12, 4), tight_layout=True)
+    _, ax = plt.subplots(figsize=(11, 3), tight_layout=True)
     ax.plot(combined.index, combined["mean"], "k-", label="Combined mean")
     ax.fill_between(
         combined.index,
         combined["hdi_3%"],
         combined["hdi_97%"],
         alpha=0.2,
-        label="94% Credible Interval",
+        # label="94% Credible Interval",
     )
 
     # 绘制原始数据
