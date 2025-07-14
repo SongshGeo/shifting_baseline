@@ -17,7 +17,13 @@ from scipy.stats import mode, norm
 
 from past1000.compare import compare_corr_2d
 from past1000.constants import MAX_AGE
-from past1000.filters import calc_std_deviation, classify, classify_single_value
+from past1000.filters import (
+    adjust_judgment_by_climate_direction,
+    calc_std_deviation,
+    classify,
+    classify_single_value,
+    sigmoid_adjustment_probability,
+)
 from past1000.utils.config import get_output_dir
 
 if TYPE_CHECKING:
@@ -281,37 +287,67 @@ class ClimateObserver(Actor):
     def rejudge_based_on_mode(
         self,
         init_judgment: int,
-        x0: float = 0.05,
-        k: float = 27.72,
+        rand_func=sigmoid_adjustment_probability,
+        **rand_kwargs,
     ) -> int:
         """Re-evaluate judgment based on collective memory (mode).
 
+        This method handles the ABM-specific logic for obtaining climate data from
+        collective memory, calculating adjustment probability, and making the final
+        adjustment decision. The probability calculation function and its parameters
+        can be customized for testing different behavioral models.
+
         Args:
             init_judgment (int): Initial judgment based on personal memory.
-            x0 (float): Offset for sigmoid probability.
-            k (float): Steepness for sigmoid probability.
+            rand_func: Function to calculate adjustment probability. Should take
+                climate_diff as first argument and return probability (0-1).
+                Default is sigmoid_adjustment_probability.
+            **rand_kwargs: Keyword arguments passed to rand_func. For sigmoid
+                function, typically includes x0 (offset) and k (steepness).
+
         Returns:
             int: Final judgment after possible adjustment.
         """
+        # ABM-specific logic: Get last event year from collective memory
         last_event_year = self.model.get_last_event_year_for_level(init_judgment)
         if last_event_year is None:
             return init_judgment
-        if (self.time.tick - self.age) > last_event_year:
+
+        # ABM-specific logic: Check if individual was born after the event
+        birth_year = self.time.tick - self.age
+        if birth_year > last_event_year:
             return init_judgment
+
+        # ABM-specific logic: Extract climate data from model
         climate_then = self.model.climate_series.loc[last_event_year]
         climate_now = self.model.climate
-        diff = climate_now - climate_then
-        prob_to_adjust = 1 / (1 + np.exp(-k * (np.abs(diff) - x0)))
-        if self.random.random() > prob_to_adjust:
+        climate_diff = climate_now - climate_then
+
+        # ABM-specific logic: Calculate adjustment probability using provided function
+        adjustment_prob = rand_func(climate_diff, **rand_kwargs)
+
+        # ABM-specific logic: Make stochastic decision
+        if self.random.random() > adjustment_prob:
             return init_judgment
-        if diff > 0:
-            return min(init_judgment + 1, 2)
-        if diff < 0:
-            return max(init_judgment - 1, -2)
-        return init_judgment
+
+        # Delegate deterministic adjustment logic to filter function
+        return adjust_judgment_by_climate_direction(
+            init_judgment=init_judgment,
+            climate_now=climate_now,
+            climate_then=climate_then,
+            min_level=-2,
+            max_level=2,
+        )
 
     def step(self) -> None:
-        """Update observer state: age, memory, and possibly record an event."""
+        """Update observer state at each step.
+
+        The observer:
+        - Increases age by 1.
+        - Updates memory with current climate.
+        - If the observer is old enough, it perceives the climate and decides whether to record an event. When it records an event, it will be re-judged based on collective memory (mode).
+        - If the observer is too old, it dies.
+        """
         self.age += 1
         climate = self.model.climate
         self._memory.append(climate)

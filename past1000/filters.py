@@ -460,3 +460,136 @@ def classify(
         ValueError: If levels length is not thresholds length + 1
     """
     return classify_series(series, thresholds, levels, handle_na="raise")
+
+
+def sigmoid_adjustment_probability(
+    climate_diff: float,
+    x0: float = 0.05,
+    k: float = 27.72,
+) -> float:
+    """Calculate adjustment probability using sigmoid function based on climate difference.
+
+    This function implements a sigmoid probability model that captures the psychological
+    tendency to adjust expectations when climate conditions change. The probability
+    increases with larger climate differences, following a smooth S-shaped curve.
+
+    The probability is calculated using the sigmoid function:
+    $$P_{adjust} = \\frac{1}{1 + e^{-k(|\\Delta climate| - x_0)}}$$
+
+    Args:
+        climate_diff: Climate difference value (climate_now - climate_then).
+        x0: Offset threshold for sigmoid calculation. Climate differences below
+            this threshold have low adjustment probability. Default is 0.05.
+        k: Steepness parameter for sigmoid function. Higher values create
+            sharper probability transitions. Default is 27.72.
+
+    Returns:
+        float: Adjustment probability between 0 and 1.
+
+    Raises:
+        TypeError: If any parameter is not numeric.
+
+    Examples:
+        >>> # Small climate difference
+        >>> sigmoid_adjustment_probability(0.01)
+        0.2481...
+
+        >>> # Large climate difference
+        >>> sigmoid_adjustment_probability(0.5)
+        0.9999...
+
+        >>> # No climate difference
+        >>> sigmoid_adjustment_probability(0.0)
+        0.2689...
+    """
+    if not isinstance(climate_diff, (int, float)):
+        raise TypeError("climate_diff must be numeric")
+
+    if not all(isinstance(x, (int, float)) for x in [x0, k]):
+        raise TypeError("Parameters x0 and k must be numeric")
+
+    abs_diff = abs(climate_diff)
+    return 1 / (1 + np.exp(-k * (abs_diff - x0)))
+
+
+def adjust_judgment_by_climate_direction(
+    init_judgment: int,
+    climate_now: float,
+    climate_then: float,
+    min_level: int = -2,
+    max_level: int = 2,
+) -> int:
+    """Adjust judgment level based on climate change direction.
+
+    This function implements deterministic judgment adjustment logic based on the
+    direction of climate change. It assumes that the decision to adjust has already
+    been made (e.g., through probability calculation and random sampling) and only
+    determines the direction and magnitude of adjustment.
+
+    The adjustment logic follows climate change direction:
+    - If climate warmed/became wetter (climate_now > climate_then): increase level
+    - If climate cooled/became drier (climate_now < climate_then): decrease level
+    - If no climate change (climate_now == climate_then): no adjustment
+    - All adjustments are constrained within [min_level, max_level] bounds
+
+    Args:
+        init_judgment: Initial judgment level to adjust.
+            Must be within [min_level, max_level] range.
+        climate_now: Current climate value.
+        climate_then: Past climate value for comparison.
+        min_level: Minimum allowable judgment level. Default is -2.
+        max_level: Maximum allowable judgment level. Default is 2.
+
+    Returns:
+        int: Adjusted judgment level, constrained within [min_level, max_level].
+
+    Raises:
+        ValueError: If init_judgment is outside [min_level, max_level] range.
+        TypeError: If any parameter is not of the expected type.
+
+    Examples:
+        >>> # Climate warmed - increase judgment
+        >>> adjust_judgment_by_climate_direction(1, 0.5, 0.0)
+        2
+
+        >>> # Climate cooled - decrease judgment
+        >>> adjust_judgment_by_climate_direction(1, 0.0, 0.5)
+        0
+
+        >>> # No climate change - no adjustment
+        >>> adjust_judgment_by_climate_direction(1, 0.5, 0.5)
+        1
+
+        >>> # At boundary - constrained adjustment
+        >>> adjust_judgment_by_climate_direction(2, 1.0, 0.0)  # Cannot exceed max
+        2
+
+        >>> adjust_judgment_by_climate_direction(-2, 0.0, 1.0)  # Cannot go below min
+        -2
+    """
+    # Input validation
+    if not isinstance(init_judgment, int):
+        raise TypeError("init_judgment must be an integer")
+
+    if init_judgment < min_level or init_judgment > max_level:
+        raise ValueError(
+            f"init_judgment must be within [{min_level}, {max_level}] range, "
+            f"got {init_judgment}"
+        )
+
+    if not all(isinstance(x, (int, float)) for x in [climate_now, climate_then]):
+        raise TypeError("Climate values must be numeric")
+
+    # Calculate climate difference
+    climate_diff = climate_now - climate_then
+
+    # Determine adjustment direction based on climate change
+    if climate_diff > 0:
+        # Climate became warmer/wetter - increase judgment level
+        return min(init_judgment + 1, max_level)
+    elif climate_diff < 0:
+        # Climate became cooler/drier - decrease judgment level
+        return max(init_judgment - 1, min_level)
+    else:
+        # No climate change - no adjustment
+        return init_judgment
