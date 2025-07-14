@@ -10,7 +10,13 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_series_equal
 
-from past1000.filters import calc_std_deviation, classify
+from past1000.constants import LEVELS, THRESHOLDS
+from past1000.filters import (
+    calc_std_deviation,
+    classify,
+    classify_series,
+    classify_single_value,
+)
 
 
 class TestStdDeviation:
@@ -89,3 +95,233 @@ class TestClassification:
         arr = np.array([-2, -1, -0.5, 0, 0.2, 1, 2])
         result = classify(arr)
         assert_series_equal(result, pd.Series([-2, -1, -1, 0, 0, 1, 2]))
+
+
+class TestClassifySingleValue:
+    """Test cases for classify_single_value function"""
+
+    def test_basic_classification(self):
+        """Test basic classification with default thresholds"""
+        # Test each classification level
+        assert classify_single_value(-2.0) == -2  # Below first threshold
+        assert classify_single_value(-1.0) == -1  # Between first and second threshold
+        assert classify_single_value(0.0) == 0  # Between second and third threshold
+        assert classify_single_value(1.0) == 1  # Between third and fourth threshold
+        assert classify_single_value(2.0) == 2  # Above last threshold
+
+    def test_boundary_values(self):
+        """Test classification at exact threshold boundaries"""
+        # Test values exactly at thresholds
+        assert classify_single_value(-1.17) == -2  # Exactly at first threshold
+        assert classify_single_value(-0.33) == -1  # Exactly at second threshold
+        assert classify_single_value(0.33) == 0  # Exactly at third threshold
+        assert classify_single_value(1.17) == 1  # Exactly at fourth threshold
+
+        # Test values just above thresholds
+        assert classify_single_value(-1.16) == -1  # Just above first threshold
+        assert classify_single_value(-0.32) == 0  # Just above second threshold
+        assert classify_single_value(0.34) == 1  # Just above third threshold
+        assert classify_single_value(1.18) == 2  # Just above fourth threshold
+
+    def test_custom_thresholds_and_levels(self):
+        """Test classification with custom thresholds and levels"""
+        custom_thresholds = [0.0, 1.0, 2.0]
+        custom_levels = [10, 20, 30, 40]
+
+        assert classify_single_value(-1.0, custom_thresholds, custom_levels) == 10
+        assert classify_single_value(0.5, custom_thresholds, custom_levels) == 20
+        assert classify_single_value(1.5, custom_thresholds, custom_levels) == 30
+        assert classify_single_value(3.0, custom_thresholds, custom_levels) == 40
+
+    def test_input_validation(self):
+        """Test input validation and error handling"""
+        # Test NaN values
+        with pytest.raises(ValueError, match="Cannot classify NaN values"):
+            classify_single_value(np.nan)
+
+        # Test infinite values
+        with pytest.raises(ValueError, match="Cannot classify infinite values"):
+            classify_single_value(np.inf)
+
+        with pytest.raises(ValueError, match="Cannot classify infinite values"):
+            classify_single_value(-np.inf)
+
+        # Test non-numeric types
+        with pytest.raises(TypeError, match="Value must be numeric"):
+            classify_single_value("not_a_number")
+
+        # Test mismatched thresholds and levels
+        with pytest.raises(
+            ValueError, match="Levels must be one element longer than thresholds"
+        ):
+            classify_single_value(1.0, [0.0, 1.0], [1, 2])  # levels too short
+
+        with pytest.raises(
+            ValueError, match="Levels must be one element longer than thresholds"
+        ):
+            classify_single_value(1.0, [0.0, 1.0], [1, 2, 3, 4])  # levels too long
+
+    def test_threshold_order_validation(self):
+        """Test validation of threshold ordering"""
+        # Test unsorted thresholds
+        with pytest.raises(
+            ValueError, match="Thresholds must be in strictly ascending order"
+        ):
+            classify_single_value(1.0, [1.0, 0.0, 2.0], [1, 2, 3, 4])
+
+        # Test duplicate thresholds
+        with pytest.raises(
+            ValueError, match="Thresholds must be in strictly ascending order"
+        ):
+            classify_single_value(1.0, [0.0, 1.0, 1.0], [1, 2, 3, 4])
+
+    def test_numpy_numeric_types(self):
+        """Test compatibility with numpy numeric types"""
+        # Test various numpy types
+        assert classify_single_value(np.int32(-2)) == -2
+        assert classify_single_value(np.float64(1.5)) == 2
+        assert classify_single_value(np.float32(0.0)) == 0
+
+
+class TestClassifySeries:
+    """Test cases for classify_series function"""
+
+    def test_basic_series_classification(self):
+        """Test basic series classification"""
+        data = pd.Series([-2.0, -1.0, 0.0, 1.0, 2.0])
+        result = classify_series(data)
+        expected = pd.Series([-2, -1, 0, 1, 2], dtype=int)
+        pd.testing.assert_series_equal(result, expected)
+
+    def test_numpy_array_input(self):
+        """Test classification with numpy array input"""
+        data = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+        result = classify_series(data)
+        expected = pd.Series([-2, -1, 0, 1, 2], dtype=int)
+        pd.testing.assert_series_equal(result, expected)
+
+    def test_index_preservation(self):
+        """Test that original index is preserved"""
+        data = pd.Series([-2.0, 0.0, 2.0], index=["a", "b", "c"])
+        result = classify_series(data)
+        expected = pd.Series([-2, 0, 2], index=["a", "b", "c"], dtype=int)
+        pd.testing.assert_series_equal(result, expected)
+
+    def test_nan_handling_strategies(self):
+        """Test different strategies for handling NaN values"""
+        data = pd.Series([-1.5, np.nan, 0.5, np.nan, 1.5])
+
+        # Test 'raise' strategy (default)
+        with pytest.raises(ValueError, match="Cannot classify NaN values"):
+            classify_series(data, handle_na="raise")
+
+        # Test 'skip' strategy
+        result_skip = classify_series(data, handle_na="skip")
+        expected_skip = pd.Series([-2, pd.NA, 1, pd.NA, 2], dtype="Int64")
+        pd.testing.assert_series_equal(result_skip, expected_skip)
+
+        # Test 'fill' strategy
+        result_fill = classify_series(data, handle_na="fill")
+        expected_fill = pd.Series([-2, -2, 1, -2, 2], dtype=int)
+        pd.testing.assert_series_equal(result_fill, expected_fill)
+
+    def test_empty_series_handling(self):
+        """Test handling of empty series"""
+        with pytest.raises(ValueError, match="Cannot classify empty series"):
+            classify_series(pd.Series([]))
+
+    def test_infinite_values_handling(self):
+        """Test handling of infinite values"""
+        data = pd.Series([-1.0, np.inf, 1.0])
+        with pytest.raises(ValueError, match="Cannot classify infinite values"):
+            classify_series(data)
+
+        data = pd.Series([-1.0, -np.inf, 1.0])
+        with pytest.raises(ValueError, match="Cannot classify infinite values"):
+            classify_series(data)
+
+    def test_non_numeric_data_handling(self):
+        """Test handling of non-numeric data"""
+        data = pd.Series(["a", "b", "c"])
+        with pytest.raises(TypeError, match="Series must contain numeric data"):
+            classify_series(data)
+
+    def test_custom_parameters(self):
+        """Test classification with custom thresholds and levels"""
+        data = pd.Series([-1.0, 0.5, 1.5, 3.0])
+        custom_thresholds = [0.0, 1.0, 2.0]
+        custom_levels = [10, 20, 30, 40]
+
+        result = classify_series(data, custom_thresholds, custom_levels)
+        expected = pd.Series([10, 20, 30, 40], dtype=int)
+        pd.testing.assert_series_equal(result, expected)
+
+    def test_invalid_handle_na_parameter(self):
+        """Test validation of handle_na parameter"""
+        data = pd.Series([-1.0, np.nan, 1.0])
+        with pytest.raises(
+            ValueError, match="handle_na must be 'raise', 'skip', or 'fill'"
+        ):
+            classify_series(data, handle_na="invalid")
+
+
+class TestClassifyBackwardCompatibility:
+    """Test backward compatibility of the original classify function"""
+
+    def test_backward_compatibility(self):
+        """Test that the original classify function still works"""
+        data = pd.Series([-2.0, -1.0, 0.0, 1.0, 2.0])
+        result = classify(data)
+        expected = pd.Series([-2, -1, 0, 1, 2], dtype=int)
+        pd.testing.assert_series_equal(result, expected)
+
+    def test_nan_handling_in_backward_compatibility(self):
+        """Test that NaN values raise error in backward compatibility mode"""
+        data = pd.Series([-1.0, np.nan, 1.0])
+        with pytest.raises(ValueError, match="Cannot classify NaN values"):
+            classify(data)
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (-3.0, -2),
+        (-1.5, -2),
+        (-1.17, -2),
+        (-1.16, -1),
+        (-0.5, -1),
+        (-0.33, -1),
+        (-0.32, 0),
+        (0.0, 0),
+        (0.32, 0),
+        (0.33, 0),
+        (0.34, 1),
+        (1.0, 1),
+        (1.17, 1),
+        (1.18, 2),
+        (3.0, 2),
+    ],
+)
+def test_classify_single_value_parametrized(value, expected):
+    """Parametrized test for classify_single_value with various inputs"""
+    assert classify_single_value(value) == expected
+
+
+@pytest.mark.parametrize(
+    "thresholds,levels,test_value,expected",
+    [
+        # Simple binary classification
+        ([0.0], [0, 1], -1.0, 0),
+        ([0.0], [0, 1], 1.0, 1),
+        # Three-level classification
+        ([-1.0, 1.0], [1, 2, 3], -2.0, 1),
+        ([-1.0, 1.0], [1, 2, 3], 0.0, 2),
+        ([-1.0, 1.0], [1, 2, 3], 2.0, 3),
+        # Custom levels with non-sequential values
+        ([0.0, 1.0], [10, 50, 100], 0.5, 50),
+        ([0.0, 1.0], [10, 50, 100], 1.5, 100),
+    ],
+)
+def test_custom_classification_parametrized(thresholds, levels, test_value, expected):
+    """Parametrized test for custom threshold and level configurations"""
+    assert classify_single_value(test_value, thresholds, levels) == expected

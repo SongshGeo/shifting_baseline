@@ -16,8 +16,8 @@ from omegaconf import DictConfig
 from scipy.stats import mode, norm
 
 from past1000.compare import compare_corr_2d
-from past1000.constants import MAX_AGE, THRESHOLDS
-from past1000.filters import calc_std_deviation, classify
+from past1000.constants import MAX_AGE
+from past1000.filters import calc_std_deviation, classify, classify_single_value
 from past1000.utils.config import get_output_dir
 
 if TYPE_CHECKING:
@@ -278,24 +278,6 @@ class ClimateObserver(Actor):
         """
         return (climate - self.memory.mean()) / self.memory.std()
 
-    def judge_extreme(self, z: float) -> int:
-        """Classify the z-score as an extreme event level.
-
-        Args:
-            z (float): Z-score of the event.
-        Returns:
-            int: Classified event level.
-        """
-        if z > THRESHOLDS[3]:
-            return 2
-        if z > THRESHOLDS[2]:
-            return 1
-        if z < THRESHOLDS[0]:
-            return -1
-        if z < THRESHOLDS[1]:
-            return -2
-        return 0
-
     def rejudge_based_on_mode(
         self,
         init_judgment: int,
@@ -337,7 +319,7 @@ class ClimateObserver(Actor):
             return
         z = self.perception(climate)
         if self.write_down(z):
-            extreme = self.judge_extreme(z)
+            extreme = classify_single_value(z)
             if self.model.p.get("rejudge", True):
                 extreme = self.rejudge_based_on_mode(extreme)
             self.model.write_down(extreme)
