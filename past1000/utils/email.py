@@ -14,9 +14,19 @@ from typing import Optional
 
 # Load environment variables from .env file
 try:
+    from pathlib import Path
+
     from dotenv import load_dotenv
 
-    load_dotenv()
+    # 指定 .env 文件的绝对路径（更可靠）
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    result = load_dotenv(env_path)
+
+    # 如果指定路径失败，尝试当前工作目录
+    if not result:
+        result = load_dotenv()
+
+    print(f"环境变量加载: {env_path.exists()} (文件存在), {result} (加载成功)")
 except ImportError:
     print(
         "Warning: python-dotenv not installed, using system environment variables only"
