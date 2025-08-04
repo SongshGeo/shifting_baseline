@@ -5,7 +5,9 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+import traceback
 from collections import deque
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
@@ -24,6 +26,7 @@ from past1000.filters import (
     classify_single_value,
     sigmoid_adjustment_probability,
 )
+from past1000.utils.email import send_notification_email
 
 if TYPE_CHECKING:
     from past1000.utils.types import CorrFunc
@@ -386,4 +389,15 @@ def repeat_run(cfg: Optional[DictConfig] = None) -> None:
 
 
 if __name__ == "__main__":
-    repeat_run()
+    start_time = datetime.now()
+    print(f"ABM 模型开始运行: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    try:
+        repeat_run()
+        send_notification_email(success=True, start_time=start_time)
+        print("✅ ABM 模型运行成功完成")
+    except Exception as e:  # pylint: disable=broad-except # 需要捕获所有异常以发送邮件通知
+        error_msg = f"{str(e)}\n\n详细错误信息:\n{traceback.format_exc()}"
+        send_notification_email(
+            success=False, error_msg=error_msg, start_time=start_time
+        )
+        print(f"❌ ABM 模型运行失败: {e}")
