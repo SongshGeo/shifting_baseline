@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
-from abses import Actor, MainModel
+from abses import Actor, Experiment, MainModel
 from hydra import main
 from omegaconf import DictConfig
 from scipy.stats import mode, norm
@@ -24,7 +24,6 @@ from past1000.filters import (
     classify_single_value,
     sigmoid_adjustment_probability,
 )
-from past1000.utils.config import get_output_dir
 
 if TYPE_CHECKING:
     from past1000.utils.types import CorrFunc
@@ -59,7 +58,6 @@ class Model(MainModel):
         self._mode_cache: Optional[pd.Series] = None
         self._mode_cache_tick: int = -1
         self._last_event_years: dict[int, int] = {}
-        self.final_corr: Optional[pd.Series] = None
         self.spin_up_years: int = self._new_agents * (self._max_age - self._min_age + 1)
         self._years: int = years + self.spin_up_years
         self._climate: np.ndarray = np.random.normal(0, 1, self._years)
@@ -195,7 +193,6 @@ class Model(MainModel):
         min_period: int = self.p.get("min_period", 2)
         filter_side: str = self.p.get("filter_side", "right")
         corr_method: CorrFunc = self.p.get("corr_method", "kendall")
-        self.estimation.to_csv(self.outpath / f"estimation_{self.run_id}.csv")
         windows = np.arange(2, 100)
         min_periods = np.repeat(min_period, 98)
         rs, _, _ = compare_corr_2d(
@@ -207,11 +204,22 @@ class Model(MainModel):
             corr_method=corr_method,
             filter_side=filter_side,
         )
-        self.final_corr = pd.Series(
+        corr_series = pd.Series(
             data=rs,
             index=windows,
             name=f"model_{self.run_id}",
         )
+        output_file = self.outpath / "correlations.csv"
+        # Smart save logic: create new file or append column
+        if output_file.exists():
+            # File exists, read and add new column
+            existing_df = pd.read_csv(output_file, index_col=0)
+            existing_df[corr_series.name] = corr_series
+            existing_df.to_csv(output_file)
+        else:
+            # File doesn't exist, create new DataFrame
+            new_df = pd.DataFrame({corr_series.name: corr_series})
+            new_df.to_csv(output_file)
 
 
 class ClimateObserver(Actor):
@@ -373,13 +381,8 @@ def repeat_run(cfg: Optional[DictConfig] = None) -> None:
         AssertionError: If cfg is None.
     """
     assert cfg is not None, "cfg is None"
-    path = get_output_dir()
-    final_corr_datasets = []
-    for i in range(cfg.how.repeat):
-        model = Model(parameters={"model": cfg.how}, run_id=i, outpath=path)
-        model.run_model()
-        final_corr_datasets.append(model.final_corr)
-    pd.concat(final_corr_datasets, axis=1).to_csv(path / "correlations.csv")
+    exp = Experiment.new(Model, cfg=cfg.how)
+    exp.batch_run(repeats=exp.cfg.repeats, parallels=exp.cfg.num_process)
 
 
 if __name__ == "__main__":

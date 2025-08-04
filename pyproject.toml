@@ -36,7 +36,7 @@ arviz = "^0.20.0"
 pymc = "^5.20.1"
 GeoDSKit = ">=0.2.0"
 fitter = "^1.7.1"
-abses = "^0.7.5"
+abses = ">=0.7.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"

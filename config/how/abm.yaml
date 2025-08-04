@@ -1,4 +1,5 @@
-repeat: 10
+repeats: 10  # 每组参数的运行重复次数
+num_process: 5  # 并行运算的进程数
 
 min_period: 5
 years: 300
