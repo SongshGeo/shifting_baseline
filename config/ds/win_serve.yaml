@@ -2,7 +2,6 @@
 root: /Users/songshgeo/Documents/VSCode/past1000
 # 项目数据目录
 processed: ${ds.root}/data
-multirun: ${ds.root}/multirun
 
 # 数据目录
 cmip6: /Volumes/CMIP6/past1000
@@ -22,8 +21,6 @@ spei:
   pet: ${ds.spei.folder}/month_pet_0.1degree.nc
   pr: ${ds.spei.folder}/month_pre_0.1degree.nc
   pattern: ${ds.spei.folder}/spei_penman/spei_spei_{dist}_{freq}.nc
-
-abm: ${ds.multirun}/2025-07-27/23-18-33
 
 includes:
   - "hexi2019scpdsi"
