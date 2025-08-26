@@ -27,4 +27,4 @@ if TYPE_CHECKING:
         "青藏高原区",
     ]
 
-    Stages: TypeAlias = int | slice | Literal[1, 2, 3, 4]
+    Stages: TypeAlias = int | slice | str | Literal[1, 2, 3, 4]

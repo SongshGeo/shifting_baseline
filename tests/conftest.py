@@ -61,17 +61,49 @@ def fixture_series():
     return pd.Series(data, index=np.arange(850, 1850))
 
 
-@pytest.fixture(scope="session")
-def python_bin() -> str:
-    """Return current Python executable used to run subprocesses."""
+@pytest.fixture(scope="session", name="python_bin")
+def fixture_python_bin() -> str:
+    """Python executable for subprocess runs."""
     return sys.executable
 
 
-@pytest.fixture()
-def repo_root() -> Path:
-    """Locate repository root assuming tests/ is under the root.
-
-    Returns:
-        Path: Absolute path to repository root directory.
-    """
+@pytest.fixture(name="repo_root")
+def fixture_repo_root() -> Path:
+    """Repository root path."""
     return Path(__file__).resolve().parents[1]
+
+
+def _make_fake_excel(
+    region_names: list[str], years: list[int], cities: list[str]
+) -> dict[str, pd.DataFrame]:
+    """Build in-memory Excel-like data for multiple regions."""
+    rng = np.random.default_rng(123)
+    sheets: dict[str, pd.DataFrame] = {}
+    for region in region_names:
+        data = rng.integers(low=0, high=6, size=(len(years), len(cities)))
+        df = pd.DataFrame(data, index=years, columns=cities)
+        df.index.name = "year"
+        sheets[region] = df
+    return sheets
+
+
+@pytest.fixture(name="excel_file")
+def fixture_excel_file(tmp_path: Path) -> Path:
+    """Create a temporary multi-sheet Excel with zeros as missing values."""
+    years = list(range(1000, 1011))
+    cities = ["北京", "天津", "保定"]
+    regions = ["华北地区", "华南地区"]
+    sheets = _make_fake_excel(regions, years, cities)
+    sheets["华北地区"].loc[1003, :] = 0
+    sheets["华北地区"].loc[1007, "天津"] = 0
+    xlsx = tmp_path / "hist.xlsx"
+    with pd.ExcelWriter(xlsx) as writer:
+        for region, df in sheets.items():
+            df.to_excel(writer, sheet_name=region)
+    return xlsx
+
+
+@pytest.fixture(name="shp_file")
+def fixture_shp_file(tmp_path: Path) -> Path:
+    """Dummy path for shapefile; reading will be monkeypatched."""
+    return tmp_path / "dummy.shp"
