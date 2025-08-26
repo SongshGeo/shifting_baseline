@@ -1,21 +1,22 @@
+# config/hydra/job_logging/custom.yaml
 # @package hydra.job_logging
 version: 1
 formatters:
   simple:
-    format: "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+    format: "%(levelname)s | %(message)s"
 handlers:
   console:
     class: logging.StreamHandler
-    level: WARNING
+    level: INFO          # 从 WARNING 改为 INFO
     formatter: simple
     stream: ext://sys.stdout
   file:
     class: logging.FileHandler
-    level: DEBUG
+    level: DEBUG         # 保持 DEBUG
     formatter: simple
     filename: ${hydra:runtime.output_dir}/app.log
     encoding: utf-8
 root:
-  level: DEBUG
+  level: DEBUG           # 保持 DEBUG，确保 DEBUG 能写入文件
   handlers: [console, file]
 disable_existing_loggers: false

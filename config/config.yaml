@@ -1,6 +1,5 @@
 defaults:
 - ds: mac
 - how: process
-- override hydra/job_logging: custom
-- override hydra/hydra_logging: custom
+- override hydra/job_logging: log
 - _self_

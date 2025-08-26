@@ -15,7 +15,7 @@ from hydra import main
 from omegaconf import DictConfig
 
 from past1000.process import batch_process_recon_data
-from past1000.utils.config import format_by_config
+from past1000.utils.config import format_by_config, get_output_dir
 
 __version__ = "0.1.0"
 __all__ = [
@@ -31,11 +31,7 @@ def _main(cfg: DictConfig | None = None):
         raise ValueError("cfg 不能为空")
     cfg = format_by_config(cfg)
     log = logging.getLogger(__name__)
-    log.debug("开始以“%s”模式运行。", cfg.how.name)
-    log.info("测试")
-    log.warning("测试")
-    log.error("测试")
-    log.critical("测试")
+    log.info("实验开始，配置文件请参看 %s", get_output_dir() / ".hydra/config.yaml")
 
 
 if __name__ == "__main__":
