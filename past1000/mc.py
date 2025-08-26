@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymc as pm
+from matplotkit import with_axes
 from sklearn.preprocessing import StandardScaler
 
 
@@ -212,9 +213,11 @@ def combine_reconstructions(
     return combined, trace
 
 
-def plot_combined_reconstruction(combined, data):
+@with_axes(figsize=(11, 3))
+def plot_combined_reconstruction(combined, data, ax: plt.Axes | None = None):
     """绘制整合后的重建序列及其不确定性"""
-    _, ax = plt.subplots(figsize=(11, 3), tight_layout=True)
+    if ax is None:
+        _, ax = plt.subplots(figsize=(11, 3), tight_layout=True)
     ax.plot(combined.index, combined["mean"], "k-", label="Combined mean")
     ax.fill_between(
         combined.index,

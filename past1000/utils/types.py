@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -16,3 +16,15 @@ if TYPE_CHECKING:
     FilterSide = Literal["both", "left", "right"]
     DistributionType = Literal["pearson", "gamma"]
     HistoricalAggregateType = Literal["mean", "median", "mode"]
+
+    Region: TypeAlias = Literal[
+        "华北地区",
+        "西北内陆区",
+        "西南地区",
+        "东北地区",
+        "华南地区",
+        "长江中下游地区",
+        "青藏高原区",
+    ]
+
+    Stages: TypeAlias = int | slice | Literal[1, 2, 3, 4]

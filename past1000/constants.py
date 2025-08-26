@@ -10,8 +10,6 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
-
 GRADE_VALUES: list[int] = [5, 4, 3, 2, 1]  # 原始等级值
 STD_THRESHOLDS: list[float] = [-1.17, -0.33, 0, 0.33, 1.17]  # 标准差阈值 - 5
 THRESHOLDS: list[float] = [-1.17, -0.33, 0.33, 1.17]  # 阈值 - 4
@@ -27,22 +25,14 @@ VERBOSE_LABELS: list[str] = [
     "Very wet",
 ]
 
-Region: TypeAlias = Literal[
-    "华北地区",
-    "西北内陆区",
-    "西南地区",
-    "东北地区",
-    "华南地区",
-    "长江中下游地区",
-    "青藏高原区",
-]
-
 # 历史记录数据的时间段
 START = 1000
 STAGE1 = 1469
 STAGE2 = 1659
-END = 1870
-STAGES_BINS: list[int] = [START, STAGE1, STAGE2, END, 2021]
+END = 1900
+FINAL = 2010
+
+STAGES_BINS: list[int] = [START, STAGE1, STAGE2, END, FINAL]
 LABELS = [
     f"{START}-{STAGE1}",
     f"{STAGE1}-{STAGE2}",

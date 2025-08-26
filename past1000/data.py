@@ -19,14 +19,14 @@ from fitter import Fitter, get_common_distributions
 from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
 from geo_dskit.utils.path import filter_files, get_files
 
-from past1000.constants import GRADE_VALUES, STD_THRESHOLDS, Region
+from past1000.constants import GRADE_VALUES, STAGES_BINS, STD_THRESHOLDS
 from past1000.mc import standardize_both
 from past1000.utils.calc import calc_corr
 
 if TYPE_CHECKING:
-    from geo_dskit.core.types import PathLike
+    from geo_dskit.core.types import PathLike, Region
 
-    from past1000.utils.types import HistoricalAggregateType
+    from past1000.utils.types import HistoricalAggregateType, Stages
 
 log = logging.getLogger(__name__)
 # 常用的分布
@@ -126,32 +126,49 @@ class HistoricalRecords:
         self,
         shp_path: PathLike,
         data_path: PathLike,
-        region: Region = "华北地区",
+        region: Region | None = "华北地区",
         symmetrical_level: bool = True,
     ):
+        """
+        历史千年旱涝记录数据，参考：
+        https://news.fudan.edu.cn/2024/0420/c5a140208/page.htm
+
+        Args:
+            shp_path (PathLike): 矢量图路径
+            data_path (PathLike): 数据路径
+            region (Region): 地区，可供选择的有：
+                - 华北地区
+                - 东北地区
+                - 华东地区
+                - 华中地区
+                - 华南地区
+                - 西南地区
+                - 西北地区
+                如果为 None，则读取所有地区.
+            symmetrical_level (bool): 是否对称等级.
+                如果为 True，则将数据转换为对称等级.
+                如果为 False，则不进行转换.
+        """
         self.shp_path = Path(shp_path)
         self.data_path = Path(data_path)
-        # 读取数据
+        # 读取地理空间数据
         self.shp = gpd.read_file(shp_path).dropna(how="any")
-        self.shp = self.shp[self.shp["region"] == region]
-        # TODO: 这里读取不同地区的数据还需要实现
+        if region is not None:
+            self.shp = self.shp[self.shp["region"] == region]
         self._data = self._read_data(region)
+        # 处理对称等级
         if symmetrical_level:
             self._data = 3 - self._data
-
-    def _read_data(self, region: Region):
-        full_index = np.arange(1000, 2021)
-        df = pd.read_excel(
-            self.data_path,
-            sheet_name=region,
-            index_col=0,
-            header=1,
-        ).replace(0, pd.NA)
-        df.index.name = "year"
-        return df.reindex(full_index)
+        self._sym_level = symmetrical_level
+        assert isinstance(self._sym_level, bool), "symmetrical_level 必须是布尔值"
 
     @property
-    def data(self) -> pd.DataFrame:
+    def sym(self) -> bool:
+        """是否对称等级"""
+        return self._sym_level
+
+    @property
+    def data(self) -> pd.DataFrame | pd.Series:
         """根据地区筛选后的历史记录数据"""
         return self._data
 
@@ -162,10 +179,131 @@ class HistoricalRecords:
             raise ValueError("数据必须是DataFrame或Series")
         self._data = value
 
-    @property
-    def stage4(self) -> pd.DataFrame:
-        """第四阶段的数据"""
-        return self.data.loc[1949:2010]
+    def period(self, stage: Stages) -> pd.DataFrame | pd.Series:
+        """Select data by historical stage(s) or explicit year range.
+
+        This method accepts multiple convenient notations:
+        - Integer stage index: 1, 2, 3, 4
+        - Stage slice: ``slice(1, 3)`` meaning stages 1 through 2 (inclusive of
+          the end year of stage 2). If ``start`` or ``stop`` is ``None``, they
+          default to 1 and 4 respectively. ``step`` is not supported.
+        - String forms:
+          - ``"stage1"``, ``"stage2"``, ...
+          - ``"1:3"`` or ``"1-3"`` for stages
+          - ``"stage1:stage3"`` or ``"stage1-stage3"``
+          - ``"1000:1469"`` or ``"1000-1469"`` for explicit year ranges
+          - ``"all"`` / ``"full"`` / ``"total"`` for the whole series
+
+        Returns the same type as ``self.data`` (DataFrame or Series).
+
+        Examples:
+            >>> history.period(1)  # stage 1
+            >>> history.period(slice(1, 2))  # stages 1-2
+            >>> history.period("1:4")  # stages 1-4
+            >>> history.period("stage3")
+            >>> history.period("1000:2010")  # explicit years
+        """
+        bins = STAGES_BINS
+
+        def _bounds_from_stage_indices(
+            start_stage: int, stop_stage: int
+        ) -> tuple[int, int]:
+            statement = (
+                f"Stage index out of range: {start_stage}..{stop_stage}. "
+                f"Valid is 1..{len(bins) - 1}"
+            )
+            if not (
+                1 <= start_stage <= len(bins) - 1 and 1 <= stop_stage <= len(bins) - 1
+            ):
+                raise ValueError(statement)
+            if start_stage > stop_stage:
+                start_stage, stop_stage = stop_stage, start_stage
+            return bins[start_stage - 1], bins[stop_stage]
+
+        def _select_years(start_year: int, end_year: int):
+            return self.data.loc[start_year:end_year]
+
+        # Integer stage
+        if isinstance(stage, int):
+            start_year, end_year = _bounds_from_stage_indices(stage, stage)
+            return _select_years(start_year, end_year)
+
+        # Slice: interpret as stage indices if within 1..4, otherwise pass through as year slice
+        if isinstance(stage, slice):
+            if stage.step is not None:
+                raise ValueError("Slice step is not supported for stage selection")
+
+            # Detect stage-style slice: values within valid stage indices or None
+            start_is_stage = stage.start is None or (
+                isinstance(stage.start, int) and 1 <= stage.start <= len(bins) - 1
+            )
+            stop_is_stage = stage.stop is None or (
+                isinstance(stage.stop, int) and 1 <= stage.stop <= len(bins) - 1
+            )
+
+            if start_is_stage and stop_is_stage:
+                start_stage = 1 if stage.start is None else stage.start
+                stop_stage = (len(bins) - 1) if stage.stop is None else stage.stop
+                start_year, end_year = _bounds_from_stage_indices(
+                    start_stage, stop_stage
+                )
+                return _select_years(start_year, end_year)
+
+            # Otherwise treat as a raw year slice
+            return self.data.loc[stage]
+
+        # String patterns
+        if isinstance(stage, str):
+            s = stage.strip().lower()
+            if s in {"all", "full", "total", "whole"}:
+                return self.data
+
+            # "stageN"
+            m = re.fullmatch(r"stage\s*(\d)", s)
+            if m:
+                n = int(m.group(1))
+                start_year, end_year = _bounds_from_stage_indices(n, n)
+                return _select_years(start_year, end_year)
+
+            # "stageA:stageB" or "stageA-stageB"
+            m = re.fullmatch(r"stage\s*(\d)\s*[:\-]\s*stage\s*(\d)", s)
+            if m:
+                a, b = int(m.group(1)), int(m.group(2))
+                start_year, end_year = _bounds_from_stage_indices(a, b)
+                return _select_years(start_year, end_year)
+
+            # "A:B" or "A-B" where A,B are stage indices (single digit)
+            m = re.fullmatch(r"(\d)\s*[:\-]\s*(\d)", s)
+            if m:
+                a, b = int(m.group(1)), int(m.group(2))
+                start_year, end_year = _bounds_from_stage_indices(a, b)
+                return _select_years(start_year, end_year)
+
+            # Explicit years "YYYY:YYYY" or "YYYY-YYYY"
+            m = re.fullmatch(r"(\d{3,4})\s*[:\-]\s*(\d{3,4})", s)
+            if m:
+                start_year, end_year = int(m.group(1)), int(m.group(2))
+                if start_year > end_year:
+                    start_year, end_year = end_year, start_year
+                return _select_years(start_year, end_year)
+
+            raise ValueError(
+                f"Invalid stage expression: {stage}. Expected like 'stage1', '1:3', or '1000-1469'."
+            )
+
+        raise TypeError("stage must be int, slice, or str representing stage/years")
+
+    def _read_data(self, region: Region) -> pd.DataFrame:
+        """读取数据，并统一为逐年索引"""
+        full_index = np.arange(1000, 2021)
+        df = pd.read_excel(
+            self.data_path,
+            sheet_name=region,
+            index_col=0,
+            header=1,
+        ).replace(0, pd.NA)
+        df.index.name = "year"
+        return df.reindex(full_index)
 
     def rescale_to_std(self, target_std=None):
         """
@@ -182,8 +320,7 @@ class HistoricalRecords:
         return self.data.replace(dict(zip(GRADE_VALUES, target_std)))
 
     def __repr__(self) -> str:
-        print("<Historical Records>")
-        return repr(self.data)
+        return f"<Historical Records: {self.data.shape}>"
 
     def __getattr__(self, item: str):
         return getattr(self._data, item)
@@ -220,27 +357,38 @@ class HistoricalRecords:
         inplace: bool = False,
         name: str | None = None,
         **kwargs,
-    ) -> pd.Series | None:
-        """转换为Series"""
+    ) -> pd.Series | "HistoricalRecords":
+        """转换为Series
+
+        If ``self.data`` is already a Series, it will be returned (optionally
+        interpolated/renamed). If it is a DataFrame, it will be aggregated along
+        rows (time) using ``how`` into a Series.
+        """
         # data = self.rescale_to_std()
         data = self.data
-        if how == "mean":
-            result = data.mean(axis=1)
-        elif how == "median":
-            result = data.median(axis=1)
-        elif how == "mode":
-            result = data.mode(axis=1)[0]
+        if isinstance(data, pd.Series):
+            result = data.copy()
         else:
-            raise ValueError(f"无效的聚合方法: {how}")
+            if how == "mean":
+                result = data.mean(axis=1)
+            elif how == "median":
+                result = data.median(axis=1)
+            elif how == "mode":
+                result = data.mode(axis=1)[0]
+            else:
+                raise ValueError(f"无效的聚合方法: {how}")
         if interpolate:
             result = result.interpolate(method=interpolate, **kwargs)
         if name is None:
-            func_name = str(how).lower()
-            name = f"{func_name}_{interpolate}" if interpolate else func_name
+            if isinstance(data, pd.Series) and data.name:
+                name = data.name
+            else:
+                func_name = str(how).lower()
+                name = f"{func_name}_{interpolate}" if interpolate else func_name
         result.name = name
         if inplace:
             self.data = result
-            return None
+            return self
         return result
 
     def merge_with(

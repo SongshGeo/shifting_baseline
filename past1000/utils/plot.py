@@ -448,3 +448,56 @@ def heatmap_with_annot(
     ax.set_xlabel("Natural data")
     ax.set_ylabel("Historical data")
     return ax
+
+
+@with_axes(figsize=(14, 3))
+def plot_std_times(
+    data: pd.Series,
+    ax: Optional[Axes] = None,
+    color_options: Optional[dict[str, str]] = None,
+) -> None:
+    """分段绘制正负值出现次数图
+
+    Args:
+        data: pd.Series
+            输入数据。
+        ax: matplotlib.axes.Axes
+            绘图的Axes对象。
+        colors: dict[str, str]
+            颜色映射。
+    """
+    assert isinstance(data, pd.Series), "data must be a pandas Series"
+    assert data.index.is_monotonic_increasing, "index must be monotonic increasing"
+    assert data.index.is_unique, "index must be unique"
+    assert ax is not None, "ax must be provided"
+
+    # 使用numpy条件设置颜色：正数蓝色，负数红色，零值灰色
+    if color_options is None:
+        color_options = {
+            "positive": "#689B8A",
+            "negative": "#E43636",
+            "zero": "gray",
+        }
+    colors = np.where(
+        data.values > 0,
+        color_options["positive"],  # 正数用蓝色
+        np.where(
+            data.values < 0, color_options["negative"], color_options["zero"]
+        ),  # 负数用红色，零值用灰色
+    )
+
+    # 绘制垂直线和散点
+    for x, y, color in zip(data.index, data.values, colors):
+        ax.vlines(x, 0, y, colors=color, linewidth=1)
+        ax.scatter(x, y, c=color, s=30, zorder=3)
+
+    # 添加基线
+    ax.axhline(y=0, color="black", linewidth=0.5, alpha=0.7)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.grid(True, alpha=0.3, ls=":", color="gray")
+
+    ax.set_ylabel("Times of STD")
+    ax.set_xlabel("Year")
+    return ax
