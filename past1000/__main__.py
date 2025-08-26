@@ -6,21 +6,16 @@
 # Website: https://cv.songshgeo.com/
 
 """
-past1000 是一个用于处理气候模式数据，并进行气候重建的Python库。
-
-如果直接运行此文件，则默认使用 config/config.yaml 作为配置文件。
-如果需要使用其他配置文件，则可以通过命令行参数 --config-name 指定。
-
-本文件用于对当前的工作流进行快速的批处理与输出。
+past1000 是一个用于对比历史集体记忆和气候重建资料的 Python 库。
 """
 
+import logging
+
 from hydra import main
-from loguru import logger
 from omegaconf import DictConfig
 
 from past1000.process import batch_process_recon_data
 from past1000.utils.config import format_by_config
-from past1000.utils.log import setup_logger
 
 __version__ = "0.1.0"
 __all__ = [
@@ -35,21 +30,12 @@ def _main(cfg: DictConfig | None = None):
     if cfg is None:
         raise ValueError("cfg 不能为空")
     cfg = format_by_config(cfg)
-    setup_logger(std_level=cfg.log.std)
-
-    logger.info(f"开始以“{cfg.how.name}”模式运行。")
-    pipeline = cfg.how.pipeline
-    # 获取处理流程
-    for step in pipeline:
-        logger.info(f"开始处理 {step}.")
-        # 在当前文件里，获取该步骤的函数
-        try:
-            func = globals()[step]
-            func(cfg)
-        except KeyError as e:
-            logger.error(f"没有找到 {step} 函数: {e}")
-        logger.info(f"步骤处理完成: {step}.")
-    logger.info("日志保存在 config/log/past1000.log")
+    log = logging.getLogger(__name__)
+    log.debug("开始以“%s”模式运行。", cfg.how.name)
+    log.info("测试")
+    log.warning("测试")
+    log.error("测试")
+    log.critical("测试")
 
 
 if __name__ == "__main__":

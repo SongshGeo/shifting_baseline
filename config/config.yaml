@@ -1,28 +1,6 @@
 defaults:
 - ds: mac
 - how: process
+- override hydra/job_logging: custom
+- override hydra/hydra_logging: custom
 - _self_
-
-# 数据频率
-freq: mon
-# 变量
-vars:
-  - pr
-  # - tas
-  - tasmin
-  - tasmax
-  # - hfls
-  # - mrso
-  # - mrro
-  # - rsd
-  # - rld
-  # - sfcWind
-  # - hurs
-
-models:
-  - ACCESS-ESM1-5
-  - MIROC-ES2L
-  - MRI-ESM2-0
-
-log:
-  std: WARNING
