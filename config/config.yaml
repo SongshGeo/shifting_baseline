@@ -3,3 +3,20 @@ defaults:
 - how: process
 - override hydra/job_logging: log
 - _self_
+
+
+# # 历史记录数据的时间段
+# START = 1000
+# STAGE1 = 1469
+# STAGE2 = 1659
+# END = 1900
+# FINAL = 2010
+years:
+  start: 1000
+  stage1: 1469
+  stage2: 1659
+  end: 1900
+  final: 2010
+
+# Testing mode - when enabled, only test logging and exit
+test_mode: false

@@ -7,7 +7,7 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: INFO          # 从 WARNING 改为 INFO
+    level: WARNING       # 控制台只显示 WARNING 及以上级别
     formatter: simple
     stream: ext://sys.stdout
   file:

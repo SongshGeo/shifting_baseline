@@ -51,13 +51,16 @@ class TestSingleRunLogging:
         """Single run should create app.log with DEBUG content and console at WARNING.
 
         Steps:
+        - Enable test_mode to avoid executing business logic.
         - Force hydra.run.dir to a temp directory.
         - Run module once.
         - Assert app.log exists and contains a DEBUG line.
         - Assert stdout has no INFO/DEBUG text.
         """
         run_dir = tmp_path / "run1"
-        cp = _run_module(python_bin, repo_root, [f"hydra.run.dir={run_dir}"])
+        cp = _run_module(
+            python_bin, repo_root, [f"hydra.run.dir={run_dir}", "test_mode=true"]
+        )
         # Console should not contain INFO/DEBUG
         assert " DEBUG " not in cp.stdout
         assert " INFO " not in cp.stdout
@@ -69,6 +72,13 @@ class TestSingleRunLogging:
         assert (
             " DEBUG " in content or "DEBUG" in content
         ), "File log should include DEBUG lines"
+
+        # Verify test log messages are present
+        assert "这是一条 DEBUG 日志消息" in content
+        assert "这是一条 INFO 日志消息" in content
+        assert "这是一条 WARNING 日志消息" in content
+        assert "这是一条 ERROR 日志消息" in content
+        assert "这是一条 CRITICAL 日志消息" in content
 
 
 @pytest.mark.parametrize(
@@ -89,6 +99,7 @@ class TestMultiRunLogging:
         """Multirun should create a log file for each job under hydra.sweep.dir.
 
         Steps:
+        - Enable test_mode to avoid executing business logic.
         - Use -m to enable multirun and sweep an existing option.
         - Override hydra.sweep.dir and subdir to controlled temp locations.
         - Assert logs exist under each job subdir and contain DEBUG lines.
@@ -101,6 +112,7 @@ class TestMultiRunLogging:
                 "-m",
                 f"hydra.sweep.dir={sweep_dir}",
                 "hydra.sweep.subdir=${hydra.job.num}",
+                "test_mode=true",
                 sweep_param,
             ],
         )
@@ -116,6 +128,10 @@ class TestMultiRunLogging:
             content = log_file.read_text(encoding="utf-8")
             assert "DEBUG" in content, f"Job {job_idx} log should include DEBUG lines"
 
+            # Verify specific test log messages are present
+            assert "这是一条 DEBUG 日志消息" in content
+            assert "日志测试完成，程序退出" in content
+
 
 class TestOverrideLogFilename:
     """Tests for overriding log filename via Hydra override.
@@ -129,6 +145,7 @@ class TestOverrideLogFilename:
         """Single run with filename override should write to custom name.
 
         Steps:
+        - Enable test_mode to avoid executing business logic.
         - Override job_logging file handler filename to custom.log.
         - Assert 'custom.log' exists and default 'app.log' does not.
         """
@@ -140,6 +157,7 @@ class TestOverrideLogFilename:
             [
                 f"hydra.run.dir={run_dir}",
                 f"hydra.job_logging.handlers.file.filename={custom_file}",
+                "test_mode=true",
             ],
         )
         # Console should not contain INFO/DEBUG
@@ -151,3 +169,86 @@ class TestOverrideLogFilename:
         assert not (
             run_dir / "app.log"
         ).exists(), "Default app.log should not be created when overridden"
+
+        # Verify test log messages are present in custom file
+        content = custom_file.read_text(encoding="utf-8")
+        assert "这是一条 DEBUG 日志消息" in content
+        assert "日志测试完成，程序退出" in content
+
+
+class TestLoggingTestMode:
+    """Tests for the test_mode functionality.
+
+    These tests verify that when test_mode=true is set, the application:
+    1) Only executes logging tests without business logic
+    2) Outputs all log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    3) Exits cleanly without processing data
+    """
+
+    def test_test_mode_produces_all_log_levels(
+        self, python_bin: str, repo_root: Path, tmp_path: Path
+    ) -> None:
+        """Test mode should produce all log levels and exit cleanly."""
+        run_dir = tmp_path / "test_mode_run"
+        cp = _run_module(
+            python_bin, repo_root, [f"hydra.run.dir={run_dir}", "test_mode=true"]
+        )
+
+        # Should complete successfully without errors
+        assert cp.returncode == 0
+
+        # Console should not contain INFO/DEBUG (they go to file)
+        assert " DEBUG " not in cp.stdout
+        assert " INFO " not in cp.stdout
+
+        # Log file should exist and contain all test messages
+        log_file = run_dir / "app.log"
+        assert log_file.exists()
+        content = log_file.read_text(encoding="utf-8")
+
+        # Verify all log levels are present
+        expected_messages = [
+            "这是一条 DEBUG 日志消息",
+            "这是一条 INFO 日志消息",
+            "这是一条 WARNING 日志消息",
+            "这是一条 ERROR 日志消息",
+            "这是一条 CRITICAL 日志消息",
+            "日志测试完成，程序退出",
+        ]
+
+        for message in expected_messages:
+            assert message in content, f"Missing expected message: {message}"
+
+    def test_normal_mode_vs_test_mode(
+        self, python_bin: str, repo_root: Path, tmp_path: Path
+    ) -> None:
+        """Compare normal mode vs test mode execution."""
+        # Test mode run
+        test_run_dir = tmp_path / "test_mode"
+        test_cp = _run_module(
+            python_bin, repo_root, [f"hydra.run.dir={test_run_dir}", "test_mode=true"]
+        )
+
+        # Test mode should complete much faster and successfully
+        assert test_cp.returncode == 0
+
+        test_log = test_run_dir / "app.log"
+        test_content = test_log.read_text(encoding="utf-8")
+
+        # Test mode should NOT contain business logic messages
+        business_messages = [
+            "实验开始，配置文件请参看",
+            "Step 1: 加载数据",
+            "Step 2: 比较每个树轮数据",
+            "Step 3: 整合树轮数据",
+            "Step 4: 历史数据时期对比",
+        ]
+
+        for message in business_messages:
+            assert (
+                message not in test_content
+            ), f"Test mode should not contain: {message}"
+
+        # But should contain test messages
+        assert "这是一条 DEBUG 日志消息" in test_content
+        assert "日志测试完成，程序退出" in test_content
