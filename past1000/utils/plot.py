@@ -346,7 +346,26 @@ def plot_mismatch_matrix(
         return p_value < 0.1
 
     # 1. 设置渐变色和归一化
-    vmax = np.nanmax(np.abs(actual_diff_aligned.values))
+    # 处理全为NaN的情况（如完美匹配数据）
+    try:
+        # 转换为数值数组，确保可以使用numpy函数
+        values_array = pd.to_numeric(
+            actual_diff_aligned.values.flatten(), errors="coerce"
+        )
+        abs_values = np.abs(values_array)
+
+        if np.isnan(abs_values).all() or len(abs_values) == 0:
+            # 全为NaN的情况，设置默认值
+            vmax = 1.0
+        else:
+            vmax = np.nanmax(abs_values)
+            # 处理可能的无穷值或非正值
+            if np.isnan(vmax) or np.isinf(vmax) or vmax <= 0:
+                vmax = 1.0
+    except (ValueError, TypeError):
+        # 如果转换失败，使用默认值
+        vmax = 1.0
+
     cmap = mpl.cm.coolwarm  # 或 mpl.cm.RdBu
     # 归一化，使用幂函数归一化，gamma=0.5 使得颜色分布更均匀
     norm = mpl.colors.PowerNorm(gamma=0.5, vmin=-vmax, vmax=vmax)
