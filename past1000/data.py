@@ -18,6 +18,7 @@ import pandas as pd
 from fitter import Fitter, get_common_distributions
 from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
 from geo_dskit.utils.path import filter_files, get_files
+from omegaconf import DictConfig
 
 from past1000.constants import GRADE_VALUES, STAGES_BINS, STD_THRESHOLDS
 from past1000.mc import standardize_both
@@ -64,6 +65,7 @@ def load_nat_data(
     index_name: str = "year",
     start_year: int = 1000,
     standardize: bool = True,
+    end_year: int = 2021,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """加载自然数据，并进行标准化处理，返回数据和不确定性
 
@@ -78,7 +80,8 @@ def load_nat_data(
         uncertainties (pd.DataFrame): 不确定性
     """
     includes_str = ", ".join(includes)
-    log.info("开始加载自然数据，文件夹: %s，包含: %s，开始年份: %s", folder, includes_str, start_year)
+    log.info("从 %s 加载自然数据: %s", folder, includes_str)
+    log.debug("年份范围: %s-%s", start_year, end_year)
 
     datasets = []
     uncertainties = []
@@ -419,3 +422,51 @@ class HistoricalRecords:
         """
         arr1 = self.get_series(col=col)
         return calc_corr(arr1, arr2, how)
+
+    def detect_mismatch(
+        self,
+        true_data: pd.Series,
+        years: slice,
+        agg_method: HistoricalAggregateType = "mean",
+    ):
+        """检测历史记录和真实数据之间的差异
+
+        Returns:
+            MismatchReport: 不匹配分析报告
+
+        Note:
+            需要先导入: from past1000.calibration import MismatchReport
+        """
+        from past1000.calibration import MismatchReport
+
+        recorded = self.to_series(how=agg_method).loc[years]
+        # 处理缺失值 - 内联实现避免循环导入
+        combined = pd.concat([true_data.loc[years], recorded], axis=1).dropna()
+        if len(combined) == 0:
+            raise ValueError("清理缺失值后没有有效数据")
+        nat, his = combined.iloc[:, 0], combined.iloc[:, 1]
+
+        return MismatchReport(pred=his, true=nat)
+
+
+def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRecords]:
+    """读取自然和历史数据，以及不确定性"""
+    log = logging.getLogger(__name__)
+    start_year = cfg.years.start
+    end_year = cfg.years.end
+    log.info("加载自然数据 [%s-%s]...", start_year, end_year)
+    log.debug("数据路径: %s", cfg.ds.noaa)
+    log.debug("数据包括: %s", cfg.ds.includes)
+    datasets, uncertainties = load_nat_data(
+        folder=cfg.ds.noaa,
+        includes=cfg.ds.includes,
+        index_name="year",
+        start_year=start_year,
+    )
+    log.info("加载历史数据 ...")
+    history = HistoricalRecords(
+        shp_path=cfg.ds.atlas.shp,
+        data_path=cfg.ds.atlas.file,
+        symmetrical_level=True,
+    )
+    return datasets, uncertainties, history

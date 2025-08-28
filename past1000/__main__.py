@@ -14,7 +14,7 @@ import logging
 from hydra import main
 from omegaconf import DictConfig
 
-from past1000.calibration import load_data
+from past1000.data import load_data
 from past1000.mc import combine_reconstructions
 from past1000.process import batch_process_recon_data
 from past1000.utils.config import format_by_config, get_output_dir

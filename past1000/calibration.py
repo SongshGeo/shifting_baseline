@@ -11,13 +11,11 @@ from typing import Literal, overload
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from omegaconf import DictConfig
 from scipy.stats import kendalltau, norm
 from sklearn.metrics import cohen_kappa_score, confusion_matrix
 from tqdm.auto import tqdm
 
 from past1000.constants import LEVELS, LEVELS_PROB, TICK_LABELS
-from past1000.data import HistoricalRecords, load_nat_data
 from past1000.filters import classify
 from past1000.utils.plot import (
     heatmap_with_annot,
@@ -55,7 +53,7 @@ class MismatchReport:
         带错误模式分析：
         >>> report = MismatchReport(pred_levels, true_levels, value_series=natural_data)
         >>> error_df = report.analyze_error_patterns()  # 分析错误模式
-        >>> print(error_df[['value', 'expect', 'classified', 'exact', 'diff']])
+        >>> print(error_df[['value', 'pred', 'true', 'exact', 'diff']])
     """
 
     def __repr__(self) -> str:
@@ -75,14 +73,28 @@ class MismatchReport:
         self.value_series = value_series  # 原始连续值序列，用于错误模式分析
         self.labels = labels if labels is not None else TICK_LABELS
         self.mc_runs = mc_runs
-        self.diff_matrix = None  # 错误分析矩阵，只有在调用 analyze_error_patterns 后才创建
+        # 错误分析矩阵，只有在调用 analyze_error_patterns 后才创建
+        self.diff_matrix: pd.DataFrame | None = None
 
         # 清理数据：移除缺失值
         self._clean_data()
         self._compute_confusion_matrix()
 
     @property
+    def false_count_matrix(self) -> pd.DataFrame:
+        """返回false count矩阵"""
+        # 计算错误计数矩阵（对角线为0，其他为实际错误数）
+        true = np.zeros((self.n_categories, self.n_categories), dtype=bool)
+        np.fill_diagonal(true, 1)
+        return pd.DataFrame(
+            np.where(true, 0, self.cm_df.values),
+            index=pd.Series(LEVELS, name="true"),
+            columns=pd.Series(LEVELS, name="pred"),
+        )
+
+    @property
     def n_samples(self) -> int:
+        """有效样本数"""
         return len(self.data)
 
     def _clean_data(self) -> None:
@@ -102,8 +114,8 @@ class MismatchReport:
         """计算混淆矩阵"""
         cm = confusion_matrix(self.true_clean, self.pred_clean, labels=LEVELS).T
         self.cm_df = pd.DataFrame(cm, index=self.labels, columns=self.labels)
-        self.cm_df.index.name = "classified"
-        self.cm_df.columns.name = "expect"
+        self.cm_df.index.name = "true"
+        self.cm_df.columns.name = "pred"
 
     def analyze_error_patterns(
         self, value_series: pd.Series | None = None
@@ -118,8 +130,8 @@ class MismatchReport:
 
         Note:
             - value: 原始连续值（如自然数据）
-            - expect: 预测等级 (pred_clean)
-            - classified: 真实等级 (true_clean)
+            - pred: 预测等级 (pred_clean)
+            - true: 真实等级 (true_clean)
         """
         if value_series is None:
             value_series = self.value_series
@@ -135,9 +147,9 @@ class MismatchReport:
             return pd.DataFrame()
 
         # 重命名列以匹配预期的结构
-        df.columns = ["value", "expect", "classified"]
+        df.columns = ["value", "pred", "true"]
         # 检查分类准确性
-        df["exact"] = df["expect"] == df["classified"]
+        df["exact"] = df["pred"] == df["true"]
         # 计算同类别内的差异
         df["last"] = self._generate_last_column(df)
         df["diff"] = df["value"] - df["last"]
@@ -145,39 +157,32 @@ class MismatchReport:
         # 创建错误分析矩阵
         self.diff_matrix = self._create_misclassification_matrix(df)
 
-        # 计算错误计数矩阵（对角线为0，其他为实际错误数）
-        self.false_count_matrix = pd.DataFrame(
-            np.where(np.eye(self.n_categories), 0, self.cm_df.values),
-            index=LEVELS,
-            columns=LEVELS,
-        )
-
         self._run_significance_test()
-        return df
+        return self.diff_matrix
 
     def _generate_last_column(self, df: pd.DataFrame) -> pd.Series:
         """生成上一次同类别的值"""
         df = df.copy()
         df["last"] = np.nan
-        for c in df["classified"].unique():
-            mask = df["classified"] == c
+        for c in df["true"].unique():
+            mask = df["true"] == c
             df.loc[mask, "last"] = df.loc[mask, "value"].shift(1)
         return df["last"]
 
     def _create_misclassification_matrix(self, df: pd.DataFrame) -> pd.DataFrame:
         """创建错误分类的差异矩阵"""
-        misclassified = df[~df["exact"]].copy()
+        mistrue = df[~df["exact"]].copy()
 
-        if len(misclassified) == 0:
+        if len(mistrue) == 0:
             logger.warning("没有发现分类错误")
             return pd.DataFrame(index=LEVELS, columns=LEVELS)
 
         # 计算各种错误组合的平均差异
         pivot_matrix = pd.pivot_table(
-            misclassified,
+            mistrue,
             values="diff",
-            index="expect",
-            columns="classified",
+            index="pred",
+            columns="true",
             aggfunc="mean",
             fill_value=np.nan,
         )
@@ -195,18 +200,18 @@ class MismatchReport:
         for _ in tqdm(range(self.mc_runs), desc="MC模拟"):
             # 生成随机数据
             random_data = np.random.normal(0, 1, n_samples)
-            random_expect = np.random.choice(LEVELS, size=n_samples, p=LEVELS_PROB)
+            random_pred = np.random.choice(LEVELS, size=n_samples, p=LEVELS_PROB)
 
             random_df = pd.DataFrame(
                 {
                     "value": random_data,
-                    "expect": random_expect,
-                    "classified": classify(random_data),
+                    "pred": random_pred,
+                    "true": classify(random_data),
                 }
             )
 
             # 计算差异矩阵
-            random_df["exact"] = random_df["expect"] == random_df["classified"]
+            random_df["exact"] = random_df["pred"] == random_df["true"]
             random_df["last"] = self._generate_last_column(random_df)
             random_df["diff"] = random_df["value"] - random_df["last"]
 
@@ -362,29 +367,6 @@ class MismatchReport:
             result["false_count_matrix"] = self.false_count_matrix.to_dict()
 
         return result
-
-
-def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRecords]:
-    """读取自然和历史数据，以及不确定性"""
-    log = logging.getLogger(__name__)
-    start_year = cfg.years.start
-    end_year = cfg.years.end
-    log.info("加载自然数据 [%s-%s]...", start_year, end_year)
-    log.debug("数据路径: %s", cfg.ds.noaa)
-    log.debug("数据包括: %s", cfg.ds.includes)
-    datasets, uncertainties = load_nat_data(
-        folder=cfg.ds.noaa,
-        includes=cfg.ds.includes,
-        index_name="year",
-        start_year=start_year,
-    )
-    log.info("加载历史数据 ...")
-    history = HistoricalRecords(
-        shp_path=cfg.ds.atlas.shp,
-        data_path=cfg.ds.atlas.file,
-        symmetrical_level=True,
-    )
-    return datasets, uncertainties, history
 
 
 def report_mismatch(

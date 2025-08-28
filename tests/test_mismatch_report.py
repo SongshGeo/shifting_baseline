@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
+from pandas.testing import assert_frame_equal
 
 from past1000.calibration import MismatchReport
 from past1000.constants import LEVELS, TICK_LABELS
@@ -343,8 +344,7 @@ class TestMismatchReportErrorAnalysis:
 
         assert isinstance(error_df, pd.DataFrame)
         assert len(error_df) > 0
-        expected_columns = {"value", "expect", "classified", "exact", "last", "diff"}
-        assert set(error_df.columns) == expected_columns
+        assert_frame_equal(error_df, report.diff_matrix)
 
         # Check that analysis matrices are created
         assert hasattr(report, "diff_matrix")
