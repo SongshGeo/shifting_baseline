@@ -63,7 +63,6 @@ class MismatchReport:
         self,
         pred: pd.Series,
         true: pd.Series,
-        mc_runs: int = 1000,
         labels: list[str] | None = None,
         value_series: pd.Series | None = None,
     ):
@@ -72,9 +71,10 @@ class MismatchReport:
         self.true = true
         self.value_series = value_series  # 原始连续值序列，用于错误模式分析
         self.labels = labels if labels is not None else TICK_LABELS
-        self.mc_runs = mc_runs
         # 错误分析矩阵，只有在调用 analyze_error_patterns 后才创建
+        self._analyzed = False
         self.diff_matrix: pd.DataFrame | None = None
+        self.p_value_matrix: pd.DataFrame | None = None
 
         # 清理数据：移除缺失值
         self._clean_data()
@@ -97,6 +97,21 @@ class MismatchReport:
         """有效样本数"""
         return len(self.data)
 
+    @property
+    def n_raw_samples(self) -> int:
+        """原始样本数"""
+        return len(self.pred)
+
+    @property
+    def n_mismatches(self) -> int:
+        """不匹配数"""
+        return self.false_count_matrix.sum().sum()
+
+    @property
+    def error_analyzed(self) -> bool:
+        """是否已经进行了错误分析"""
+        return self._analyzed
+
     def _clean_data(self) -> None:
         """清理输入数据，移除缺失值"""
         data = pd.concat([self.pred, self.true], axis=1).dropna()
@@ -118,7 +133,9 @@ class MismatchReport:
         self.cm_df.columns.name = "pred"
 
     def analyze_error_patterns(
-        self, value_series: pd.Series | None = None
+        self,
+        value_series: pd.Series | None = None,
+        mc_runs: int = 1000,
     ) -> pd.DataFrame:
         """分析分类错误的模式（公开方法）
 
@@ -156,8 +173,8 @@ class MismatchReport:
 
         # 创建错误分析矩阵
         self.diff_matrix = self._create_misclassification_matrix(df)
-
-        self._run_significance_test()
+        self._analyzed = True
+        self._run_significance_test(mc_runs=mc_runs)
         return self.diff_matrix
 
     def _generate_last_column(self, df: pd.DataFrame) -> pd.Series:
@@ -190,14 +207,14 @@ class MismatchReport:
         # 确保所有等级都存在
         return pivot_matrix.reindex(index=LEVELS, columns=LEVELS, fill_value=np.nan)
 
-    def _run_significance_test(self):
+    def _run_significance_test(self, mc_runs: int = 1000):
         """运行蒙特卡洛显著性检验"""
-        logger.info("开始蒙特卡洛模拟 (n=%d)", self.mc_runs)
+        logger.info("开始蒙特卡洛模拟 (n=%d)", mc_runs)
 
         all_diff_matrices = []
-        n_samples = self.n_samples
+        n_samples = self.n_raw_samples
 
-        for _ in tqdm(range(self.mc_runs), desc="MC模拟"):
+        for _ in tqdm(range(mc_runs), desc="MC模拟"):
             # 生成随机数据
             random_data = np.random.normal(0, 1, n_samples)
             random_pred = np.random.choice(LEVELS, size=n_samples, p=LEVELS_PROB)
@@ -221,22 +238,19 @@ class MismatchReport:
 
         if not all_diff_matrices:
             logger.warning("蒙特卡洛模拟中未发现错误分类")
-            self.mc_mean_matrix = pd.DataFrame(index=LEVELS, columns=LEVELS)
-            self.mc_std_matrix = pd.DataFrame(index=LEVELS, columns=LEVELS)
-            self.p_value_matrix = pd.DataFrame(index=LEVELS, columns=LEVELS)
             return
 
         # 计算统计量
         combined_matrices = pd.concat(all_diff_matrices)
-        self.mc_mean_matrix = combined_matrices.groupby(level=0).mean()
-        self.mc_std_matrix = combined_matrices.groupby(level=0).std()
+        mc_mean_matrix = combined_matrices.groupby(level=0).mean()
+        mc_std_matrix = combined_matrices.groupby(level=0).std()
 
         # 确保索引一致
-        for matrix in [self.mc_mean_matrix, self.mc_std_matrix]:
+        for matrix in [mc_mean_matrix, mc_std_matrix]:
             matrix = matrix.reindex(index=LEVELS, columns=LEVELS)
 
         # 计算p值
-        z_scores = (self.diff_matrix - self.mc_mean_matrix) / self.mc_std_matrix
+        z_scores = (self.diff_matrix - mc_mean_matrix) / mc_std_matrix
 
         # 处理 NaN 值，将其转换为 float 类型避免 object dtype 问题
         z_scores = z_scores.astype(float)
@@ -285,7 +299,8 @@ class MismatchReport:
             "kendall_tau": tau,
             "tau_p_value": tau_p_value,
             "accuracy": accuracy,
-            "n_samples": len(self.data),
+            "n_samples": self.n_samples,
+            "n_raw_samples": self.n_raw_samples,
         }
 
         if as_str:
@@ -307,6 +322,9 @@ class MismatchReport:
         """绘制不匹配分析图"""
         if self.diff_matrix is None:
             raise ValueError("需要先调用 analyze_error_patterns() 进行错误分析")
+        if self.n_mismatches == 0:
+            logger.warning("没有发现分类错误，无法绘制不匹配分析图")
+            return ax
         return plot_mismatch_matrix(
             actual_diff_aligned=self.diff_matrix,
             p_value_matrix=self.p_value_matrix,
@@ -323,7 +341,7 @@ class MismatchReport:
         )
 
     def generate_report_figure(
-        self, figsize: tuple = (10, 4), save_path: str | None = None
+        self, figsize: tuple = (6, 4), save_path: str | None = None
     ) -> plt.Figure:
         """生成完整的报告图表"""
         if self.diff_matrix is None:
@@ -355,16 +373,15 @@ class MismatchReport:
         result = {
             "statistics": self.get_statistics_summary(),
             "confusion_matrix": self.cm_df.to_dict(),
-            "mc_runs": self.mc_runs,
         }
 
         # 只有在进行过错误分析后才包含相关矩阵
-        if hasattr(self, "diff_matrix") and self.diff_matrix is not None:
+        result["false_count_matrix"] = self.false_count_matrix.to_dict()
+        if self.error_analyzed:
+            assert self.diff_matrix is not None
+            assert self.p_value_matrix is not None
             result["diff_matrix"] = self.diff_matrix.to_dict()
-        if hasattr(self, "p_value_matrix"):
             result["p_value_matrix"] = self.p_value_matrix.to_dict()
-        if hasattr(self, "false_count_matrix"):
-            result["false_count_matrix"] = self.false_count_matrix.to_dict()
 
         return result
 

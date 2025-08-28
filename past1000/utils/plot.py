@@ -23,6 +23,24 @@ from past1000.constants import LEVELS, TICK_LABELS
 from past1000.utils.calc import fill_star_matrix, get_coords
 
 
+def is_significant(p_value: float, threshold: float = 0.1) -> bool:
+    if np.isnan(p_value):
+        return False
+    return p_value < threshold
+
+
+def get_marker(p_value: float, threshold: float = 0.1) -> str:
+    if is_significant(p_value, threshold=0.01):
+        marker = "***"
+    elif is_significant(p_value, threshold=0.05):
+        marker = "**"
+    elif is_significant(p_value, threshold=0.10):
+        marker = "*"
+    else:
+        marker = ""
+    return marker
+
+
 @with_axes(figsize=(12, 3))
 def plot_single_time_series(
     data: xr.DataArray,
@@ -340,44 +358,37 @@ def plot_mismatch_matrix(
     """
     assert isinstance(ax, Axes), "ax must be an instance of Axes"
 
-    def is_significant(p_value: float) -> bool:
-        if np.isnan(p_value):
-            return False
-        return p_value < 0.1
-
     # 1. 设置渐变色和归一化
-    # 处理全为NaN的情况（如完美匹配数据）
-    try:
-        # 转换为数值数组，确保可以使用numpy函数
-        values_array = pd.to_numeric(
-            actual_diff_aligned.values.flatten(), errors="coerce"
-        )
-        abs_values = np.abs(values_array)
-
-        if np.isnan(abs_values).all() or len(abs_values) == 0:
-            # 全为NaN的情况，设置默认值
-            vmax = 1.0
-        else:
-            vmax = np.nanmax(abs_values)
-            # 处理可能的无穷值或非正值
-            if np.isnan(vmax) or np.isinf(vmax) or vmax <= 0:
-                vmax = 1.0
-    except (ValueError, TypeError):
-        # 如果转换失败，使用默认值
-        vmax = 1.0
-
+    # vmax = np.nanmax(np.abs(actual_diff_aligned.values))
+    vmax = 0.2
     cmap = mpl.cm.coolwarm  # 或 mpl.cm.RdBu
-    # 归一化，使用幂函数归一化，gamma=0.5 使得颜色分布更均匀
-    norm = mpl.colors.PowerNorm(gamma=0.5, vmin=-vmax, vmax=vmax)
+    # 使用线性归一化，对于对称的数据分布更合适
+    norm = mpl.colors.Normalize(vmin=-vmax, vmax=vmax)
 
     for l1, l2 in product(LEVELS, LEVELS):
         value = actual_diff_aligned.loc[l1, l2]
+        if l1 == l2 or np.isnan(value):
+            continue
         p_value = p_value_matrix.loc[l1, l2]
         false_count = false_count_matrix.loc[l1, l2]
+
         color = cmap(norm(value))
-        lw = false_count * 0.5
-        alpha = 0.9 if is_significant(p_value) else 0.4
-        ax.plot([0, 1], [l2, l1], lw=lw, color=color, alpha=alpha)
+        lw = false_count * 0.7
+        va = "bottom" if l1 > l2 else "top"
+        marker = get_marker(p_value, threshold=0.1)
+        if marker:
+            ax.text(
+                0,
+                l2,
+                marker,
+                ha="left",
+                va=va,
+                fontsize=10,
+                fontweight="bold",
+                color=color,
+                zorder=10,
+            )
+        ax.plot([0, 1], [l2, l1], lw=lw, color=color, alpha=0.8)
 
     ax.set_xlim(0, 1)
     ax.set_ylim(-2.5, 2.5)
@@ -391,9 +402,7 @@ def plot_mismatch_matrix(
     sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
 
-    cbar = plt.colorbar(
-        sm, ax=ax, orientation="horizontal", pad=0.18, fraction=0.15, alpha=0.4
-    )
+    cbar = plt.colorbar(sm, ax=ax, orientation="horizontal", pad=0.18, fraction=0.15)
     # cbar.set_label('Standardized difference', labelpad=8, fontsize=10, loc='center')
     cbar.ax.xaxis.set_label_position("bottom")  # 标签放到上方
     cbar.ax.set_xlabel("Std. diff. between last/current")

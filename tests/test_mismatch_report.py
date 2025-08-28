@@ -125,7 +125,7 @@ class TestMismatchReportInitialization:
         - All analysis components are computed
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=10)  # Use fewer runs for speed
+        report = MismatchReport(pred, true)  # mc_runs moved to analyze_error_patterns
 
         # Check basic properties
         assert isinstance(report, MismatchReport)
@@ -152,13 +152,10 @@ class TestMismatchReportInitialization:
         """
         pred, true = realistic_data
         custom_labels = ["A", "B", "C", "D", "E"]
-        custom_mc_runs = 50
 
-        report = MismatchReport(
-            pred, true, mc_runs=custom_mc_runs, labels=custom_labels
-        )
+        report = MismatchReport(pred, true, labels=custom_labels)
 
-        assert report.mc_runs == custom_mc_runs
+        # mc_runs is no longer stored in the report object
         assert report.labels == custom_labels
         assert list(report.cm_df.index) == custom_labels
         assert list(report.cm_df.columns) == custom_labels
@@ -204,7 +201,7 @@ class TestMismatchReportDataCleaning:
         pred, true = sparse_data
         original_valid = (~pred.isna() & ~true.isna()).sum()
 
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         assert len(report.pred_clean) == original_valid
         assert len(report.true_clean) == original_valid
@@ -223,7 +220,7 @@ class TestMismatchReportDataCleaning:
         pred.iloc[5:10] = np.nan
         true.iloc[15:20] = np.nan
 
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Check that remaining data is properly aligned
         assert report.pred_clean.index.equals(report.true_clean.index)
@@ -242,7 +239,7 @@ class TestMismatchReportStatistics:
         - Kendall's Tau = 1.0 (or very close)
         """
         pred, true = perfect_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         stats = report.get_statistics_summary()
         assert stats["accuracy"] == 1.0
@@ -259,7 +256,7 @@ class TestMismatchReportStatistics:
         - Tau should be computable (may be NaN for constant predictions)
         """
         pred, true = extreme_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         stats = report.get_statistics_summary()
         assert stats["accuracy"] == 0.0
@@ -276,11 +273,18 @@ class TestMismatchReportStatistics:
         - Significance marking works correctly
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Test dictionary format
         stats_dict = report.get_statistics_summary(as_str=False)
-        expected_keys = {"kappa", "kendall_tau", "tau_p_value", "accuracy", "n_samples"}
+        expected_keys = {
+            "kappa",
+            "kendall_tau",
+            "tau_p_value",
+            "accuracy",
+            "n_samples",
+            "n_raw_samples",
+        }
         assert set(stats_dict.keys()) == expected_keys
         assert all(
             isinstance(v, (int, float, np.integer, np.floating))
@@ -306,7 +310,7 @@ class TestMismatchReportConfusionMatrix:
         - All values are non-negative integers
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         assert report.cm_df.shape == (5, 5)
         assert list(report.cm_df.index) == TICK_LABELS
@@ -321,7 +325,7 @@ class TestMismatchReportConfusionMatrix:
         of valid (non-missing) data points.
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         assert report.cm_df.sum().sum() == len(report.pred_clean)
 
@@ -332,7 +336,7 @@ class TestMismatchReportErrorAnalysis:
     def test_analyze_error_patterns_with_value_series(self, realistic_data):
         """Should analyze error patterns when value_series is provided."""
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Create natural value series
         natural_data = pd.Series(
@@ -340,7 +344,7 @@ class TestMismatchReportErrorAnalysis:
         )
 
         # Analyze error patterns
-        error_df = report.analyze_error_patterns(natural_data)
+        error_df = report.analyze_error_patterns(natural_data, mc_runs=10)
 
         assert isinstance(error_df, pd.DataFrame)
         assert len(error_df) > 0
@@ -354,10 +358,10 @@ class TestMismatchReportErrorAnalysis:
     def test_analyze_error_patterns_without_value_series(self, realistic_data):
         """Should handle gracefully when no value_series is provided."""
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Call without providing value_series
-        error_df = report.analyze_error_patterns()
+        error_df = report.analyze_error_patterns(mc_runs=10)
 
         # Should return empty DataFrame and log warning
         assert isinstance(error_df, pd.DataFrame)
@@ -373,10 +377,10 @@ class TestMismatchReportErrorAnalysis:
         )
 
         # Initialize with value_series
-        report = MismatchReport(pred, true, mc_runs=5, value_series=natural_data)
+        report = MismatchReport(pred, true, value_series=natural_data)
 
-        # Call analyze_error_patterns without arguments
-        error_df = report.analyze_error_patterns()
+        # Call analyze_error_patterns with mc_runs
+        error_df = report.analyze_error_patterns(mc_runs=10)
 
         assert isinstance(error_df, pd.DataFrame)
         assert len(error_df) > 0
@@ -394,14 +398,14 @@ class TestMismatchReportMonteCarlo:
         - P-values are within valid range [0, 1]
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=20)
+        report = MismatchReport(pred, true)
 
         # Need to call analyze_error_patterns first
         natural_data = pd.Series(np.random.normal(0, 1, len(pred)), index=pred.index)
-        report.analyze_error_patterns(natural_data)
+        report.analyze_error_patterns(natural_data, mc_runs=20)
 
-        assert hasattr(report, "mc_mean_matrix")
-        assert hasattr(report, "mc_std_matrix")
+        # After analyze_error_patterns, these matrices should be available
+        assert hasattr(report, "diff_matrix")
         assert hasattr(report, "p_value_matrix")
 
         # Check shapes
@@ -421,15 +425,15 @@ class TestMismatchReportMonteCarlo:
         no division by zero or similar numerical issues.
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=1)
+        report = MismatchReport(pred, true)
 
         # Need to call analyze_error_patterns first
         natural_data = pd.Series(np.random.normal(0, 1, len(pred)), index=pred.index)
-        report.analyze_error_patterns(natural_data)
+        report.analyze_error_patterns(natural_data, mc_runs=1)
 
         # Should complete without errors
         assert hasattr(report, "p_value_matrix")
-        assert report.mc_runs == 1
+        # mc_runs is no longer stored in the report object
 
     def test_monte_carlo_with_no_misclassifications(self, perfect_data):
         """Should handle case where no misclassifications occur.
@@ -438,11 +442,11 @@ class TestMismatchReportMonteCarlo:
         misclassification patterns to analyze.
         """
         pred, true = perfect_data
-        report = MismatchReport(pred, true, mc_runs=10)
+        report = MismatchReport(pred, true)
 
         # For perfect data, we can still analyze error patterns
         natural_data = pd.Series(np.random.normal(0, 1, len(pred)), index=pred.index)
-        report.analyze_error_patterns(natural_data)
+        report.analyze_error_patterns(natural_data, mc_runs=10)
 
         # Should create matrices without crashing (may be empty/NaN for perfect matches)
         assert hasattr(report, "diff_matrix")
@@ -461,7 +465,7 @@ class TestMismatchReportVisualization:
         - Can specify custom title
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Test with default title
         ax1 = report.plot_confusion_matrix()
@@ -479,11 +483,11 @@ class TestMismatchReportVisualization:
         Tests plot creation for the flow/difference matrix visualization.
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Need error analysis for mismatch analysis plot
         natural_data = pd.Series(np.random.normal(0, 1, len(pred)), index=pred.index)
-        report.analyze_error_patterns(natural_data)
+        report.analyze_error_patterns(natural_data, mc_runs=10)
 
         ax = report.plot_mismatch_analysis()
         assert isinstance(ax, plt.Axes)
@@ -496,11 +500,11 @@ class TestMismatchReportVisualization:
         Tests heatmap visualization of difference matrix with p-values.
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Need error analysis for heatmap
         natural_data = pd.Series(np.random.normal(0, 1, len(pred)), index=pred.index)
-        report.analyze_error_patterns(natural_data)
+        report.analyze_error_patterns(natural_data, mc_runs=10)
 
         ax = report.plot_heatmap()
         assert isinstance(ax, plt.Axes)
@@ -516,11 +520,11 @@ class TestMismatchReportVisualization:
         - Returns matplotlib Figure object
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Need error analysis for complete report figure
         natural_data = pd.Series(np.random.normal(0, 1, len(pred)), index=pred.index)
-        report.analyze_error_patterns(natural_data)
+        report.analyze_error_patterns(natural_data, mc_runs=10)
 
         # Test without saving
         fig = report.generate_report_figure()
@@ -551,11 +555,11 @@ class TestMismatchReportDataExport:
         - Statistics are included
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Need error analysis for complete export
         natural_data = pd.Series(np.random.normal(0, 1, len(pred)), index=pred.index)
-        report.analyze_error_patterns(natural_data)
+        report.analyze_error_patterns(natural_data, mc_runs=10)
 
         result_dict = report.to_dict()
 
@@ -565,7 +569,6 @@ class TestMismatchReportDataExport:
             "diff_matrix",
             "p_value_matrix",
             "false_count_matrix",
-            "mc_runs",
         }
         assert set(result_dict.keys()) == expected_keys
 
@@ -576,9 +579,6 @@ class TestMismatchReportDataExport:
         assert isinstance(result_dict["confusion_matrix"], dict)
         assert isinstance(result_dict["diff_matrix"], dict)
 
-        # Check mc_runs value
-        assert result_dict["mc_runs"] == 5
-
     def test_repr_string_representation(self, realistic_data):
         """Should provide informative string representation.
 
@@ -586,7 +586,7 @@ class TestMismatchReportDataExport:
         with key information about the report.
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         repr_str = repr(report)
         assert isinstance(repr_str, str)
@@ -605,9 +605,11 @@ class TestMismatchReportParameterization:
         computational complexity levels.
         """
         pred, true = realistic_data
-        report = MismatchReport(pred, true, mc_runs=mc_runs)
+        report = MismatchReport(pred, true)
 
-        assert report.mc_runs == mc_runs
+        # Test with different mc_runs values by calling analyze_error_patterns
+        natural_data = pd.Series(np.random.normal(0, 1, len(pred)), index=pred.index)
+        report.analyze_error_patterns(natural_data, mc_runs=mc_runs)
 
         # Test statistics
         stats = report.get_statistics_summary()
@@ -636,7 +638,7 @@ class TestMismatchReportDataVariations:
         - Extreme mismatches
         """
         pred, true = request.getfixturevalue(data_fixture)
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         # Basic integrity checks that should pass for all data types
         assert len(report.pred_clean) > 0
@@ -657,7 +659,7 @@ class TestMismatchReportDataVariations:
             natural_data = pd.Series(
                 np.random.normal(0, 1, len(pred)), index=pred.index
             )
-            error_df = report.analyze_error_patterns(natural_data)
+            error_df = report.analyze_error_patterns(natural_data, mc_runs=5)
             assert isinstance(error_df, pd.DataFrame)
 
             # Should be able to create full report after error analysis
@@ -677,7 +679,7 @@ class TestMismatchReportEdgeCases:
         pred = pd.Series([0], index=[0])
         true = pd.Series([1], index=[0])
 
-        report = MismatchReport(pred, true, mc_runs=1)
+        report = MismatchReport(pred, true)
 
         assert len(report.pred_clean) == 1
         assert len(report.true_clean) == 1
@@ -694,7 +696,7 @@ class TestMismatchReportEdgeCases:
         pred = pd.Series([0] * 20, index=range(20))
         true = pd.Series(list(range(5)) * 4, index=range(20))  # Varied true values
 
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         assert report.pred_clean.nunique() == 1
         assert report.true_clean.nunique() > 1
@@ -710,7 +712,7 @@ class TestMismatchReportEdgeCases:
         pred = pd.Series(list(range(5)) * 4, index=range(20))  # Varied predictions
         true = pd.Series([2] * 20, index=range(20))
 
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         assert report.pred_clean.nunique() > 1
         assert report.true_clean.nunique() == 1
@@ -739,7 +741,7 @@ class TestMismatchReportEdgeCases:
             alternatives = [x for x in LEVELS if x != current]
             pred.iloc[idx] = rng.choice(alternatives)
 
-        report = MismatchReport(pred, true, mc_runs=5)
+        report = MismatchReport(pred, true)
 
         stats = report.get_statistics_summary()
         assert 0.95 <= stats["accuracy"] <= 1.0  # Should be very high accuracy

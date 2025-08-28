@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Tuple, overload
 
 import geopandas as gpd
 import numpy as np
@@ -353,10 +353,9 @@ class HistoricalRecords:
             raise TypeError("尚未转化为 pd.Series")
         return self.data
 
-    def to_series(
+    def aggregate(
         self,
-        how: HistoricalAggregateType = "mean",
-        interpolate: str | None = None,
+        how: HistoricalAggregateType | Callable = "mean",
         inplace: bool = False,
         name: str | None = None,
         **kwargs,
@@ -366,6 +365,26 @@ class HistoricalRecords:
         If ``self.data`` is already a Series, it will be returned (optionally
         interpolated/renamed). If it is a DataFrame, it will be aggregated along
         rows (time) using ``how`` into a Series.
+
+        Args:
+            how: 聚合方法，可以是字符串或函数
+            inplace: 是否在原地修改数据
+            name: 结果的名称
+            **kwargs: 传递给函数的参数
+
+        Examples:
+            >>> history.aggregate('mean')
+            >>> history.aggregate('median')
+            >>> history.aggregate('mode')
+            >>> history.aggregate(lambda x: x.mean(axis=1).astype(float).round(0))
+            >>> history.aggregate(lambda x: x.mean(axis=1).astype(float).round(0), inplace=True)
+
+        Raises:
+            ValueError: 如果聚合方法无效
+
+        Returns:
+            pd.Series: 聚合后的结果
+            HistoricalRecords: 如果 inplace 为 True，则返回自身
         """
         # data = self.rescale_to_std()
         data = self.data
@@ -373,37 +392,73 @@ class HistoricalRecords:
             result = data.copy()
         else:
             if how == "mean":
-                result = data.mean(axis=1)
+                result = data.mean(axis=1).astype(float).round(0)
             elif how == "median":
                 result = data.median(axis=1)
             elif how == "mode":
                 result = data.mode(axis=1)[0]
+            elif callable(how):
+                result = how(data, **kwargs)
             else:
                 raise ValueError(f"无效的聚合方法: {how}")
-        if interpolate:
-            result = result.interpolate(method=interpolate, **kwargs)
         if name is None:
             if isinstance(data, pd.Series) and data.name:
                 name = data.name
             else:
-                func_name = str(how).lower()
-                name = f"{func_name}_{interpolate}" if interpolate else func_name
-        result.name = name
+                name = str(how).lower()
+        result.name = "history_" + name
         if inplace:
             self.data = result
             return self
         return result
 
+    @overload
     def merge_with(
-        self, other: pd.Series | pd.DataFrame, time_range=None
+        self,
+        other: pd.Series | pd.DataFrame,
+        time_range: Stages = "all",
+        split: Literal[False] = False,
     ) -> pd.DataFrame:
-        """合并两个数据集"""
-        if time_range is None:
-            time_range = self.data.index
-            data = self.data.copy()
-        else:
-            data = self.data.reindex(time_range)
-        return pd.concat([data, other.reindex(time_range)], axis=1)
+        ...
+
+    @overload
+    def merge_with(
+        self,
+        other: pd.Series | pd.DataFrame,
+        time_range: Stages = "all",
+        split: Literal[True] = True,
+    ) -> tuple[pd.Series, pd.Series]:
+        ...
+
+    def merge_with(
+        self,
+        other: pd.Series | pd.DataFrame,
+        time_range: Stages = "all",
+        split: bool = False,
+    ) -> pd.DataFrame | tuple[pd.Series, pd.Series]:
+        """合并两个数据集
+
+        Args:
+            other: 要合并的数据集
+            time_range: 时间范围
+            split: 是否拆分
+
+        Returns:
+            pd.DataFrame | tuple[pd.Series, pd.Series]: 合并后的数据集，如果 split 为 True，则返回两个 Series
+        """
+        # 获取历史记录数据
+        data = self.period(time_range)
+        # 合并两个数据集，并返回一个DataFrame
+        df = pd.merge(
+            left=data,
+            right=other,
+            left_index=True,
+            right_index=True,
+            how="inner",
+        )
+        if split:
+            return df.iloc[:, 0], df.iloc[:, 1]
+        return df
 
     def corr_with(
         self,
@@ -439,7 +494,7 @@ class HistoricalRecords:
         """
         from past1000.calibration import MismatchReport
 
-        recorded = self.to_series(how=agg_method).loc[years]
+        recorded = self.aggregate(how=agg_method).loc[years]
         # 处理缺失值 - 内联实现避免循环导入
         combined = pd.concat([true_data.loc[years], recorded], axis=1).dropna()
         if len(combined) == 0:
@@ -451,7 +506,6 @@ class HistoricalRecords:
 
 def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRecords]:
     """读取自然和历史数据，以及不确定性"""
-    log = logging.getLogger(__name__)
     start_year = cfg.years.start
     end_year = cfg.years.end
     log.info("加载自然数据 [%s-%s]...", start_year, end_year)

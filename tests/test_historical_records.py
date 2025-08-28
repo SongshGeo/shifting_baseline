@@ -127,12 +127,12 @@ class TestHistoricalRecordsSeriesOps:
         )
 
     def test_to_series_mean(self, rec: HistoricalRecords):
-        ser = rec.to_series(how="mean", inplace=False)
+        ser = rec.aggregate(how="mean", inplace=False)
         assert isinstance(ser, pd.Series)
         assert ser.index.min() == 1000 and ser.index.max() == 2020
 
     def test_to_series_inplace_chain(self, rec: HistoricalRecords):
-        out = rec.to_series(how="median", inplace=True)
+        out = rec.aggregate(how="median", inplace=True)
         assert isinstance(out, HistoricalRecords)
         sel = out.period("1000:1010")
         assert isinstance(sel, pd.Series)
@@ -161,7 +161,7 @@ class TestHistoricalRecordsMergeAndCorr:
             region="华北地区",
             symmetrical_level=True,
         )
-        return rec.to_series(how="mean", inplace=False)
+        return rec.aggregate(how="mean", inplace=False)
 
     def test_merge_with_aligns_index(self, rec_series: pd.Series):
         other = pd.Series(
@@ -171,8 +171,23 @@ class TestHistoricalRecordsMergeAndCorr:
         # Build a small HistoricalRecords-like holder to call merge_with; use minimal shim
 
         class Holder:
+            """Mock HistoricalRecords-like holder for testing merge_with"""
+
             def __init__(self, data):
                 self.data = data
+
+            def period(self, period):
+                """Mock period method that filters data by time range"""
+                if isinstance(period, str) and period == "all":
+                    return self.data
+                elif hasattr(period, "__iter__") and not isinstance(period, str):
+                    # Handle numpy array or list of years
+                    years = list(period)
+                    return self.data.loc[self.data.index.isin(years)]
+                elif isinstance(period, slice):
+                    return self.data.loc[period]
+                else:
+                    return self.data
 
         holder = Holder(rec)
         merged = HistoricalRecords.merge_with(
