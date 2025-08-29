@@ -194,3 +194,51 @@ def calc_corr(
         penalty = np.sqrt(neff / n)
         r = r * penalty
     return r, p, n
+
+
+def find_top_max_indices(
+    arr: np.ndarray,
+    ratio: float = 0.1,
+) -> np.ndarray | tuple[np.ndarray, ...]:
+    """
+    找到numpy数组中前10%大值所在的索引（忽略nan值）
+
+    参数:
+    arr: numpy数组
+
+    返回:
+    numpy数组，包含前10%大值的索引
+    """
+    # 将数组展平
+    flat_arr = arr.flatten()
+
+    # 找到非nan值的索引
+    valid_mask = ~np.isnan(flat_arr)
+    valid_indices = np.where(valid_mask)[0]
+    valid_values = flat_arr[valid_mask]
+
+    # 如果没有有效值，返回空数组
+    if len(valid_values) == 0:
+        if arr.ndim > 1:
+            return tuple(np.array([]) for _ in range(arr.ndim))
+        else:
+            return np.array([])
+
+    # 计算前10%的元素个数（基于有效值）
+    top_10_percent_count = max(1, int(len(valid_values) * ratio))
+
+    # 使用argpartition找到前10%大值的索引（在有效值中）
+    top_indices_in_valid = np.argpartition(valid_values, -top_10_percent_count)[
+        -top_10_percent_count:
+    ]
+
+    # 映射回原数组的索引
+    flat_indices = valid_indices[top_indices_in_valid]
+
+    # 如果需要返回原数组形状的索引，可以使用unravel_index
+    if arr.ndim > 1:
+        # 返回多维索引
+        return np.unravel_index(flat_indices, arr.shape)
+    else:
+        # 返回一维索引
+        return flat_indices
