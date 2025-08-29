@@ -341,7 +341,7 @@ class MismatchReport:
         )
 
     def generate_report_figure(
-        self, figsize: tuple = (6, 4), save_path: str | None = None
+        self, figsize: tuple = (5, 3), save_path: str | None = None
     ) -> plt.Figure:
         """生成完整的报告图表"""
         if self.diff_matrix is None:
@@ -361,6 +361,7 @@ class MismatchReport:
             self.plot_confusion_matrix(ax=axes[0])
             # 不匹配分析
             self.plot_mismatch_analysis(ax=axes[1])
+            fig.tight_layout(rect=[0, 0, 1, 1])
 
         if save_path:
             fig.savefig(save_path, dpi=300, bbox_inches="tight")
