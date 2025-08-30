@@ -22,7 +22,7 @@ from omegaconf import DictConfig
 from past1000 import filters
 from past1000.data import HistoricalRecords, load_nat_data
 from past1000.mc import combine_reconstructions
-from past1000.utils.calc import calc_corr, detrend_with_nan
+from past1000.utils.calc import calc_corr, detrend_with_nan, find_top_max_indices
 from past1000.utils.config import get_output_dir
 from past1000.utils.plot import plot_corr_heatmap
 
@@ -101,7 +101,7 @@ def compare_corr_2d(
     n_diff_w: int | float = 2,
     penalty: bool = False,
     **rolling_kwargs,
-) -> tuple[float, float, int]:
+) -> tuple[float | np.ndarray, float | np.ndarray, int | np.ndarray]:
     """
     批量对比两个序列的相关性，并返回相关性系数，p值，样本数
 
@@ -162,7 +162,7 @@ def experiment_corr_2d(
     data2: pd.Series,
     corr_method: CorrFunc = "pearson",
     time_slice: slice = slice(None),
-    filter_side: FilterSide = "both",
+    filter_side: FilterSide = "right",
     filter_func: Callable | None = None,
     sample_threshold: float = 1,
     std_offset: float = 0.2,
@@ -233,6 +233,77 @@ def experiment_corr_2d(
     )
     ax.set_title(f"{corr_method.capitalize()} Corr. Coef.")
     return filtered_df, r_benchmark, ax
+
+
+def sweep_slices(
+    start_year: int,
+    window_size: int,
+    step_size: int,
+    end_year: int,
+) -> tuple[list[slice], list[int], list[str]]:
+    """
+    遍历生成所有可能的窗口，并返回切片和对应的标签
+
+    Args:
+        start_year: 开始年份
+        window_size: 窗口大小
+        step_size: 步长
+        end_year: 结束年份
+
+    Returns:
+        tuple[list[slice], list[int], list[str]]: 切片，中间年份，切片标签
+    """
+    slices = []
+    slice_labels = []
+    current_start = start_year
+
+    # 生成所有可能的窗口
+    while current_start + window_size <= end_year:
+        current_end = current_start + window_size
+        slices.append(slice(current_start, current_end))
+        slice_labels.append(f"{current_start}-{current_end}")
+        current_start += step_size
+
+    mid_year = [np.mean([s.start, s.stop]).astype(int) for s in slices]
+    # mid_year = [s.stop for s in slices]
+    return slices, mid_year, slice_labels
+
+
+def sweep_max_corr_year(
+    data1: pd.Series,
+    data2: pd.Series,
+    slices: list[slice],
+    windows: np.ndarray,
+    min_periods: np.ndarray,
+    ratio: float = 0.1,
+    **compare_kwargs,
+) -> tuple[list, list]:
+    """
+    遍历所有切片，计算相关性系数，并返回最大相关性系数和对应的窗口
+    """
+    assert 0 < ratio < 1, "ratio must be between 0 and 1"
+    max_corr = []
+    max_corr_year = []
+    for slice_now in slices:
+        base_corr = compare_corr(
+            data1.loc[slice_now],
+            data2.loc[slice_now],
+            **compare_kwargs,
+        )
+        r_benchmark = base_corr[0]
+        rs, _, _ = compare_corr_2d(
+            data1=data1.loc[slice_now],
+            data2=data2.loc[slice_now],
+            windows=windows,
+            min_periods=min_periods,
+            **compare_kwargs,
+        )
+        assert isinstance(rs, np.ndarray), "rs must be a numpy array"
+        top_max_indices = find_top_max_indices(rs, ratio)
+        max_corr_year.append(top_max_indices)
+        max_corr.append((rs[top_max_indices] - r_benchmark) / r_benchmark)
+
+    return max_corr_year, max_corr
 
 
 @main(config_path="../config", config_name="config", version_base=None)

@@ -11,6 +11,7 @@ from itertools import product
 from typing import Optional
 
 import matplotlib as mpl
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -24,12 +25,14 @@ from past1000.utils.calc import fill_star_matrix, get_coords
 
 
 def is_significant(p_value: float, threshold: float = 0.1) -> bool:
+    """判断p值是否显著"""
     if np.isnan(p_value):
         return False
     return p_value < threshold
 
 
 def get_marker(p_value: float, threshold: float = 0.1) -> str:
+    """获取显著性标记"""
     if is_significant(p_value, threshold=0.01):
         marker = "***"
     elif is_significant(p_value, threshold=0.05):
@@ -528,4 +531,134 @@ def plot_std_times(
 
     ax.set_ylabel("Times of STD")
     ax.set_xlabel("Year")
+    return ax
+
+
+@with_axes(figsize=(8, 3.5))
+def plot_correlation_windows(
+    max_corr_year: list[np.ndarray],
+    max_corr: list[np.ndarray],
+    mid_years: list[int],
+    slice_labels: list[str] | None = None,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    """
+    绘制时间窗口的最优相关性年份图
+
+    Parameters:
+    -----------
+    max_corr_year : list of arrays
+        每个时间窗口的最大相关性年份数据
+    max_corr : list of arrays
+        每个时间窗口的最大相关性值数据
+    slice_labels : list, optional
+        时间窗口标签
+    figsize : tuple
+        图形大小
+    """
+    assert isinstance(ax, Axes), "ax must be an instance of Axes"
+    # 数据预处理
+    means = np.array([arr.mean() for arr in max_corr_year])
+    stds = np.array([arr.std() for arr in max_corr_year])
+
+    # 过滤负相关性，转换为改进百分比
+    corr_improvements = []
+    for arr in max_corr:
+        mean_corr = arr.mean()
+        corr_improvements.append(mean_corr * 100 if mean_corr >= 0 else np.nan)
+
+    corr_improvements = np.array(corr_improvements)
+    valid_mask = ~np.isnan(corr_improvements)
+
+    # 设置颜色映射
+    if np.any(valid_mask):
+        vmin, vmax = 0, np.nanmax(corr_improvements) + 0.01
+        # 确保 vmax > vmin 避免颜色映射问题
+        if vmax <= vmin:
+            vmax = vmin + 1
+    else:
+        vmin, vmax = 0, 1
+
+    cmap = cm.OrRd
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+
+    # 收集有效点用于趋势线
+    valid_points = []
+
+    # 绘制数据点
+    i = 0
+    for mid, mean_y, std_y, improvement in zip(
+        mid_years, means, stds, corr_improvements
+    ):
+        if valid_mask[i]:
+            point_color = cmap(norm(improvement))
+            alpha = 0.8
+            valid_points.append({"x": mid, "y": mean_y})
+
+            # 绘制带彩色点和黑色误差棒
+            ax.errorbar(
+                mid,
+                mean_y,
+                yerr=std_y,
+                fmt="o",
+                color=point_color,  # 点的颜色
+                ecolor="black",  # 误差棒颜色
+                elinewidth=2,  # 误差棒线宽
+                capsize=5,  # 误差棒端帽大小
+                capthick=2,  # 误差棒端帽粗细
+                markersize=8,  # 点的大小
+                alpha=alpha,
+                markeredgecolor="black",  # 点的边框
+                markeredgewidth=0.5,  # 点边框宽度
+            )
+        else:
+            # 对于无效数据，可以选择不绘制或用灰色
+            ax.errorbar(
+                mid,
+                mean_y,
+                yerr=std_y,
+                fmt="o",
+                color="lightgray",
+                ecolor="lightgray",
+                alpha=0.3,
+                capsize=5,
+                capthick=2,
+                elinewidth=2,
+                markersize=8,
+            )
+
+        i += 1
+
+    # 添加趋势线
+    if len(valid_points) > 1:
+        valid_df = pd.DataFrame(valid_points)
+        sns.regplot(
+            data=valid_df,
+            x="x",
+            y="y",
+            scatter=False,
+            color="red",
+            line_kws={"linewidth": 2, "alpha": 0.8, "linestyle": "--"},
+            ax=ax,
+            truncate=False,
+        )
+
+    # 设置坐标轴
+    ax.set_xticks(mid_years)
+    ax.set_xticklabels(slice_labels, rotation=30)
+    ax.set_xlabel("Periods applied the filter (AD)")
+    ax.set_ylabel("Window Size with Optimal $Tau$")
+    # ax.set_title("Optimal Year of Max Correlation with Error Bars\n(Color indicates correlation improvement)")
+    ax.grid(True, alpha=0.3)
+
+    # 添加颜色条（修复白色问题）
+    if np.any(valid_mask):
+        # 只为有效数据创建颜色映射
+        valid_improvements = corr_improvements[valid_mask]
+        sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array(valid_improvements)  # 设置实际数据数组
+
+        cbar = plt.colorbar(sm, ax=ax)
+        cbar.set_label("Avg. Correlation Improvement (%)", rotation=270, labelpad=15)
+
     return ax
