@@ -20,3 +20,7 @@ years:
 
 # Testing mode - when enabled, only test logging and exit
 test_mode: false
+
+corr_method: kendall
+filter_side: right
+agg_method: mean

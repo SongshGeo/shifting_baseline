@@ -5,8 +5,10 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+from __future__ import annotations
+
 import logging
-from typing import Literal, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,6 +24,9 @@ from past1000.utils.plot import (
     plot_confusion_matrix,
     plot_mismatch_matrix,
 )
+
+if TYPE_CHECKING:
+    from geo_dskit.utils.path import PathLike
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +346,7 @@ class MismatchReport:
         )
 
     def generate_report_figure(
-        self, figsize: tuple = (5, 3), save_path: str | None = None
+        self, figsize: tuple = (5, 3), save_path: PathLike | None = None
     ) -> plt.Figure:
         """生成完整的报告图表"""
         if self.diff_matrix is None:

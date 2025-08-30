@@ -660,5 +660,8 @@ def plot_correlation_windows(
 
         cbar = plt.colorbar(sm, ax=ax)
         cbar.set_label("Avg. Correlation Improvement (%)", rotation=270, labelpad=15)
-
+    lims = ax.get_xlim()
+    ax.set_xlim(lims)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
     return ax

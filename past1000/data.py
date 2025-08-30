@@ -20,6 +20,7 @@ from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
 from geo_dskit.utils.path import filter_files, get_files
 from omegaconf import DictConfig
 
+from past1000.calibration import MismatchReport
 from past1000.constants import GRADE_VALUES, STAGES_BINS, STD_THRESHOLDS
 from past1000.mc import standardize_both
 from past1000.utils.calc import calc_corr
@@ -182,10 +183,10 @@ class HistoricalRecords:
             raise ValueError("数据必须是DataFrame或Series")
         self._data = value
 
-    def period(self, stage: Stages) -> pd.DataFrame | pd.Series:
-        """Select data by historical stage(s) or explicit year range.
+    def get_time_slice(self, stage: Stages) -> slice:
+        """Convert stage input to a time slice.
 
-        This method accepts multiple convenient notations:
+        This method accepts multiple convenient notations and returns a slice object:
         - Integer stage index: 1, 2, 3, 4
         - Stage slice: ``slice(1, 3)`` meaning stages 1 through 2 (inclusive of
           the end year of stage 2). If ``start`` or ``stop`` is ``None``, they
@@ -197,14 +198,14 @@ class HistoricalRecords:
           - ``"1000:1469"`` or ``"1000-1469"`` for explicit year ranges
           - ``"all"`` / ``"full"`` / ``"total"`` for the whole series
 
-        Returns the same type as ``self.data`` (DataFrame or Series).
+        Returns a slice object representing the time range.
 
         Examples:
-            >>> history.period(1)  # stage 1
-            >>> history.period(slice(1, 2))  # stages 1-2
-            >>> history.period("1:4")  # stages 1-4
-            >>> history.period("stage3")
-            >>> history.period("1000:2010")  # explicit years
+            >>> history.get_time_slice(1)  # slice(1000, 1469)
+            >>> history.get_time_slice(slice(1, 2))  # slice(1000, 1669)
+            >>> history.get_time_slice("1:4")  # slice(1000, 2010)
+            >>> history.get_time_slice("stage3")  # slice(1669, 1889)
+            >>> history.get_time_slice("1000:2010")  # slice(1000, 2010)
         """
         bins = STAGES_BINS
 
@@ -223,13 +224,10 @@ class HistoricalRecords:
                 start_stage, stop_stage = stop_stage, start_stage
             return bins[start_stage - 1], bins[stop_stage]
 
-        def _select_years(start_year: int, end_year: int):
-            return self.data.loc[start_year:end_year]
-
         # Integer stage
         if isinstance(stage, int):
             start_year, end_year = _bounds_from_stage_indices(stage, stage)
-            return _select_years(start_year, end_year)
+            return slice(start_year, end_year)
 
         # Slice: interpret as stage indices if within 1..4, otherwise pass through as year slice
         if isinstance(stage, slice):
@@ -250,37 +248,37 @@ class HistoricalRecords:
                 start_year, end_year = _bounds_from_stage_indices(
                     start_stage, stop_stage
                 )
-                return _select_years(start_year, end_year)
+                return slice(start_year, end_year)
 
             # Otherwise treat as a raw year slice
-            return self.data.loc[stage]
+            return stage
 
         # String patterns
         if isinstance(stage, str):
             s = stage.strip().lower()
             if s in {"all", "full", "total", "whole"}:
-                return self.data
+                return slice(None)  # slice(None) selects all data
 
             # "stageN"
             m = re.fullmatch(r"stage\s*(\d)", s)
             if m:
                 n = int(m.group(1))
                 start_year, end_year = _bounds_from_stage_indices(n, n)
-                return _select_years(start_year, end_year)
+                return slice(start_year, end_year)
 
             # "stageA:stageB" or "stageA-stageB"
             m = re.fullmatch(r"stage\s*(\d)\s*[:\-]\s*stage\s*(\d)", s)
             if m:
                 a, b = int(m.group(1)), int(m.group(2))
                 start_year, end_year = _bounds_from_stage_indices(a, b)
-                return _select_years(start_year, end_year)
+                return slice(start_year, end_year)
 
             # "A:B" or "A-B" where A,B are stage indices (single digit)
             m = re.fullmatch(r"(\d)\s*[:\-]\s*(\d)", s)
             if m:
                 a, b = int(m.group(1)), int(m.group(2))
                 start_year, end_year = _bounds_from_stage_indices(a, b)
-                return _select_years(start_year, end_year)
+                return slice(start_year, end_year)
 
             # Explicit years "YYYY:YYYY" or "YYYY-YYYY"
             m = re.fullmatch(r"(\d{3,4})\s*[:\-]\s*(\d{3,4})", s)
@@ -288,13 +286,40 @@ class HistoricalRecords:
                 start_year, end_year = int(m.group(1)), int(m.group(2))
                 if start_year > end_year:
                     start_year, end_year = end_year, start_year
-                return _select_years(start_year, end_year)
+                return slice(start_year, end_year)
 
             raise ValueError(
                 f"Invalid stage expression: {stage}. Expected like 'stage1', '1:3', or '1000-1469'."
             )
 
         raise TypeError("stage must be int, slice, or str representing stage/years")
+
+    def select_data(self, time_slice: slice) -> pd.DataFrame | pd.Series:
+        """Select data using a time slice.
+
+        Args:
+            time_slice: A slice object representing the time range
+
+        Returns:
+            The selected data subset with the same type as self.data
+        """
+        return self.data.loc[time_slice]
+
+    def period(self, stage: Stages) -> pd.DataFrame | pd.Series:
+        """Select data by historical stage(s) or explicit year range.
+
+        This is a convenience method that combines get_time_slice() and select_data().
+        See get_time_slice() for detailed parameter documentation.
+
+        Examples:
+            >>> history.period(1)  # stage 1
+            >>> history.period(slice(1, 2))  # stages 1-2
+            >>> history.period("1:4")  # stages 1-4
+            >>> history.period("stage3")
+            >>> history.period("1000:2010")  # explicit years
+        """
+        time_slice = self.get_time_slice(stage)
+        return self.select_data(time_slice)
 
     def _read_data(self, region: Region) -> pd.DataFrame:
         """读取数据，并统一为逐年索引"""
@@ -477,31 +502,6 @@ class HistoricalRecords:
         """
         arr1 = self.get_series(col=col)
         return calc_corr(arr1, arr2, how)
-
-    def detect_mismatch(
-        self,
-        true_data: pd.Series,
-        years: slice,
-        agg_method: HistoricalAggregateType = "mean",
-    ):
-        """检测历史记录和真实数据之间的差异
-
-        Returns:
-            MismatchReport: 不匹配分析报告
-
-        Note:
-            需要先导入: from past1000.calibration import MismatchReport
-        """
-        from past1000.calibration import MismatchReport
-
-        recorded = self.aggregate(how=agg_method).loc[years]
-        # 处理缺失值 - 内联实现避免循环导入
-        combined = pd.concat([true_data.loc[years], recorded], axis=1).dropna()
-        if len(combined) == 0:
-            raise ValueError("清理缺失值后没有有效数据")
-        nat, his = combined.iloc[:, 0], combined.iloc[:, 1]
-
-        return MismatchReport(pred=his, true=nat)
 
 
 def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRecords]:
