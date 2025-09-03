@@ -15,17 +15,6 @@ shp: ${ds.data}/黄河流域矢量图/空间范围/huai_hai.shp  # 仅仅裁剪�
 
 # 自然重建数据
 recon:
-  # 黄河径流量
-  yellow2019flow:
-    path: ${ds.noaa}/yellowriverflow2019/yellow2019flow.txt
-    type: csv
-    process:
-      read_csv:
-        skiprows: 104
-        sep: '\t'
-        names: ['year', 'streamflow']
-    out: ${how.output}/recon/yellow2019flow.csv
-
   # 降水
   shi2018:
     path: ${ds.noaa}/shi2018/RAP_v1.nc
@@ -39,9 +28,3 @@ recon:
         begin_year: 1470
     out: ${how.output}/recon/shi2018.nc
     variable: 'pr'
-
-# 处理流程
-pipeline:
-  # 数据处理
-  - batch_process_and_save_by_config
-  - batch_process_recon_data

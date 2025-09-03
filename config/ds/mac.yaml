@@ -25,6 +25,16 @@ spei:
 
 abm: ${ds.multirun}/2025-07-27/23-18-33
 
+instrumental:
+  input: ${ds.data}/中国1900以来逐月降水
+  output: ${ds.processed}/JAS_precipitation_1900-2017.nc
+  agg_months:
+    - 7
+    - 8
+    - 9
+  agg_method: sum
+
+
 includes:
   - "hexi2019scpdsi"
   - "qinling2016precip"
