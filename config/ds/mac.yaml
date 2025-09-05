@@ -11,6 +11,10 @@ data: /Users/songshgeo/Documents/Datasets
 # 重建数据
 noaa: ${ds.data}/东亚古气候重建数据
 
+base_maps:
+  china: ${ds.data}/中国标准地图-审图号GS(2020)4619号-shp格式/国界线.shp
+  yrb: ${ds.data}/黄河流域矢量图/空间范围/huang_huai_hai.shp
+
 # 千年旱涝地图集数据
 atlas:
   file: ${ds.data}/中国历史千年旱涝数据/中国千年区域极端旱涝地图集（表格） - 杨煜达 主编.xlsx
@@ -36,12 +40,15 @@ instrumental:
 
 
 includes:
-  - "hexi2019scpdsi"
-  - "qinling2016precip"
-  - "shanxi2015precip"
-  - "tan2011precip-noaa"
-  - "xu2023-asm"
-  # - "yellow2019flow"
-  # - "yellow2020flow"
-  - "north-china-precip2010"
-  - "north-china-temp-precip2011"
+- "chen2020f"  # not good
+- "li2015b"  # not good
+- "li2019a"  # not good
+- "liu2020"  # not good
+- "shi2017"
+- "shi2018"
+- "tan2011"  # not good
+- "xu2023c"  # great
+- "yang2016"  # great
+- "yang2019d"  # terrible
+- "yi2010"  # very good
+- "yi2012"  # very good

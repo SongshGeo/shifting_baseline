@@ -20,7 +20,6 @@ from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
 from geo_dskit.utils.path import filter_files, get_files
 from omegaconf import DictConfig
 
-from past1000.calibration import MismatchReport
 from past1000.constants import GRADE_VALUES, STAGES_BINS, STD_THRESHOLDS
 from past1000.mc import standardize_both
 from past1000.utils.calc import calc_corr
