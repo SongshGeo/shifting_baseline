@@ -38,6 +38,7 @@ instrumental:
     - 9
   agg_method: sum
 
+region_corr: ${ds.processed}/region_corr.csv
 
 includes:
 - "chen2020f"  # not good
@@ -46,9 +47,9 @@ includes:
 - "liu2020"  # not good
 - "shi2017"
 - "shi2018"
-- "tan2011"  # not good
+# - "tan2011"  # not good
 - "xu2023c"  # great
 - "yang2016"  # great
-- "yang2019d"  # terrible
+# - "yang2019d"  # terrible
 - "yi2010"  # very good
 - "yi2012"  # very good

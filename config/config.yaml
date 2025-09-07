@@ -24,3 +24,10 @@ test_mode: false
 corr_method: kendall
 filter_side: right
 agg_method: mean
+to_int: true
+resolution: 0.25
+
+low_pass:
+  window_size: 30
+  method: rolling_mean  # rolling_mean, gaussian, butterworth
+  center: true

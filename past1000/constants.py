@@ -12,6 +12,7 @@ from __future__ import annotations
 
 GRADE_VALUES: list[int] = [5, 4, 3, 2, 1]  # 原始等级值
 STD_THRESHOLDS: list[float] = [-1.17, -0.33, 0, 0.33, 1.17]  # 标准差阈值 - 5
+COLORS = ["#EF7722", "#FAA533", "#BBDCE5", "#0BA6DF"]
 THRESHOLDS: list[float] = [-1.17, -0.33, 0.33, 1.17]  # 阈值 - 4
 LEVELS: list[int] = [-2, -1, 0, 1, 2]  # 等级值
 LEVELS_PROB: list[float] = [0.1, 0.25, 0.30, 0.25, 0.1]  # 等级值
@@ -24,6 +25,15 @@ VERBOSE_LABELS: list[str] = [
     "Moderate wet",
     "Very wet",
 ]
+
+# 等级映射为标准差值
+MAP = {
+    -2: -1.5,
+    -1: -0.5,
+    0: 0,
+    1: 0.5,
+    2: 1.5,
+}
 
 # 历史记录数据的时间段
 START = 1000
