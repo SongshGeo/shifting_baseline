@@ -8,9 +8,10 @@
 """Test cases for calc.py utility functions."""
 
 import numpy as np
+import pandas as pd
 import pytest
 
-from past1000.utils.calc import find_top_max_indices
+from past1000.utils.calc import calc_corr, find_top_max_indices
 
 
 class TestFindTopMaxIndices1D:
@@ -365,3 +366,219 @@ class TestFindTopMaxIndicesEdgeCases:
         assert 0.999 in values or np.any(values >= 0.999)
         assert 0.998 in values or np.any(values >= 0.998)
         assert 0.997 in values or np.any(values >= 0.997)
+
+
+class TestCalcCorr:
+    """Test calc_corr function for correlation calculations."""
+
+    @pytest.fixture
+    def sample_data(self):
+        """Create sample data for testing."""
+        np.random.seed(42)
+        n = 100
+        x = np.random.randn(n)
+        y = 0.5 * x + np.random.randn(n) * 0.5
+        return x, y
+
+    @pytest.fixture
+    def perfect_correlation_data(self):
+        """Create perfectly correlated data."""
+        x = np.array([1, 2, 3, 4, 5])
+        y = np.array([2, 4, 6, 8, 10])
+        return x, y
+
+    def test_pandas_series_input(self, sample_data):
+        """Test pandas Series input."""
+        x, y = sample_data
+        x_series = pd.Series(x)
+        y_series = pd.Series(y)
+
+        r, p, n = calc_corr(x_series, y_series)
+
+        assert isinstance(r, float)
+        assert isinstance(p, float)
+        assert isinstance(n, (int, np.integer))
+        assert n == 100
+        assert 0 < r < 1  # Positive correlation
+        assert 0 < p < 1  # p-value in reasonable range
+
+    def test_numpy_array_input(self, sample_data):
+        """Test numpy array input."""
+        x, y = sample_data
+
+        r, p, n = calc_corr(x, y)
+
+        assert isinstance(r, float)
+        assert isinstance(p, float)
+        assert isinstance(n, (int, np.integer))
+        assert n == 100
+
+    def test_mixed_input_types(self, sample_data):
+        """Test mixed input types (pandas Series and numpy array)."""
+        x, y = sample_data
+        x_series = pd.Series(x)
+
+        r, p, n = calc_corr(x_series, y)
+
+        assert isinstance(r, float)
+        assert isinstance(p, float)
+        assert isinstance(n, (int, np.integer))
+
+    @pytest.mark.parametrize(
+        "method,expected_correlation",
+        [
+            ("pearson", 1.0),
+            ("kendall", 1.0),
+            ("spearman", 1.0),
+        ],
+    )
+    def test_different_correlation_methods(
+        self, perfect_correlation_data, method, expected_correlation
+    ):
+        """Test different correlation calculation methods."""
+        x, y = perfect_correlation_data
+
+        r, p, n = calc_corr(x, y, how=method)
+
+        assert isinstance(r, float)
+        assert isinstance(p, float)
+        assert isinstance(n, (int, np.integer))
+        assert abs(r - expected_correlation) < 1e-10
+
+    def test_with_penalty(self, sample_data):
+        """Test effective sample size penalty."""
+        x, y = sample_data
+
+        r_with_penalty, _, _ = calc_corr(x, y, penalty=True)
+        r_without_penalty, _, _ = calc_corr(x, y, penalty=False)
+
+        # Penalized correlation should be smaller in absolute value
+        assert abs(r_with_penalty) <= abs(r_without_penalty)
+
+    def test_with_missing_values(self):
+        """Test data with missing values."""
+        x = np.array([1, 2, np.nan, 4, 5])
+        y = np.array([2, 4, 6, np.nan, 10])
+
+        r, p, n = calc_corr(x, y)
+
+        assert isinstance(r, float)
+        assert isinstance(p, float)
+        assert isinstance(n, (int, np.integer))
+        assert n == 3  # Only 3 valid data points
+
+    def test_insufficient_data(self):
+        """Test insufficient data case."""
+        x = np.array([1, 2])
+        y = np.array([2, 4])
+
+        r, p, n = calc_corr(x, y)
+
+        assert np.isnan(r)
+        assert np.isnan(p)
+        assert n == 2
+
+    def test_constant_data(self):
+        """Test constant data."""
+        x = np.array([1, 1, 1, 1])
+        y = np.array([2, 2, 2, 2])
+
+        r, p, n = calc_corr(x, y)
+
+        assert np.isnan(r)
+        assert np.isnan(p)
+        assert n == 4
+
+    def test_invalid_inputs(self):
+        """Test invalid inputs."""
+        # None input
+        with pytest.raises(ValueError, match="输入序列不能为None"):
+            calc_corr(None, np.array([1, 2, 3]))
+
+        # Length mismatch
+        with pytest.raises(ValueError, match="两个序列长度必须相同"):
+            calc_corr(np.array([1, 2]), np.array([1, 2, 3]))
+
+        # Invalid correlation method
+        with pytest.raises(ValueError, match="无效的相关系数计算方法"):
+            calc_corr(np.array([1, 2, 3]), np.array([1, 2, 3]), how="invalid")
+
+    def test_empty_arrays(self):
+        """Test empty arrays."""
+        x = np.array([])
+        y = np.array([])
+
+        r, p, n = calc_corr(x, y)
+        assert np.isnan(r)
+        assert np.isnan(p)
+        assert n == 0
+
+    def test_single_element_arrays(self):
+        """Test single element arrays."""
+        x = np.array([1])
+        y = np.array([2])
+
+        r, p, n = calc_corr(x, y)
+        assert np.isnan(r)
+        assert np.isnan(p)
+        assert n == 1
+
+    def test_negative_correlation(self):
+        """Test negative correlation."""
+        x = np.array([1, 2, 3, 4, 5])
+        y = np.array([5, 4, 3, 2, 1])
+
+        r, p, n = calc_corr(x, y, how="pearson")
+
+        assert isinstance(r, float)
+        assert isinstance(p, float)
+        assert isinstance(n, (int, np.integer))
+        assert r < 0  # Negative correlation
+        assert abs(r - (-1.0)) < 1e-10  # Should be close to -1
+
+    def test_penalty_calculation_error_handling(self):
+        """Test penalty calculation error handling."""
+        # Create data that might cause issues in penalty calculation
+        x = np.array([1, 1, 1, 1, 1])  # Constant data
+        y = np.array([2, 2, 2, 2, 2])  # Constant data
+
+        # Should handle penalty calculation gracefully
+        r, p, n = calc_corr(x, y, penalty=True)
+        assert np.isnan(r)  # Should return NaN for constant data
+        assert np.isnan(p)
+        assert n == 5
+
+    def test_numpy_vs_pandas_consistency(self):
+        """Test that numpy and pandas paths give consistent results."""
+        # Create test data
+        np.random.seed(42)
+        x = np.random.randn(100)
+        y = 0.5 * x + np.random.randn(100) * 0.5
+
+        # Test numpy path
+        r_numpy, p_numpy, n_numpy = calc_corr(x, y)
+
+        # Test pandas path
+        x_series = pd.Series(x)
+        y_series = pd.Series(y)
+        r_pandas, p_pandas, n_pandas = calc_corr(x_series, y_series)
+
+        # Results should be identical
+        assert abs(r_numpy - r_pandas) < 1e-10
+        assert abs(p_numpy - p_pandas) < 1e-10
+        assert n_numpy == n_pandas
+
+    def test_large_array_performance(self):
+        """Test performance with large arrays."""
+        # Create large test data
+        size = 10000
+        x = np.random.randn(size)
+        y = 0.5 * x + np.random.randn(size) * 0.5
+
+        # Should complete quickly for numpy arrays
+        r, p, n = calc_corr(x, y)
+
+        assert isinstance(r, float)
+        assert isinstance(p, float)
+        assert isinstance(n, (int, np.integer))
+        assert n == size

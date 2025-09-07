@@ -164,35 +164,165 @@ def effective_sample_size(n: int, arr1: pd.Series, arr2: pd.Series) -> int:
 
 
 def calc_corr(
-    arr1: pd.Series,
-    arr2: pd.Series,
+    arr1: pd.Series | np.ndarray,
+    arr2: pd.Series | np.ndarray,
     how: CorrFunc = "pearson",
     penalty: bool = False,
 ) -> tuple[float, float, int]:
-    """计算两个序列之间的相关系数"""
-    # 确保两个序列都是数值类型
-    arr1 = pd.to_numeric(arr1, errors="coerce")
-    arr2 = pd.to_numeric(arr2, errors="coerce")
-    # 使用pandas的isna()方法
-    mask = ~arr1.isna() & ~arr2.isna()
-    n = mask.sum()
+    """计算两个序列之间的相关系数
+
+    Args:
+        arr1: 第一个序列，支持pandas Series或numpy数组
+        arr2: 第二个序列，支持pandas Series或numpy数组
+        how: 相关系数计算方法，可选'pearson', 'kendall', 'spearman'
+        penalty: 是否应用有效样本量惩罚
+
+    Returns:
+        tuple[float, float, int]: (相关系数, p值, 有效样本数)
+
+    Raises:
+        ValueError: 当输入数据无效或计算方法不支持时
+        TypeError: 当输入类型不支持时
+    """
+    # 输入验证
+    if arr1 is None or arr2 is None:
+        raise ValueError("输入序列不能为None")
+
+    # 确保两个序列长度相同
+    if len(arr1) != len(arr2):
+        raise ValueError(f"两个序列长度必须相同，但得到 {len(arr1)} 和 {len(arr2)}")
+
+    # 高效处理：根据输入类型选择最优路径
+    if isinstance(arr1, np.ndarray) and isinstance(arr2, np.ndarray):
+        # 两个都是numpy数组，使用高效路径
+        return _calc_corr_numpy(arr1, arr2, how, penalty)
+    else:
+        # 包含pandas Series，使用pandas路径
+        return _calc_corr_pandas(arr1, arr2, how, penalty)
+
+
+def _calc_corr_numpy(
+    arr1: np.ndarray,
+    arr2: np.ndarray,
+    how: CorrFunc,
+    penalty: bool,
+) -> tuple[float, float, int]:
+    """高效处理numpy数组的相关系数计算"""
+    # 转换为数值类型（如果还不是的话）
+    try:
+        arr1 = np.asarray(arr1, dtype=float)
+        arr2 = np.asarray(arr2, dtype=float)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"无法将输入转换为数值类型: {e}") from e
+
+    # 找到有效数据点（使用numpy的高效操作）
+    mask = np.isfinite(arr1) & np.isfinite(arr2)
+    n = np.sum(mask)
+
+    # 检查有效样本数
     if n <= 2:
         return np.nan, np.nan, n
-    # 计算相关系数
+
+    # 提取有效数据
     valid_arr1 = arr1[mask]
     valid_arr2 = arr2[mask]
-    if how == "pearson":
-        r, p = stats.pearsonr(valid_arr1, valid_arr2)
-    elif how == "kendall":
-        r, p = stats.kendalltau(valid_arr1, valid_arr2)
-    elif how == "spearman":
-        r, p = stats.spearmanr(valid_arr1, valid_arr2)
-    else:
-        raise ValueError(f"无效的相关系数计算方法: {how}")
+
+    # 检查数据是否全为常数（使用numpy的高效操作）
+    if np.var(valid_arr1) == 0 or np.var(valid_arr2) == 0:
+        return np.nan, np.nan, n
+
+    # 计算相关系数
+    try:
+        if how == "pearson":
+            r, p = stats.pearsonr(valid_arr1, valid_arr2)
+        elif how == "kendall":
+            r, p = stats.kendalltau(valid_arr1, valid_arr2)
+        elif how == "spearman":
+            r, p = stats.spearmanr(valid_arr1, valid_arr2)
+        else:
+            raise ValueError(f"无效的相关系数计算方法: {how}")
+    except (ValueError, RuntimeError, FloatingPointError) as e:
+        raise ValueError(f"计算相关系数时出错: {e}") from e
+
+    # 应用有效样本量惩罚
     if penalty:
-        neff = effective_sample_size(n, valid_arr1, valid_arr2)
-        penalty = np.sqrt(neff / n)
-        r = r * penalty
+        try:
+            # 对于numpy数组，需要转换为pandas Series来计算自相关
+            valid_series1 = pd.Series(valid_arr1)
+            valid_series2 = pd.Series(valid_arr2)
+            neff = effective_sample_size(n, valid_series1, valid_series2)
+            penalty_factor = np.sqrt(neff / n)
+            r = r * penalty_factor
+        except (ValueError, RuntimeError, FloatingPointError) as e:
+            # 如果惩罚计算失败，记录警告但继续返回原始结果
+            import warnings
+
+            warnings.warn(f"有效样本量惩罚计算失败: {e}")
+
+    return r, p, n
+
+
+def _calc_corr_pandas(
+    arr1: pd.Series | np.ndarray,
+    arr2: pd.Series | np.ndarray,
+    how: CorrFunc,
+    penalty: bool,
+) -> tuple[float, float, int]:
+    """处理包含pandas Series的相关系数计算"""
+    # 统一转换为pandas Series进行处理，保持索引对齐
+    if isinstance(arr1, np.ndarray):
+        arr1 = pd.Series(arr1)
+    if isinstance(arr2, np.ndarray):
+        arr2 = pd.Series(arr2)
+
+    # 确保两个序列都是数值类型
+    try:
+        arr1 = pd.to_numeric(arr1, errors="coerce")
+        arr2 = pd.to_numeric(arr2, errors="coerce")
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"无法将输入转换为数值类型: {e}") from e
+
+    # 找到有效数据点
+    mask = ~arr1.isna() & ~arr2.isna()
+    n = mask.sum()
+
+    # 检查有效样本数
+    if n <= 2:
+        return np.nan, np.nan, n
+
+    # 提取有效数据
+    valid_arr1 = arr1[mask]
+    valid_arr2 = arr2[mask]
+
+    # 检查数据是否全为常数
+    if valid_arr1.nunique() <= 1 or valid_arr2.nunique() <= 1:
+        return np.nan, np.nan, n
+
+    # 计算相关系数
+    try:
+        if how == "pearson":
+            r, p = stats.pearsonr(valid_arr1, valid_arr2)
+        elif how == "kendall":
+            r, p = stats.kendalltau(valid_arr1, valid_arr2)
+        elif how == "spearman":
+            r, p = stats.spearmanr(valid_arr1, valid_arr2)
+        else:
+            raise ValueError(f"无效的相关系数计算方法: {how}")
+    except (ValueError, RuntimeError, FloatingPointError) as e:
+        raise ValueError(f"计算相关系数时出错: {e}") from e
+
+    # 应用有效样本量惩罚
+    if penalty:
+        try:
+            neff = effective_sample_size(n, valid_arr1, valid_arr2)
+            penalty_factor = np.sqrt(neff / n)
+            r = r * penalty_factor
+        except (ValueError, RuntimeError, FloatingPointError) as e:
+            # 如果惩罚计算失败，记录警告但继续返回原始结果
+            import warnings
+
+            warnings.warn(f"有效样本量惩罚计算失败: {e}")
+
     return r, p, n
 
 
@@ -242,3 +372,92 @@ def find_top_max_indices(
     else:
         # 返回一维索引
         return flat_indices
+
+
+def low_pass_filter(
+    data: pd.Series | np.ndarray,
+    window_size: int = 30,
+    method: str = "rolling_mean",
+    center: bool = True,
+    min_periods: int | None = None,
+) -> pd.Series:
+    """Apply low-pass filter to time series data.
+
+    This function applies a low-pass filter to remove high-frequency noise
+    and reveal long-term trends in time series data. The default 30-year
+    window is commonly used in paleoclimate studies.
+
+    Args:
+        data: Input time series data
+        window_size: Size of the rolling window for filtering (default: 30)
+        method: Filtering method ('rolling_mean', 'gaussian', 'butterworth')
+        center: Whether to center the rolling window (default: True)
+        min_periods: Minimum number of observations in window required to have a value
+
+    Returns:
+        pd.Series: Filtered time series data
+
+    Examples:
+        >>> import pandas as pd
+        >>> import numpy as np
+        >>> data = pd.Series(np.random.randn(100), index=range(1000, 1100))
+        >>> filtered = low_pass_filter(data, window_size=10)
+        >>> print(filtered.head())
+    """
+    if isinstance(data, np.ndarray):
+        data = pd.Series(data)
+
+    if min_periods is None:
+        min_periods = max(1, window_size // 2)
+
+    if method == "rolling_mean":
+        return data.rolling(
+            window=window_size, center=center, min_periods=min_periods
+        ).mean()
+    elif method == "gaussian":
+        # Gaussian filter using scipy
+        from scipy.ndimage import gaussian_filter1d
+
+        sigma = window_size / 6  # 3-sigma rule
+        filtered_values = gaussian_filter1d(data.dropna().values, sigma=sigma)
+        result = pd.Series(index=data.index, dtype=float)
+        result.loc[data.dropna().index] = filtered_values
+        return result
+    elif method == "butterworth":
+        # Butterworth low-pass filter
+        from scipy.signal import butter, filtfilt
+
+        nyquist = 0.5  # Assuming yearly data
+        cutoff = 1.0 / window_size  # Cutoff frequency
+        normal_cutoff = cutoff / nyquist
+        b, a = butter(4, normal_cutoff, btype="low", analog=False)
+        filtered_values = filtfilt(b, a, data.dropna().values)
+        result = pd.Series(index=data.index, dtype=float)
+        result.loc[data.dropna().index] = filtered_values
+        return result
+    else:
+        raise ValueError(f"Unknown filtering method: {method}")
+
+
+def calculate_rmse(
+    observed: pd.Series | np.ndarray,
+    predicted: pd.Series | np.ndarray,
+    axis: int | None = None,
+) -> float:
+    """Calculate Root Mean Square Error (RMSE).
+
+    Args:
+        observed: Observed values
+        predicted: Predicted values
+        axis: Axis along which to calculate RMSE
+
+    Returns:
+        float: RMSE value
+    """
+    if isinstance(observed, pd.Series):
+        observed = observed.values
+    if isinstance(predicted, pd.Series):
+        predicted = predicted.values
+
+    mse = np.mean((observed - predicted) ** 2, axis=axis)
+    return np.sqrt(mse)
