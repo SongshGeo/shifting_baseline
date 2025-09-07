@@ -10,6 +10,7 @@ from __future__ import annotations
 from itertools import product
 from typing import Optional
 
+import geopandas as gpd
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
@@ -19,9 +20,15 @@ import seaborn as sns
 import xarray as xr
 from matplotkit import with_axes
 from matplotlib.axes import Axes
+from pyproj import CRS
 
 from past1000.constants import LEVELS, TICK_LABELS
-from past1000.utils.calc import fill_star_matrix, get_coords
+from past1000.utils.calc import (
+    calculate_rmse,
+    fill_star_matrix,
+    get_coords,
+    low_pass_filter,
+)
 
 
 def is_significant(p_value: float, threshold: float = 0.1) -> bool:
@@ -486,6 +493,7 @@ def plot_std_times(
     data: pd.Series,
     ax: Optional[Axes] = None,
     color_options: Optional[dict[str, str]] = None,
+    **kwargs,
 ) -> None:
     """分段绘制正负值出现次数图
 
@@ -494,8 +502,10 @@ def plot_std_times(
             输入数据。
         ax: matplotlib.axes.Axes
             绘图的Axes对象。
-        colors: dict[str, str]
+        color_options: dict[str, str]
             颜色映射。
+        add_legend: bool
+            是否添加图例。
     """
     assert isinstance(data, pd.Series), "data must be a pandas Series"
     assert data.index.is_monotonic_increasing, "index must be monotonic increasing"
@@ -517,10 +527,29 @@ def plot_std_times(
         ),  # 负数用红色，零值用灰色
     )
 
+    # 跟踪已添加的标签类型
+    added_labels = set()
+
     # 绘制垂直线和散点
     for x, y, color in zip(data.index, data.values, colors):
-        ax.vlines(x, 0, y, colors=color, linewidth=1)
-        ax.scatter(x, y, c=color, s=30, zorder=3)
+        ax.vlines(x, 0, y, colors=color, linewidth=1, **kwargs)
+
+        # 根据数值类型确定标签
+        if y > 0:
+            label = "Positive" if "positive" not in added_labels else None
+            if label:
+                added_labels.add("positive")
+        elif y < 0:
+            label = "Negative" if "negative" not in added_labels else None
+            if label:
+                added_labels.add("negative")
+        else:
+            label = "Zero" if "zero" not in added_labels else None
+            if label:
+                added_labels.add("zero")
+            else:
+                label = None
+        ax.scatter(x, y, c=color, s=30, zorder=3, edgecolors="white", label=label)
 
     # 添加基线
     ax.axhline(y=0, color="black", linewidth=0.5, alpha=0.7)
@@ -531,6 +560,7 @@ def plot_std_times(
 
     ax.set_ylabel("Times of STD")
     ax.set_xlabel("Year")
+
     return ax
 
 
@@ -664,4 +694,267 @@ def plot_correlation_windows(
     ax.set_xlim(lims)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    return ax
+
+
+@with_axes(figsize=(10, 4))
+def plot_time_series_with_lowpass(
+    data: pd.Series,
+    filtered_data: pd.Series | None = None,
+    window_size: int = 30,
+    filter_method: str = "rolling_mean",
+    baseline: float | None = None,
+    rmse_data: pd.Series | None = None,
+    ax: Optional[Axes] = None,
+    title: str = "Time Series with Low-pass Filter",
+    xlabel: str = "Year (CE)",
+    ylabel: str = "Value",
+    show_annual: bool = True,
+    show_filtered: bool = True,
+    show_baseline: bool = True,
+    show_rmse: bool = True,
+    colors: dict[str, str] | None = None,
+    **kwargs,
+) -> Axes:
+    """绘制带低通滤波的时间序列图，支持基准线着色和误差范围显示。
+
+    这个函数可以绘制类似你描述的时间序列图，包括：
+    - 年度原始数据（垂直线）
+    - 30年低通滤波后的平滑趋势（粗线）
+    - 基准线以上的蓝色区域和以下的红色区域
+    - ±1 RMSE误差范围（浅灰色阴影）
+
+    Args:
+        data: 原始时间序列数据
+        filtered_data: 已滤波的数据，如果为None则自动计算
+        window_size: 滤波窗口大小，默认30年
+        filter_method: 滤波方法，'rolling_mean', 'gaussian', 'butterworth'
+        baseline: 基准线值，如果为None则使用数据均值
+        rmse_data: RMSE数据，如果为None则自动计算
+        ax: matplotlib坐标轴对象
+        title: 图表标题
+        xlabel: X轴标签
+        ylabel: Y轴标签
+        unit: 数据单位
+        show_annual: 是否显示年度数据
+        show_filtered: 是否显示滤波数据
+        show_baseline: 是否显示基准线着色
+        show_rmse: 是否显示RMSE误差范围
+        colors: 颜色配置字典
+        **kwargs: 其他绘图参数
+
+    Returns:
+        Axes: matplotlib坐标轴对象
+
+    Examples:
+        >>> import pandas as pd
+        >>> import numpy as np
+        >>> # 创建示例数据
+        >>> years = np.arange(1100, 2001)
+        >>> np.random.seed(42)
+        >>> data = pd.Series(
+        ...     np.random.randn(len(years)) * 200 + 1600 +
+        ...     np.sin(years / 50) * 100,
+        ...     index=years
+        ... )
+        >>> # 绘制时间序列图
+        >>> ax = plot_time_series_with_lowpass(data, title="Streamflow Reconstruction")
+    """
+
+    if colors is None:
+        colors = {
+            "annual": "darkgray",
+            "filtered": "black",
+            "baseline": "gray",
+            "above_baseline": "lightblue",
+            "below_baseline": "lightcoral",
+            "rmse": "lightgray",
+        }
+
+    # 计算滤波数据
+    if filtered_data is None:
+        filtered_data = low_pass_filter(
+            data, window_size=window_size, method=filter_method
+        )
+
+    # 计算基准线
+    if baseline is None:
+        baseline = filtered_data.mean()
+
+    # 计算RMSE
+    if rmse_data is None and show_rmse:
+        # 使用原始数据与滤波数据的差异作为RMSE的近似
+        valid_mask = ~filtered_data.isna()
+        if valid_mask.any():
+            rmse_value = calculate_rmse(data[valid_mask], filtered_data[valid_mask])
+            rmse_data = pd.Series([rmse_value] * len(data), index=data.index)
+
+    assert isinstance(ax, Axes), "ax must be an instance of Axes"
+
+    # 绘制年度数据（垂直线）
+    if show_annual:
+        ax.plot(
+            data.index,
+            data.values,
+            color=colors["annual"],
+            linewidth=0.5,
+            alpha=0.6,
+            label="Annual data",
+        )
+
+    # 绘制RMSE误差范围
+    if show_rmse and rmse_data is not None:
+        valid_mask = ~filtered_data.isna()
+        if valid_mask.any():
+            ax.fill_between(
+                filtered_data.index[valid_mask],
+                filtered_data[valid_mask] - rmse_data[valid_mask],
+                filtered_data[valid_mask] + rmse_data[valid_mask],
+                color=colors["rmse"],
+                alpha=0.3,
+                label="±1 RMSE",
+            )
+
+    # 绘制基准线着色区域
+    if show_baseline:
+        valid_mask = ~filtered_data.isna()
+        if valid_mask.any():
+            # 找到高于和低于基准线的区域
+            above_mask = (filtered_data >= baseline) & valid_mask
+            below_mask = (filtered_data < baseline) & valid_mask
+
+            # 绘制高于基准线的区域
+            if above_mask.any():
+                ax.fill_between(
+                    filtered_data.index[above_mask],
+                    baseline,
+                    filtered_data[above_mask],
+                    color=colors["above_baseline"],
+                    alpha=0.6,
+                    label="Above baseline",
+                )
+
+            # 绘制低于基准线的区域
+            if below_mask.any():
+                ax.fill_between(
+                    filtered_data.index[below_mask],
+                    filtered_data[below_mask],
+                    baseline,
+                    color=colors["below_baseline"],
+                    alpha=0.6,
+                    label="Below baseline",
+                )
+
+    # 绘制滤波后的数据
+    if show_filtered:
+        valid_mask = ~filtered_data.isna()
+        if valid_mask.any():
+            ax.plot(
+                filtered_data.index[valid_mask],
+                filtered_data[valid_mask],
+                color=colors["filtered"],
+                linewidth=2,
+                label=f"Reconstruction ({window_size}-year low-pass filter)",
+            )
+
+    # 绘制基准线
+    if show_baseline:
+        ax.axhline(
+            y=baseline,
+            color=colors["baseline"],
+            linestyle="--",
+            linewidth=1,
+            alpha=0.8,
+            label=f"Baseline ({baseline:.1f})",
+        )
+
+    # 设置网格
+    ax.grid(True, alpha=0.3, linestyle=":", color="gray")
+
+    # 美化坐标轴
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    return ax
+
+
+@with_axes
+def plot_corr_map(
+    corr: xr.DataArray,
+    p_value: xr.DataArray,
+    threshold: float = 0.05,
+    ax: plt.Axes | None = None,
+    mask: bool = True,
+    base_maps: dict[str, str] | None = None,
+    crs: str | None | CRS = None,
+    add_colorbar: bool = True,
+    **kwargs,
+) -> plt.Axes:
+    """绘制相关性地图
+
+    Args:
+        corr (xr.DataArray): 相关性
+        p_value (xr.DataArray): p值
+        threshold (float, optional): 显著性阈值. Defaults to 0.05.
+        ax (plt.Axes | None, optional): 坐标轴. Defaults to None.
+
+    Returns:
+        plt.Axes: 坐标轴
+    """
+    assert isinstance(ax, Axes), "ax must be an instance of Axes"
+    if crs is None:
+        assert hasattr(corr, "rio"), "corr must have rio attribute"
+        crs = corr.rio.crs
+    corr_map = corr
+    # 创建显著性掩码
+    colors = ["black", "gray", "lightgray"]
+    linewidths = [0.8, 0.8, 1.5]
+    levels = [0.1, 0.05, 0.01]
+    for level, color, linewidth in zip(levels, colors, linewidths):
+        contour = p_value.plot.contour(
+            ax=ax,
+            levels=[level],
+            colors=[color],
+            linewidths=[linewidth],
+            linestyles=["--"],
+            alpha=0.8,
+        )
+        # 添加简洁标签
+        ax.clabel(
+            contour, inline=True, fontsize=7, fmt=f"{level:.2f}", colors=color  # 只显示数值
+        )
+    if mask:
+        significant_mask = p_value < threshold
+        corr_map = corr_map.where(significant_mask)
+    if add_colorbar:
+        cbar_kwargs = {"shrink": 0.8, "aspect": 20}
+    else:
+        cbar_kwargs = None
+    corr_map.plot(
+        ax=ax,
+        cmap="RdBu_r",
+        vmin=-0.5,
+        vmax=0.5,
+        add_colorbar=add_colorbar,
+        cbar_kwargs=cbar_kwargs,
+    )
+    # 绘制底图
+    if base_maps is None:
+        base_maps = {}
+    zorder = -1
+    for name, shp in base_maps.items():
+        gpd.read_file(shp).to_crs(crs).plot(
+            ax=ax,
+            color="gray",
+            edgecolor="black",
+            linewidth=0.5,
+            alpha=0.4,
+            label=name.capitalize(),
+            zorder=zorder,
+        )
+        zorder -= 1
+    sns.despine(ax=ax, left=False, bottom=False)
+    ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.5, color="gray")
+    ax.set_title("")  # 清空标题
+    ax.set_xlabel("")  # 清空x轴标签
     return ax

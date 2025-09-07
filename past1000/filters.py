@@ -442,6 +442,7 @@ def classify(
     series: pd.Series | np.ndarray,
     thresholds: list[float] | None = None,
     levels: list[int] | None = None,
+    handle_na: str = "raise",
 ) -> pd.Series:
     """Classify values in the series based on standard deviation thresholds.
 
@@ -459,7 +460,7 @@ def classify(
     Raises:
         ValueError: If levels length is not thresholds length + 1
     """
-    return classify_series(series, thresholds, levels, handle_na="raise")
+    return classify_series(series, thresholds, levels, handle_na)
 
 
 def sigmoid_adjustment_probability(

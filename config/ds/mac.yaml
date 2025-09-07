@@ -29,6 +29,7 @@ spei:
 
 abm: ${ds.multirun}/2025-07-27/23-18-33
 
+# 整合校验数据，提取夏季降水，并保存为nc文件
 instrumental:
   input: ${ds.data}/中国1900以来逐月降水
   output: ${ds.processed}/JAS_precipitation_1900-2017.nc
@@ -38,8 +39,6 @@ instrumental:
     - 9
   agg_method: sum
 
-region_corr: ${ds.processed}/region_corr.csv
-
 includes:
 - "chen2020f"  # not good
 - "li2015b"  # not good
@@ -47,9 +46,15 @@ includes:
 - "liu2020"  # not good
 - "shi2017"
 - "shi2018"
-# - "tan2011"  # not good
+- "tan2011"  # not good
 - "xu2023c"  # great
 - "yang2016"  # great
 # - "yang2019d"  # terrible
 - "yi2010"  # very good
 - "yi2012"  # very good
+
+out:
+  tree_ring: ${ds.processed}/combined_mean.csv
+  precip_z: ${ds.processed}/summer_precip_z.csv
+  sites_corr: ${ds.processed}/sites_corr.csv
+  tree_ring_uncertainty: ${ds.processed}/combined_uncertainty.csv
