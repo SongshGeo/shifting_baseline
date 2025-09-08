@@ -27,7 +27,8 @@ spei:
   pr: ${ds.spei.folder}/month_pre_0.1degree.nc
   pattern: ${ds.spei.folder}/spei_penman/spei_spei_{dist}_{freq}.nc
 
-abm: ${ds.multirun}/2025-07-27/23-18-33
+# abm: ${ds.multirun}/2025-07-27/23-18-33  # 之前的
+abm: ${ds.multirun}/2025-08-07/04-17-47
 
 # 整合校验数据，提取夏季降水，并保存为nc文件
 instrumental:

@@ -33,6 +33,7 @@ from past1000.constants import (
     START,
     STD_THRESHOLDS,
 )
+from past1000.filters import classify
 from past1000.mc import standardize_both
 from past1000.utils.calc import calc_corr, generate_from_2d_levels_averaged
 
@@ -806,10 +807,11 @@ class HistoricalRecords:
                 name = data.name
             else:
                 name = str(how).lower()
-        result.name = "history_" + name
         # 是否转换为整数
         if to_int:
-            result = result.astype(float).round(0)
+            # result = result.astype(float).round(0)
+            result = classify(result, handle_na="skip")
+        result.name = "history_" + name
         if inplace:
             self.data = result.astype(float)
             return self
