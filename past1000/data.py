@@ -34,12 +34,12 @@ from past1000.constants import (
     STD_THRESHOLDS,
 )
 from past1000.mc import standardize_both
-from past1000.utils.calc import calc_corr
+from past1000.utils.calc import calc_corr, generate_from_2d_levels_averaged
 
 if TYPE_CHECKING:
     from geo_dskit.core.types import PathLike, Region
 
-    from past1000.utils.types import HistoricalAggregateType, Stages
+    from past1000.utils.types import HistoricalAggregateType, Stages, ToStdMethod
 
 log = logging.getLogger(__name__)
 # 常用的分布
@@ -149,7 +149,7 @@ class HistoricalRecords:
         data_path: PathLike,
         region: Region | None = "华北地区",
         symmetrical_level: bool = True,
-        to_std: bool = False,
+        to_std: Optional[ToStdMethod] = None,
     ):
         """
         历史千年旱涝记录数据，参考：
@@ -188,13 +188,30 @@ class HistoricalRecords:
         # 处理对称等级
         self._setup_level_data(to_level=self.sym, to_std=self.to_std)
 
-    def _setup_level_data(self, to_level: bool, to_std: bool):
+    def _setup_level_data(self, to_level: bool, to_std: Optional[ToStdMethod]):
         """处理对称等级和标准化"""
         if to_level:
             self._data = 3 - self._data
-        if to_std:
-            assert to_level, "to_std 必须设置 to_level 同时为 True"
+        if to_std is None:
+            return
+        assert to_level, "to_std 必须设置 to_level 同时为 True"
+        if to_std == "mapping":
             self._data = self._data.replace(MAP)
+        elif to_std == "sampling":
+            data, std = generate_from_2d_levels_averaged(
+                self._data,
+                n_samples=100,
+                mu=0.0,
+                sigma=1.0,
+            )
+            self._data = pd.DataFrame(
+                data, index=self._data.index, columns=self._data.columns
+            )
+            self._std = pd.DataFrame(
+                std, index=self._data.index, columns=self._data.columns
+            )
+        else:
+            raise ValueError(f"无效的 to_std 方法: {to_std}")
 
     def get_bounds(
         self,
@@ -919,5 +936,6 @@ def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRe
         shp_path=cfg.ds.atlas.shp,
         data_path=cfg.ds.atlas.file,
         symmetrical_level=True,
+        to_std=cfg.to_std,
     )
     return datasets, uncertainties, history

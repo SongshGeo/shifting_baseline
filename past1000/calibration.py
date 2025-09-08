@@ -346,7 +346,10 @@ class MismatchReport:
         )
 
     def generate_report_figure(
-        self, figsize: tuple = (5, 3), save_path: PathLike | None = None
+        self,
+        figsize: tuple = (5, 3),
+        save_path: PathLike | None = None,
+        **kwargs,
     ) -> plt.Figure:
         """生成完整的报告图表"""
         if self.diff_matrix is None:

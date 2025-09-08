@@ -370,7 +370,7 @@ def plot_mismatch_matrix(
 
     # 1. 设置渐变色和归一化
     # vmax = np.nanmax(np.abs(actual_diff_aligned.values))
-    vmax = 0.2
+    vmax = 0.5
     cmap = mpl.cm.coolwarm  # 或 mpl.cm.RdBu
     # 使用线性归一化，对于对称的数据分布更合适
     norm = mpl.colors.Normalize(vmin=-vmax, vmax=vmax)

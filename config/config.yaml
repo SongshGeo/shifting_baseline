@@ -36,6 +36,7 @@ filter_side: right
 agg_method: mean
 to_int: true
 resolution: 0.5
+to_std: sampling
 
 low_pass:
   window_size: 30

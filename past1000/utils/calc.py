@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.signal import detrend
+from scipy.stats import truncnorm
 
 if TYPE_CHECKING:
     from past1000.utils.types import CorrFunc
@@ -461,3 +462,115 @@ def calculate_rmse(
 
     mse = np.mean((observed - predicted) ** 2, axis=axis)
     return np.sqrt(mse)
+
+
+def get_interval(level: int) -> tuple[float, float]:
+    """根据等级返回标准化下限和上限（标准差倍数）。"""
+    boundaries = {
+        -2: (-2, -1.17),
+        -1: (-1.17, -0.33),
+        0: (-0.33, 0.33),
+        1: (0.33, 1.17),
+        2: (1.17, 2),
+    }
+    if level not in boundaries:
+        raise ValueError("无效等级，必须为 {-2, -1, 0, 1, 2}")
+    return boundaries[level]
+
+
+def generate_from_2d_levels(
+    grade_matrix, mu: float = 0.0, sigma: float = 1.0
+) -> np.ndarray:
+    """
+    为 2D 等级矩阵生成对应的原始值矩阵，每个值从截断正态分布采样。
+    跳过 NA 值，在输出中保留 np.nan。
+
+    参数:
+    - grade_matrix: 2D NumPy 数组或 pandas DataFrame，元素为 {-2, -1, 0, 1, 2} 或 NA
+    - mu: 正态分布均值 (默认 0.0)
+    - sigma: 正态分布标准差 (默认 1.0)
+
+    返回:
+    - 2D NumPy 数组，形状与输入相同，非 NA 元素为采样值，NA 元素为 np.nan
+    """
+    # 处理 pandas DataFrame 输入
+    if isinstance(grade_matrix, pd.DataFrame):
+        # 使用 pandas 的原生方法处理 NA 值
+        grade_df = grade_matrix.copy()
+
+        # 将所有列转换为数值类型，pandas 会自动处理各种 NA 值
+        for col in grade_df.columns:
+            grade_df[col] = pd.to_numeric(grade_df[col], errors="coerce")
+
+        # 转换为 numpy 数组
+        grade_matrix = grade_df.values
+    else:
+        # 验证输入
+        if not isinstance(grade_matrix, np.ndarray) or grade_matrix.ndim != 2:
+            raise ValueError("输入必须是 2D NumPy 数组或 pandas DataFrame")
+
+        # 对于 numpy 数组，使用 pandas 的 to_numeric 处理
+        if grade_matrix.dtype == object:
+            # 创建临时 DataFrame 来利用 pandas 的 NA 处理能力
+            temp_df = pd.DataFrame(grade_matrix)
+            for col in temp_df.columns:
+                temp_df[col] = pd.to_numeric(temp_df[col], errors="coerce")
+            grade_matrix = temp_df.values
+        else:
+            # 已经是数值类型，直接使用
+            grade_matrix = grade_matrix.astype(float)
+
+    # 初始化输出矩阵，填充为 np.nan
+    result = np.full_like(grade_matrix, np.nan, dtype=float)
+
+    # 检测 NA 值 - 现在可以安全使用 np.isnan
+    na_mask = np.isnan(grade_matrix)
+
+    # 检查非 NA 元素的有效性
+    valid_grades = {-2, -1, 0, 1, 2}
+    non_na_grades = grade_matrix[~na_mask]
+    if len(non_na_grades) > 0 and not np.all(
+        np.isin(non_na_grades, list(valid_grades))
+    ):
+        raise ValueError("非 NA 元素包含无效等级，必须为 {-2, -1, 0, 1, 2}")
+
+    # 对每个有效等级进行向量化采样
+    for grade in valid_grades:
+        # 仅考虑非 NA 且等于该等级的位置
+        mask = (grade_matrix == grade) & (~na_mask)
+        size = np.sum(mask)
+        if size > 0:
+            lower, upper = get_interval(grade)
+            a = (lower - mu) / sigma
+            b = (upper - mu) / sigma
+            samples = truncnorm.rvs(a, b, size=size)
+            result[mask] = mu + samples * sigma
+
+    return result
+
+
+def generate_from_2d_levels_averaged(
+    grade_matrix, n_samples=100, mu=0.0, sigma=1.0, random_state=None
+):
+    """
+    多次调用 generate_from_2d_levels 并取平均值, 并返回平均值和标准差
+
+    Args:
+        grade_matrix: 2D NumPy 数组或 pandas DataFrame，元素为 {-2, -1, 0, 1, 2} 或 NA
+        n_samples: 样本数量
+        mu: 正态分布均值 (默认 0.0)
+        sigma: 正态分布标准差 (默认 1.0)
+        random_state: 随机种子
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: 平均值和标准差
+    """
+    if random_state is not None:
+        np.random.seed(random_state)
+
+    samples = []
+    for _ in range(n_samples):
+        sample = generate_from_2d_levels(grade_matrix, mu=mu, sigma=sigma)
+        samples.append(sample)
+
+    return np.mean(samples, axis=0), np.std(samples, axis=0)

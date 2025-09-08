@@ -28,3 +28,4 @@ if TYPE_CHECKING:
     ]
 
     Stages: TypeAlias = int | slice | str | Literal[1, 2, 3, 4]
+    ToStdMethod: TypeAlias = Literal["mapping", "sampling"]
