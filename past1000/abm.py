@@ -21,13 +21,7 @@ from scipy.stats import norm
 from past1000.calibration import MismatchReport
 from past1000.compare import compare_corr_2d
 from past1000.constants import MAX_AGE
-from past1000.filters import (
-    adjust_judgment_by_climate_direction,
-    calc_std_deviation,
-    classify,
-    classify_single_value,
-    sigmoid_adjustment_probability,
-)
+from past1000.filters import calc_std_deviation, classify, classify_single_value
 from past1000.utils.calc import rand_generate_from_std_levels
 from past1000.utils.email import send_notification_email
 
@@ -65,7 +59,8 @@ class Model(MainModel):
         self._min_age: int = self.p.get("min_age", 10)
         self._mode_cache: Optional[pd.Series] = None
         self._mode_cache_tick: int = -1
-        self._last_event_years: dict[int, int] = {}
+        self._collective_cache: Optional[pd.Series] = None
+        self._collective_cache_tick: int = -1
         self.spin_up_years: int = self._new_agents * (self._max_age - self._min_age + 1)
         self._years: int = years + self.spin_up_years
         self._climate: np.ndarray = np.random.normal(0, 1, self._years)
@@ -119,13 +114,24 @@ class Model(MainModel):
         Returns:
             pd.Series: Rounded mean of recorded events for each year.
         """
+        # Return cache if tick has not advanced
+        if (
+            self._collective_cache is not None
+            and self._collective_cache_tick == self.time.tick
+        ):
+            return self._collective_cache
+
         current_archive = {k: v for k, v in self._archive.items() if v}
-        return pd.Series(
+        series = pd.Series(
             {
                 k: rand_generate_from_std_levels(np.array(v)).mean()
                 for k, v in current_archive.items()
             }
         )
+        # Update cache for current tick
+        self._collective_cache = series
+        self._collective_cache_tick = self.time.tick
+        return series
 
     @property
     def mismatch_report(self) -> MismatchReport:
@@ -156,32 +162,10 @@ class Model(MainModel):
 
     def step(self) -> None:
         """Advance the model by one tick: update global info, spawn new agents, and step all agents."""
-        self.update_last_event_years()
         if self.time.tick == self._years - 1:
             self.running = False
         self.agents.new(ClimateObserver, self._new_agents, max_age=self._max_age)
         self.agents.do("step")
-
-    def update_last_event_years(self) -> None:
-        """Update and cache the last occurrence year for each event level (called at each step)."""
-        # current_mode = self.mode
-        current_mode = self.collective_memory_climate
-        if current_mode.empty:
-            return
-        unique_levels = current_mode.unique()
-        for level in unique_levels:
-            last_year = current_mode[current_mode == level].last_valid_index()
-            self._last_event_years[level] = last_year
-
-    def get_last_event_year_for_level(self, level: int) -> Optional[int]:
-        """Get the last year a specific event level was recorded (for agent use).
-
-        Args:
-            level (int): The event level to query.
-        Returns:
-            Optional[int]: The last year this level was recorded, or None if never.
-        """
-        return self._last_event_years.get(level, None)
 
     @property
     def stable_df(self) -> pd.DataFrame:
@@ -259,15 +243,6 @@ class ClimateObserver(Actor):
         """
         return np.array(self._memory)
 
-    @property
-    def classified(self) -> pd.Series:
-        """Classified memory of extreme events.
-
-        Returns:
-            pd.Series: Classified memory values.
-        """
-        return classify(self.memory)
-
     def write_down(
         self,
         event: float,
@@ -298,62 +273,22 @@ class ClimateObserver(Actor):
         Returns:
             float: Z-score of the current climate.
         """
-        return (climate - self.memory.mean()) / self.memory.std()
-
-    def rejudge_based_on_collective_memory(
-        self,
-        init_judgment: int,
-        rand_func=sigmoid_adjustment_probability,
-        **rand_kwargs,
-    ) -> int:
-        """Re-evaluate judgment based on collective memory.
-
-        This method handles the ABM-specific logic for obtaining climate data from
-        collective memory, calculating adjustment probability, and making the final
-        adjustment decision. The probability calculation function and its parameters
-        can be customized for testing different behavioral models.
-
-        Args:
-            init_judgment (int): Initial judgment based on personal memory.
-            rand_func: Function to calculate adjustment probability. Should take
-                climate_diff as first argument and return probability (0-1).
-                Default is sigmoid_adjustment_probability.
-            **rand_kwargs: Keyword arguments passed to rand_func. For sigmoid
-                function, typically includes x0 (offset) and k (steepness).
-
-        Returns:
-            int: Final judgment after possible adjustment.
-        """
-        # ABM-specific logic: Get last event year from collective memory
-        last_event_year = self.model.get_last_event_year_for_level(init_judgment)
-        if last_event_year is None:
-            return init_judgment
-
-        # ABM-specific logic: Check if individual was born after the event
-        birth_year = self.time.tick - self.age
-        if birth_year > last_event_year:
-            return init_judgment
-
-        # ABM-specific logic: Extract climate data from model
-        climate_then = self.model.climate_series.loc[last_event_year]
-        climate_now = self.model.climate_now
-        climate_diff = climate_now - climate_then
-
-        # ABM-specific logic: Calculate adjustment probability using provided function
-        adjustment_prob = rand_func(climate_diff, **rand_kwargs)
-
-        # ABM-specific logic: Make stochastic decision
-        if self.random.random() > adjustment_prob:
-            return init_judgment
-
-        # Delegate deterministic adjustment logic to filter function
-        return adjust_judgment_by_climate_direction(
-            init_judgment=init_judgment,
-            climate_now=climate_now,
-            climate_then=climate_then,
-            min_level=-2,
-            max_level=2,
-        )
+        if self.model.p.memory_baseline == "personal":
+            baseline = self.memory.mean()
+            std = self.memory.std()
+        elif self.model.p.memory_baseline == "model":
+            baseline = self.model.climate_series.mean()
+            std = self.model.climate_series.std()
+        elif self.model.p.memory_baseline == "collective":
+            baseline = self.model.collective_memory_climate.mean()
+            std = self.model.collective_memory_climate.std()
+        else:
+            raise ValueError("Invalid memory baseline")
+        if np.isnan(baseline):
+            baseline = 0
+        if np.isnan(std):
+            std = 1
+        return climate - baseline / std
 
     def step(self) -> None:
         """Update observer state at each step.
@@ -372,12 +307,6 @@ class ClimateObserver(Actor):
         z = self.perception(climate)
         if self.write_down(z):
             extreme_level = classify_single_value(z)
-            try:
-                rjudge = self.model.p.rejudge
-            except KeyError:
-                raise KeyError("rejudge is not defined in the model")
-            if rjudge:
-                extreme_level = self.rejudge_based_on_collective_memory(extreme_level)
             self.model.write_down(extreme_level)
         if self.age > self._max_age:
             self.die()

@@ -10,6 +10,7 @@ loss_rate: 0.4
 new_agents: 5
 min_age: 10
 rejudge: False
+memory_baseline: "collective"
 
 # 相关性计算参数
 min_period: ${min_period}
