@@ -1,14 +1,17 @@
 # ABM 模型配置
+mode: 'test'
 repeats: 1  # 每组参数的运行重复次数
 num_process: 5  # 并行运算的进程数
 
-min_period: 5
-years: 300
+# 模型参数
+years: 100
 max_age: 40
 loss_rate: 0.4
 new_agents: 5
 min_age: 10
 rejudge: False
 
-corr_method: kendall
-filter_side: right
+# 相关性计算参数
+min_period: ${min_period}
+corr_method: ${corr_method}
+filter_side: ${filter_side}

@@ -7,7 +7,7 @@
 import numpy as np
 import pytest
 
-from past1000.utils.calc import generate_from_2d_levels
+from past1000.utils.calc import rand_generate_from_std_levels
 
 
 class TestGenerateFrom2DLevels:
@@ -18,7 +18,7 @@ class TestGenerateFrom2DLevels:
         # 创建测试数据
         grade_matrix = np.array([[1, 2, 0], [-1, -2, 1], [0, 1, -1]])
 
-        result = generate_from_2d_levels(grade_matrix, mu=0.0, sigma=1.0)
+        result = rand_generate_from_std_levels(grade_matrix, mu=0.0, sigma=1.0)
 
         # 检查输出形状
         assert result.shape == grade_matrix.shape
@@ -31,7 +31,7 @@ class TestGenerateFrom2DLevels:
         """测试包含 NaN 值的情况"""
         grade_matrix = np.array([[1, np.nan, 0], [-1, -2, np.nan], [np.nan, 1, -1]])
 
-        result = generate_from_2d_levels(grade_matrix, mu=0.0, sigma=1.0)
+        result = rand_generate_from_std_levels(grade_matrix, mu=0.0, sigma=1.0)
 
         # 检查输出形状
         assert result.shape == grade_matrix.shape
@@ -51,7 +51,7 @@ class TestGenerateFrom2DLevels:
             [["1", "nan", "0"], ["-1", "-2", "NaN"], ["", "1", "-1"]]
         )
 
-        result = generate_from_2d_levels(grade_matrix, mu=0.0, sigma=1.0)
+        result = rand_generate_from_std_levels(grade_matrix, mu=0.0, sigma=1.0)
 
         # 检查输出形状
         assert result.shape == grade_matrix.shape
@@ -70,7 +70,7 @@ class TestGenerateFrom2DLevels:
             [[1, "nan", 0.0], [-1, -2, None], [np.nan, 1, -1]], dtype=object
         )
 
-        result = generate_from_2d_levels(grade_matrix, mu=0.0, sigma=1.0)
+        result = rand_generate_from_std_levels(grade_matrix, mu=0.0, sigma=1.0)
 
         # 检查输出形状和类型
         assert result.shape == grade_matrix.shape
@@ -91,7 +91,7 @@ class TestGenerateFrom2DLevels:
         )
 
         # 直接使用 DataFrame 输入
-        result = generate_from_2d_levels(df, mu=0.0, sigma=1.0)
+        result = rand_generate_from_std_levels(df, mu=0.0, sigma=1.0)
 
         # 检查输出形状和类型
         assert result.shape == df.shape
@@ -124,7 +124,7 @@ class TestGenerateFrom2DLevels:
         )
 
         values = df.values
-        result = generate_from_2d_levels(values, mu=0.0, sigma=1.0)
+        result = rand_generate_from_std_levels(values, mu=0.0, sigma=1.0)
 
         # 检查输出形状和类型
         assert result.shape == values.shape
@@ -158,7 +158,7 @@ class TestGenerateFrom2DLevels:
         )
 
         values = df.values
-        result = generate_from_2d_levels(values, mu=0.0, sigma=1.0)
+        result = rand_generate_from_std_levels(values, mu=0.0, sigma=1.0)
 
         # 检查输出形状和类型
         assert result.shape == values.shape
@@ -169,24 +169,24 @@ class TestGenerateFrom2DLevels:
         grade_matrix = np.array([[1, 3, 0], [-1, -2, 1], [0, 1, -1]])  # 3 是无效等级
 
         with pytest.raises(ValueError, match="非 NA 元素包含无效等级"):
-            generate_from_2d_levels(grade_matrix)
+            rand_generate_from_std_levels(grade_matrix)
 
     def test_invalid_input_type(self):
         """测试无效输入类型"""
         # 非数组输入
         with pytest.raises(ValueError, match="输入必须是 2D NumPy 数组"):
-            generate_from_2d_levels([[1, 2], [3, 4]])
+            rand_generate_from_std_levels([[1, 2], [3, 4]])
 
         # 1D 数组
         with pytest.raises(ValueError, match="输入必须是 2D NumPy 数组"):
-            generate_from_2d_levels(np.array([1, 2, 3]))
+            rand_generate_from_std_levels(np.array([1, 2, 3]))
 
     def test_custom_mu_sigma(self):
         """测试自定义均值和标准差"""
         grade_matrix = np.array([[1, 0, -1], [2, -2, 1], [0, 1, -1]])
 
         mu, sigma = 5.0, 2.0
-        result = generate_from_2d_levels(grade_matrix, mu=mu, sigma=sigma)
+        result = rand_generate_from_std_levels(grade_matrix, mu=mu, sigma=sigma)
 
         # 检查输出形状
         assert result.shape == grade_matrix.shape
@@ -198,7 +198,7 @@ class TestGenerateFrom2DLevels:
         """测试空矩阵"""
         grade_matrix = np.array([[]])
 
-        result = generate_from_2d_levels(grade_matrix)
+        result = rand_generate_from_std_levels(grade_matrix)
 
         # 检查输出形状
         assert result.shape == grade_matrix.shape
@@ -208,7 +208,7 @@ class TestGenerateFrom2DLevels:
         """测试全 NaN 矩阵"""
         grade_matrix = np.array([[np.nan, np.nan], [np.nan, np.nan]])
 
-        result = generate_from_2d_levels(grade_matrix)
+        result = rand_generate_from_std_levels(grade_matrix)
 
         # 检查输出形状
         assert result.shape == grade_matrix.shape
@@ -220,7 +220,7 @@ class TestGenerateFrom2DLevels:
         """测试单一等级"""
         grade_matrix = np.array([[1, 1, 1], [1, 1, 1]])
 
-        result = generate_from_2d_levels(grade_matrix)
+        result = rand_generate_from_std_levels(grade_matrix)
 
         # 检查输出形状
         assert result.shape == grade_matrix.shape
@@ -233,7 +233,7 @@ class TestGenerateFrom2DLevels:
         """测试每个有效等级"""
         grade_matrix = np.array([[grade]])
 
-        result = generate_from_2d_levels(grade_matrix)
+        result = rand_generate_from_std_levels(grade_matrix)
 
         # 检查输出形状
         assert result.shape == grade_matrix.shape
@@ -253,7 +253,7 @@ class TestGenerateFrom2DLevels:
         nan_indices = np.random.choice(10000, size=1000, replace=False)
         grade_matrix.flat[nan_indices] = np.nan
 
-        result = generate_from_2d_levels(grade_matrix)
+        result = rand_generate_from_std_levels(grade_matrix)
 
         # 检查输出形状
         assert result.shape == grade_matrix.shape

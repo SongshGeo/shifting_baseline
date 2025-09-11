@@ -5,6 +5,7 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+import logging
 import traceback
 from collections import deque
 from datetime import datetime
@@ -15,8 +16,9 @@ import pandas as pd
 from abses import Actor, Experiment, MainModel
 from hydra import main
 from omegaconf import DictConfig
-from scipy.stats import mode, norm
+from scipy.stats import norm
 
+from past1000.calibration import MismatchReport
 from past1000.compare import compare_corr_2d
 from past1000.constants import MAX_AGE
 from past1000.filters import (
@@ -26,10 +28,13 @@ from past1000.filters import (
     classify_single_value,
     sigmoid_adjustment_probability,
 )
+from past1000.utils.calc import rand_generate_from_std_levels
 from past1000.utils.email import send_notification_email
 
 if TYPE_CHECKING:
     from past1000.utils.types import CorrFunc
+
+log = logging.getLogger(__name__)
 
 
 class Model(MainModel):
@@ -65,9 +70,10 @@ class Model(MainModel):
         self._years: int = years + self.spin_up_years
         self._climate: np.ndarray = np.random.normal(0, 1, self._years)
         self._archive: dict[int, list[int]] = {i: [] for i in range(self._years)}
+        log.info(f"运行模式: {self.p.get('mode', 'exp')}")
 
     @property
-    def climate(self) -> float:
+    def climate_now(self) -> float:
         """Current climate value at the current tick.
 
         Returns:
@@ -85,24 +91,6 @@ class Model(MainModel):
         return pd.Series(self._climate, index=range(self._years))
 
     @property
-    def historical_mean(self) -> pd.Series:
-        """Historical mean of recorded events per year.
-
-        Returns:
-            pd.Series: Mean of recorded events for each year.
-        """
-        return pd.Series({k: np.mean(v) for k, v in self._archive.items()})
-
-    @property
-    def classified(self) -> pd.Series:
-        """Classified climate series.
-
-        Returns:
-            pd.Series: Classified climate values.
-        """
-        return classify(self._climate)
-
-    @property
     def estimation(self) -> pd.DataFrame:
         """Estimation DataFrame containing value, expected (mode), and classified series.
 
@@ -110,9 +98,8 @@ class Model(MainModel):
             pd.DataFrame: DataFrame with columns 'value', 'expect', and 'classified'.
         """
         value = self.climate_series
-        # expect = self.mode
-        expect = self.rounded_mean
-        classified = self.classified
+        expect = classify(self.collective_memory_climate)
+        classified = classify(self.climate_series)
         return (
             pd.DataFrame(
                 {
@@ -126,29 +113,34 @@ class Model(MainModel):
         )
 
     @property
-    def mode(self) -> pd.Series:
-        """Mode of recorded events per year, cached per tick.
-
-        Returns:
-            pd.Series: Mode of recorded events for each year.
-        """
-        if self._mode_cache_tick == self.time.tick:
-            return self._mode_cache
-        current_archive = {k: v for k, v in self._archive.items() if v}
-        result = pd.Series({k: mode(v)[0] for k, v in current_archive.items()})
-        self._mode_cache = result
-        self._mode_cache_tick = self.time.tick
-        return result
-
-    @property
-    def rounded_mean(self) -> pd.Series:
-        """Rounded mean of recorded events per year, cached per tick.
+    def collective_memory_climate(self) -> pd.Series:
+        """Mean of recorded events per year, cached per tick.
 
         Returns:
             pd.Series: Rounded mean of recorded events for each year.
         """
         current_archive = {k: v for k, v in self._archive.items() if v}
-        return pd.Series({k: round(np.mean(v)) for k, v in current_archive.items()})
+        return pd.Series(
+            {
+                k: rand_generate_from_std_levels(np.array(v)).mean()
+                for k, v in current_archive.items()
+            }
+        )
+
+    @property
+    def mismatch_report(self) -> MismatchReport:
+        """Mismatch report of the model.
+
+        Returns:
+            MismatchReport: Mismatch report of the model.
+        """
+        mismatch_report = MismatchReport(
+            pred=classify(self.collective_memory_climate),
+            true=classify(self.climate_series),
+            value_series=self.climate_series,
+        )
+        mismatch_report.analyze_error_patterns()
+        return mismatch_report
 
     def write_down(self, extreme: int) -> None:
         """Record an extreme climate event for the current tick.
@@ -173,7 +165,7 @@ class Model(MainModel):
     def update_last_event_years(self) -> None:
         """Update and cache the last occurrence year for each event level (called at each step)."""
         # current_mode = self.mode
-        current_mode = self.rounded_mean
+        current_mode = self.collective_memory_climate
         if current_mode.empty:
             return
         unique_levels = current_mode.unique()
@@ -191,6 +183,16 @@ class Model(MainModel):
         """
         return self._last_event_years.get(level, None)
 
+    @property
+    def stable_df(self) -> pd.DataFrame:
+        slice_ = slice(self.spin_up_years, None)
+        return pd.DataFrame(
+            {
+                "climate": self.climate_series.loc[slice_],
+                "collective_memory_climate": self.collective_memory_climate.loc[slice_],
+            }
+        )
+
     def end(self) -> None:
         """Save estimation results and compute final correlations."""
         min_period: int = self.p.get("min_period", 2)
@@ -199,8 +201,8 @@ class Model(MainModel):
         windows = np.arange(2, 100)
         min_periods = np.repeat(min_period, 98)
         rs, _, _ = compare_corr_2d(
-            self.historical_mean,
-            self.climate_series,
+            self.stable_df["collective_memory_climate"],
+            self.stable_df["climate"],
             windows=windows,
             min_periods=min_periods,
             filter_func=calc_std_deviation,
@@ -212,6 +214,9 @@ class Model(MainModel):
             index=windows,
             name=f"model_{self.run_id}",
         )
+        # if test mode, don't save any files
+        if self.p.get("mode", "exp") == "test":
+            return
         output_file = self.outpath / "correlations.csv"
         # Smart save logic: create new file or append column
         if output_file.exists():
@@ -295,13 +300,13 @@ class ClimateObserver(Actor):
         """
         return (climate - self.memory.mean()) / self.memory.std()
 
-    def rejudge_based_on_mode(
+    def rejudge_based_on_collective_memory(
         self,
         init_judgment: int,
         rand_func=sigmoid_adjustment_probability,
         **rand_kwargs,
     ) -> int:
-        """Re-evaluate judgment based on collective memory (mode).
+        """Re-evaluate judgment based on collective memory.
 
         This method handles the ABM-specific logic for obtaining climate data from
         collective memory, calculating adjustment probability, and making the final
@@ -331,7 +336,7 @@ class ClimateObserver(Actor):
 
         # ABM-specific logic: Extract climate data from model
         climate_then = self.model.climate_series.loc[last_event_year]
-        climate_now = self.model.climate
+        climate_now = self.model.climate_now
         climate_diff = climate_now - climate_then
 
         # ABM-specific logic: Calculate adjustment probability using provided function
@@ -360,16 +365,20 @@ class ClimateObserver(Actor):
         - If the observer is too old, it dies.
         """
         self.age += 1
-        climate = self.model.climate
+        climate = self.model.climate_now
         self._memory.append(climate)
         if self.age < self._min_age:
             return
         z = self.perception(climate)
         if self.write_down(z):
-            extreme = classify_single_value(z)
-            if self.model.p.get("rejudge", True):
-                extreme = self.rejudge_based_on_mode(extreme)
-            self.model.write_down(extreme)
+            extreme_level = classify_single_value(z)
+            try:
+                rjudge = self.model.p.rejudge
+            except KeyError:
+                raise KeyError("rejudge is not defined in the model")
+            if rjudge:
+                extreme_level = self.rejudge_based_on_collective_memory(extreme_level)
+            self.model.write_down(extreme_level)
         if self.age > self._max_age:
             self.die()
 
@@ -384,8 +393,11 @@ def repeat_run(cfg: Optional[DictConfig] = None) -> None:
         AssertionError: If cfg is None.
     """
     assert cfg is not None, "cfg is None"
-    exp = Experiment.new(Model, cfg=cfg.how)
-    exp.batch_run(repeats=exp.cfg.repeats, parallels=exp.cfg.num_process)
+    exp = Experiment.new(Model, cfg=cfg)
+    log.info(f"运行模式: {exp.cfg.model.mode}")
+    repeats = exp.cfg.model.repeats
+    num_process = exp.cfg.model.num_process
+    exp.batch_run(repeats=repeats, parallels=num_process)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 defaults:
 - ds: mac
 - how: process
+- model: exp
 - override hydra/job_logging: log
 - _self_
 
@@ -37,6 +38,8 @@ agg_method: mean
 to_int: true
 resolution: 0.5
 to_std: sampling
+# 在相关性计算时，控制默认的最小样本数，至少为 3，但 5+ 计算 std 更合理
+min_period: 5
 
 low_pass:
   window_size: 30
