@@ -49,7 +49,5 @@ LABELS = [
     f"{STAGE2}-{END}",
     f"{END}-2021",
 ]
-# 保留率
-RETENTION_RATES = [25.17, 66.46, 80, 80]
 
 MAX_AGE: int = 40

@@ -445,16 +445,6 @@ class TestCalcCorr:
         assert isinstance(n, (int, np.integer))
         assert abs(r - expected_correlation) < 1e-10
 
-    def test_with_penalty(self, sample_data):
-        """Test effective sample size penalty."""
-        x, y = sample_data
-
-        r_with_penalty, _, _ = calc_corr(x, y, penalty=True)
-        r_without_penalty, _, _ = calc_corr(x, y, penalty=False)
-
-        # Penalized correlation should be smaller in absolute value
-        assert abs(r_with_penalty) <= abs(r_without_penalty)
-
     def test_with_missing_values(self):
         """Test data with missing values."""
         x = np.array([1, 2, np.nan, 4, 5])
@@ -535,18 +525,6 @@ class TestCalcCorr:
         assert isinstance(n, (int, np.integer))
         assert r < 0  # Negative correlation
         assert abs(r - (-1.0)) < 1e-10  # Should be close to -1
-
-    def test_penalty_calculation_error_handling(self):
-        """Test penalty calculation error handling."""
-        # Create data that might cause issues in penalty calculation
-        x = np.array([1, 1, 1, 1, 1])  # Constant data
-        y = np.array([2, 2, 2, 2, 2])  # Constant data
-
-        # Should handle penalty calculation gracefully
-        r, p, n = calc_corr(x, y, penalty=True)
-        assert np.isnan(r)  # Should return NaN for constant data
-        assert np.isnan(p)
-        assert n == 5
 
     def test_numpy_vs_pandas_consistency(self):
         """Test that numpy and pandas paths give consistent results."""

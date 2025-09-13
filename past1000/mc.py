@@ -6,11 +6,9 @@
 # Website: https://cv.songshgeo.com/
 
 import arviz as az
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymc as pm
-from matplotkit import with_axes
 from sklearn.preprocessing import StandardScaler
 
 
@@ -113,37 +111,6 @@ def compute_uncertainties(
     return uncertainties
 
 
-def check_data_quality(
-    reconstructions: pd.DataFrame, uncertainties: pd.DataFrame | None = None
-) -> dict:
-    """检查重建数据和不确定性的质量
-
-    Args:
-        reconstructions: 重建数据
-        uncertainties: 不确定性数据
-
-    Returns:
-        包含数据质量信息的字典
-    """
-    quality_info = {
-        "reconstructions": {
-            "shape": reconstructions.shape,
-            "missing_values": reconstructions.isna().sum().to_dict(),
-            "stats": reconstructions.describe().to_dict(),
-        }
-    }
-
-    if uncertainties is not None:
-        quality_info["uncertainties"] = {
-            "shape": uncertainties.shape,
-            "missing_values": uncertainties.isna().sum().to_dict(),
-            "stats": uncertainties.describe().to_dict(),
-            "zero_or_negative": (uncertainties <= 0).sum().to_dict(),
-        }
-
-    return quality_info
-
-
 def combine_reconstructions(
     reconstructions: pd.DataFrame,
     uncertainties: pd.DataFrame | None = None,
@@ -211,32 +178,3 @@ def combine_reconstructions(
     )
 
     return combined, trace
-
-
-@with_axes(figsize=(11, 3))
-def plot_combined_reconstruction(combined, data, ax: plt.Axes | None = None):
-    """绘制整合后的重建序列及其不确定性"""
-    if ax is None:
-        _, ax = plt.subplots(figsize=(11, 3), tight_layout=True)
-    ax.plot(combined.index, combined["mean"], "k-", label="Combined mean")
-    ax.fill_between(
-        combined.index,
-        combined["hdi_3%"],
-        combined["hdi_97%"],
-        alpha=0.2,
-        # label="94% Credible Interval",
-    )
-
-    # 绘制原始数据
-    for col in data.columns:
-        ax.scatter(
-            data.index,
-            data[col],
-            alpha=0.5,
-            label=f"Original {col}",
-        )
-
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    # ax.set_title("Combined Reconstruction with Uncertainties")
-    return ax

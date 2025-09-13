@@ -35,7 +35,7 @@ from past1000.constants import (
 )
 from past1000.filters import classify
 from past1000.mc import standardize_both
-from past1000.utils.calc import calc_corr, generate_from_2d_levels_averaged
+from past1000.utils.calc import calc_corr, rand_generate_from_std_levels
 
 if TYPE_CHECKING:
     from geo_dskit.core.types import PathLike, Region
@@ -199,9 +199,8 @@ class HistoricalRecords:
         if to_std == "mapping":
             self._data = self._data.replace(MAP)
         elif to_std == "sampling":
-            data, std = generate_from_2d_levels_averaged(
+            data, std = rand_generate_from_std_levels(
                 self._data,
-                n_samples=100,
                 mu=0.0,
                 sigma=1.0,
             )
@@ -809,7 +808,9 @@ class HistoricalRecords:
                 name = str(how).lower()
         # 是否转换为整数
         if to_int:
-            # result = result.astype(float).round(0)
+            # 确保结果是数值类型
+            if not pd.api.types.is_numeric_dtype(result):
+                result = pd.to_numeric(result, errors="coerce")
             result = classify(result, handle_na="skip")
         result.name = "history_" + name
         if inplace:

@@ -393,24 +393,3 @@ class MismatchReport:
             result["p_value_matrix"] = self.p_value_matrix.to_dict()
 
         return result
-
-
-def report_mismatch(
-    pred: pd.Series,
-    true: pd.Series,
-    value_series: pd.Series | None = None,
-) -> MismatchReport:
-    """创建不匹配报告
-
-    Args:
-        pred: 预测数据序列
-        true: 真实数据序列
-
-    Returns:
-        MismatchReport: 完整的不匹配分析报告
-
-    Note: 这是一个便捷函数，直接返回 MismatchReport 实例
-    """
-    mismatch_report = MismatchReport(pred=pred, true=true)
-    mismatch_report.analyze_error_patterns(value_series=value_series)
-    return mismatch_report

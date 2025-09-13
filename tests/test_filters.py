@@ -15,7 +15,6 @@ from past1000.filters import (
     classify,
     classify_series,
     classify_single_value,
-    sigmoid_adjustment_probability,
 )
 
 
@@ -325,74 +324,3 @@ def test_classify_single_value_parametrized(value, expected):
 def test_custom_classification_parametrized(thresholds, levels, test_value, expected):
     """Parametrized test for custom threshold and level configurations"""
     assert classify_single_value(test_value, thresholds, levels) == expected
-
-
-class TestSigmoidAdjustmentProbability:
-    """Test cases for sigmoid_adjustment_probability function"""
-
-    def test_basic_probability_calculation(self):
-        """Test basic probability calculation with different climate differences"""
-        # Small difference should give low probability
-        prob_small = sigmoid_adjustment_probability(0.01)
-        assert 0 <= prob_small <= 1
-        assert prob_small < 0.5
-
-        # Large difference should give high probability
-        prob_large = sigmoid_adjustment_probability(0.5)
-        assert prob_large > 0.9
-
-        # Zero difference should give some baseline probability
-        prob_zero = sigmoid_adjustment_probability(0.0)
-        assert 0 <= prob_zero <= 1
-
-    def test_sigmoid_parameters(self):
-        """Test different sigmoid function parameters"""
-        climate_diff = 0.1
-
-        # Test different x0 values
-        prob_low_x0 = sigmoid_adjustment_probability(climate_diff, x0=0.01)
-        prob_high_x0 = sigmoid_adjustment_probability(climate_diff, x0=0.2)
-        assert prob_low_x0 > prob_high_x0  # Lower x0 should give higher probability
-
-        # Test different k values
-        prob_low_k = sigmoid_adjustment_probability(climate_diff, k=1.0)
-        prob_high_k = sigmoid_adjustment_probability(climate_diff, k=100.0)
-        # Both should be valid probabilities
-        assert 0 <= prob_low_k <= 1
-        assert 0 <= prob_high_k <= 1
-
-    def test_negative_climate_differences(self):
-        """Test that function handles negative climate differences correctly"""
-        # Function should use absolute value, so results should be the same
-        prob_pos = sigmoid_adjustment_probability(0.2)
-        prob_neg = sigmoid_adjustment_probability(-0.2)
-        assert prob_pos == prob_neg
-
-    def test_input_validation(self):
-        """Test input validation"""
-        # Test invalid climate_diff type
-        with pytest.raises(TypeError, match="climate_diff must be numeric"):
-            sigmoid_adjustment_probability("not_numeric")
-
-        # Test invalid parameter types
-        with pytest.raises(TypeError, match="Parameters x0 and k must be numeric"):
-            sigmoid_adjustment_probability(0.1, x0="not_numeric")
-
-        with pytest.raises(TypeError, match="Parameters x0 and k must be numeric"):
-            sigmoid_adjustment_probability(0.1, k="not_numeric")
-
-
-@pytest.mark.parametrize(
-    "climate_diff,expected_range",
-    [
-        (0.0, (0.2, 0.3)),  # Around x0 threshold
-        (0.01, (0.2, 0.3)),  # Small difference
-        (0.1, (0.7, 1.0)),  # Medium difference
-        (0.5, (0.99, 1.0)),  # Large difference
-        (-0.1, (0.7, 1.0)),  # Negative medium difference (should be same as positive)
-    ],
-)
-def test_sigmoid_probability_parametrized(climate_diff, expected_range):
-    """Parametrized test for sigmoid_adjustment_probability"""
-    prob = sigmoid_adjustment_probability(climate_diff)
-    assert expected_range[0] <= prob <= expected_range[1]

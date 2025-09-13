@@ -7,13 +7,11 @@
 
 from __future__ import annotations
 
-from functools import reduce
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 from scipy import stats
-from scipy.signal import detrend
 from scipy.stats import truncnorm
 
 if TYPE_CHECKING:
@@ -41,24 +39,6 @@ def get_coords(mask: np.ndarray) -> list[tuple[int, ...]]:
     return list(zip(*coords))
 
 
-def detrend_with_nan(data: pd.Series, **kwargs) -> pd.Series:
-    """
-    去除数据中的 NaN 值，并进行去趋势处理。
-
-    Args:
-        data: 输入数据
-
-    Returns:
-        np.ndarray: 去趋势处理后的数据
-    """
-    dropped_nan_data = data.dropna()
-    detrend_data = pd.Series(
-        detrend(dropped_nan_data.values, **kwargs),
-        index=dropped_nan_data.index,
-    ).reindex(data.index)
-    return detrend_data
-
-
 def get_significance_stars(p_value: float) -> str:
     """
     根据 p 值决定添加什么星号
@@ -78,41 +58,6 @@ def get_significance_stars(p_value: float) -> str:
     if p_value < 0.1:
         return "*"  # 0.05 <= p < 0.1, 一个星号
     return ""
-
-
-def align_matrices(*matrices: pd.DataFrame) -> list[pd.DataFrame]:
-    """
-    对齐一个或多个 DataFrame 矩阵，使它们具有相同的行和列索引。
-
-    这个函数会找到所有输入矩阵的索引和列的并集，
-    然后使用 .reindex() 方法将每个矩阵扩展到这个统一的维度。
-
-    Parameters:
-    -----------
-    *matrices : pd.DataFrame
-        一个或多个需要对齐的 pandas DataFrame。
-
-    Returns:
-    --------
-    list[pd.DataFrame]
-        一个包含所有已对齐的 DataFrame 的列表。
-    """
-    if not matrices:
-        return []
-
-    # 使用 reduce 和 set.union 高效地找到所有索引和列的并集
-    all_indices = reduce(lambda x, y: x.union(y.index), matrices, pd.Index([]))
-    all_columns = reduce(lambda x, y: x.union(y.columns), matrices, pd.Index([]))
-
-    # 找到行和列的全集
-    all_levels = sorted(list(all_indices.union(all_columns)))
-
-    # 对每个矩阵应用 .reindex
-    aligned_matrices = [
-        m.reindex(index=all_levels, columns=all_levels) for m in matrices
-    ]
-
-    return aligned_matrices
 
 
 def fill_star_matrix(p_values: pd.DataFrame, values: pd.DataFrame) -> pd.DataFrame:
@@ -135,40 +80,10 @@ def fill_star_matrix(p_values: pd.DataFrame, values: pd.DataFrame) -> pd.DataFra
     return annot_labels
 
 
-def effective_sample_size(n: int, arr1: pd.Series, arr2: pd.Series) -> int:
-    """计算有效样本量
-    计算公式：
-    neff = n * (1 - acf1 * acf2) / (1 + acf1 * acf2)
-    其中，n 是样本量，acf1 和 acf2 是两个序列的自相关系数。参考：https://www.cnblogs.com/yongh/p/11060111.html
-
-    Args:
-        n: 样本量
-        arr1: 序列1
-        arr2: 序列2
-
-    Returns:
-        int: 有效样本量
-    """
-    acf1 = arr1.autocorr(lag=1)
-    acf2 = arr2.autocorr(lag=1)
-    # 如果自相关无法计算，直接返回1
-    if np.isnan(acf1) or np.isnan(acf2):
-        return 1
-    denom = 1 + acf1 * acf2
-    if denom == 0:
-        return 1
-    neff = n * (1 - acf1 * acf2) / denom
-    # 防止neff为负或为nan
-    if not np.isfinite(neff) or neff <= 0:
-        return 1
-    return int(neff)
-
-
 def calc_corr(
     arr1: pd.Series | np.ndarray,
     arr2: pd.Series | np.ndarray,
     how: CorrFunc = "pearson",
-    penalty: bool = False,
 ) -> tuple[float, float, int]:
     """计算两个序列之间的相关系数
 
@@ -196,17 +111,16 @@ def calc_corr(
     # 高效处理：根据输入类型选择最优路径
     if isinstance(arr1, np.ndarray) and isinstance(arr2, np.ndarray):
         # 两个都是numpy数组，使用高效路径
-        return _calc_corr_numpy(arr1, arr2, how, penalty)
+        return _calc_corr_numpy(arr1, arr2, how)
     else:
         # 包含pandas Series，使用pandas路径
-        return _calc_corr_pandas(arr1, arr2, how, penalty)
+        return _calc_corr_pandas(arr1, arr2, how)
 
 
 def _calc_corr_numpy(
     arr1: np.ndarray,
     arr2: np.ndarray,
     how: CorrFunc,
-    penalty: bool,
 ) -> tuple[float, float, int]:
     """高效处理numpy数组的相关系数计算"""
     # 转换为数值类型（如果还不是的话）
@@ -244,22 +158,6 @@ def _calc_corr_numpy(
             raise ValueError(f"无效的相关系数计算方法: {how}")
     except (ValueError, RuntimeError, FloatingPointError) as e:
         raise ValueError(f"计算相关系数时出错: {e}") from e
-
-    # 应用有效样本量惩罚
-    if penalty:
-        try:
-            # 对于numpy数组，需要转换为pandas Series来计算自相关
-            valid_series1 = pd.Series(valid_arr1)
-            valid_series2 = pd.Series(valid_arr2)
-            neff = effective_sample_size(n, valid_series1, valid_series2)
-            penalty_factor = np.sqrt(neff / n)
-            r = r * penalty_factor
-        except (ValueError, RuntimeError, FloatingPointError) as e:
-            # 如果惩罚计算失败，记录警告但继续返回原始结果
-            import warnings
-
-            warnings.warn(f"有效样本量惩罚计算失败: {e}")
-
     return r, p, n
 
 
@@ -267,7 +165,6 @@ def _calc_corr_pandas(
     arr1: pd.Series | np.ndarray,
     arr2: pd.Series | np.ndarray,
     how: CorrFunc,
-    penalty: bool,
 ) -> tuple[float, float, int]:
     """处理包含pandas Series的相关系数计算"""
     # 统一转换为pandas Series进行处理，保持索引对齐
@@ -311,19 +208,6 @@ def _calc_corr_pandas(
             raise ValueError(f"无效的相关系数计算方法: {how}")
     except (ValueError, RuntimeError, FloatingPointError) as e:
         raise ValueError(f"计算相关系数时出错: {e}") from e
-
-    # 应用有效样本量惩罚
-    if penalty:
-        try:
-            neff = effective_sample_size(n, valid_arr1, valid_arr2)
-            penalty_factor = np.sqrt(neff / n)
-            r = r * penalty_factor
-        except (ValueError, RuntimeError, FloatingPointError) as e:
-            # 如果惩罚计算失败，记录警告但继续返回原始结果
-            import warnings
-
-            warnings.warn(f"有效样本量惩罚计算失败: {e}")
-
     return r, p, n
 
 
@@ -492,7 +376,7 @@ def rand_generate_from_std_levels(
                     元素为 {-2, -1, 0, 1, 2} 或 NA（字符串/None/pandas NA 均可）
     - mu: 正态分布均值 (默认 0.0)
     - sigma: 正态分布标准差 (默认 1.0)
-
+    - n_samples: 每个等级采样数量 (默认 100)
     返回:
     - numpy 数组，形状与输入相同，非 NA 元素为采样值，NA 元素为 np.nan
     """
@@ -509,12 +393,21 @@ def rand_generate_from_std_levels(
     else:
         raise ValueError("输入必须是 numpy.ndarray、pandas.Series 或 pandas.DataFrame")
 
+    # 检查数组维度
+    if arr.ndim != 2:
+        raise ValueError("输入必须是 2D 数组")
+
     # 为适配任意形状，扁平化到 1D
     flat = arr.ravel()
 
-    # 若为 object 或混合类型，使用 pandas to_numeric 安全转换（非数值与 NA 变为 np.nan）
-    if flat.dtype == object:
-        coerced = pd.to_numeric(pd.Series(flat), errors="coerce").to_numpy()
+    # 若为 object 或字符串类型，使用 pandas to_numeric 安全转换（非数值与 NA 变为 np.nan）
+    if flat.dtype == object or flat.dtype.kind in ["U", "S"]:
+        # 预处理：将常见的字符串 NaN 表示转换为 None
+        flat_series = pd.Series(flat)
+        # 替换常见的字符串 NaN 表示
+        nan_strings = ["", "nan", "NaN", "null", "NULL", "None"]
+        flat_series = flat_series.replace(nan_strings, None)
+        coerced = pd.to_numeric(flat_series, errors="coerce").to_numpy()
     else:
         # 已经是数值类型，复制为浮点
         coerced = flat.astype(float, copy=False)
@@ -544,30 +437,3 @@ def rand_generate_from_std_levels(
 
     # 还原为原始形状
     return out.reshape(orig_shape)
-
-
-def generate_from_2d_levels_averaged(
-    grade_matrix, n_samples=100, mu=0.0, sigma=1.0, random_state=None
-):
-    """
-    多次调用 generate_from_2d_levels 并取平均值, 并返回平均值和标准差
-
-    Args:
-        grade_matrix: 2D NumPy 数组或 pandas DataFrame，元素为 {-2, -1, 0, 1, 2} 或 NA
-        n_samples: 样本数量
-        mu: 正态分布均值 (默认 0.0)
-        sigma: 正态分布标准差 (默认 1.0)
-        random_state: 随机种子
-
-    Returns:
-        tuple[np.ndarray, np.ndarray]: 平均值和标准差
-    """
-    if random_state is not None:
-        np.random.seed(random_state)
-
-    samples = []
-    for _ in range(n_samples):
-        sample = rand_generate_from_std_levels(grade_matrix, mu=mu, sigma=sigma)
-        samples.append(sample)
-
-    return np.mean(samples, axis=0), np.std(samples, axis=0)

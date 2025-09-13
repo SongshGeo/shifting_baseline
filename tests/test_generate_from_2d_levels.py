@@ -174,11 +174,13 @@ class TestGenerateFrom2DLevels:
     def test_invalid_input_type(self):
         """测试无效输入类型"""
         # 非数组输入
-        with pytest.raises(ValueError, match="输入必须是 2D NumPy 数组"):
+        with pytest.raises(
+            ValueError, match="输入必须是 numpy.ndarray、pandas.Series 或 pandas.DataFrame"
+        ):
             rand_generate_from_std_levels([[1, 2], [3, 4]])
 
         # 1D 数组
-        with pytest.raises(ValueError, match="输入必须是 2D NumPy 数组"):
+        with pytest.raises(ValueError, match="输入必须是 2D 数组"):
             rand_generate_from_std_levels(np.array([1, 2, 3]))
 
     def test_custom_mu_sigma(self):
@@ -247,7 +249,7 @@ class TestGenerateFrom2DLevels:
         # 创建 100x100 的随机等级矩阵
         np.random.seed(42)
         grades = np.array([-2, -1, 0, 1, 2])
-        grade_matrix = np.random.choice(grades, size=(100, 100))
+        grade_matrix = np.random.choice(grades, size=(100, 100)).astype(float)
 
         # 随机添加一些 NaN
         nan_indices = np.random.choice(10000, size=1000, replace=False)
