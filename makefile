@@ -35,4 +35,4 @@ report:
 	poetry run allure serve tmp/allure_results
 
 run:
-	poetry run python past1000/abm.py --multirun how=abm how.max_age=30,35,40,45,50,55,60,65 how.rejudge=true,false how.min_age=5,10,15,20 how.loss_rate=0.2,0.4,0.6,0.8 how.new_agents=5,10,15,20
+	poetry run python past1000/abm.py --multirun model=exp model.max_age=30,35,40,45,50,55,60,65 model.memory_baseline=personal,collective model.loss_rate=0.2,0.4,0.6,0.8 model.new_agents=5,10,15,20,25,30,35,40
