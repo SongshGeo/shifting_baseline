@@ -5,10 +5,13 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+from __future__ import annotations
+
 import logging
 import traceback
 from collections import deque
 from datetime import datetime
+from functools import cached_property
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
@@ -31,19 +34,24 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-class Model(MainModel):
-    """Agent-based climate event model.
+class ClimateObservingModel(MainModel):
+    """An agent-based  model of climate event recording.
 
     Simulates a world with climate observers who record extreme climate events based on their perception.
     The collective records are compared with actual climate extremes.
+    The model can be used to study the relationship between climate events and human behavior.
 
     Attributes:
+        years (int): Total simulation years.
         _max_age (int): Maximum age of an observer.
         _new_agents (int): Number of new agents per step.
         _min_age (int): Minimum age for recording events.
-        _mode_cache (Optional[pd.Series]): Cached mode results for current tick.
-        _mode_cache_tick (int): Tick at which mode cache was generated.
-        _last_event_years (dict): Cache for last occurrence year of each event level.
+        _collective_cache (Optional[pd.Series]): Cached collective memory results for current tick.
+        _collective_cache_tick (int): Tick at which collective memory cache was generated.
+        spin_up_years (int): Spin-up years for agent initialization.
+        _years (int): Total simulation years.
+        _climate (np.ndarray): Climate time series.
+        _archive (dict[int, list[int]]): Archive of recorded events per year.
         final_corr (Optional[pd.Series]): Final correlation results.
         spin_up_years (int): Spin-up years for agent initialization.
         _years (int): Total simulation years.
@@ -51,32 +59,43 @@ class Model(MainModel):
         _archive (dict[int, list[int]]): Archive of recorded events per year.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        # Years to simulate
         years: int = self.p.get("years", 100)
+        # Maximum age for an observer
         self._max_age: int = self.p.get("max_age", 40)
         self._new_agents: int = self.p.get("new_agents", 10)
+        # Minimum age for recording events
         self._min_age: int = self.p.get("min_age", 10)
-        self._mode_cache: Optional[pd.Series] = None
-        self._mode_cache_tick: int = -1
+        # Cache for collective memory
         self._collective_cache: Optional[pd.Series] = None
         self._collective_cache_tick: int = -1
         self.spin_up_years: int = self._new_agents * (self._max_age - self._min_age + 1)
+        # Total simulation years
         self._years: int = years + self.spin_up_years
+        # Climate time series
         self._climate: np.ndarray = np.random.normal(0, 1, self._years)
+        # Archive of recorded events per year
         self._archive: dict[int, list[int]] = {i: [] for i in range(self._years)}
         log.info(f"运行模式: {self.p.get('mode', 'exp')}")
 
     @property
+    def is_nan(self) -> bool:
+        """Check if the collective memory is all NaN."""
+        return self.collective_memory_climate.isna().all()
+
+    @property
     def climate_now(self) -> float:
         """Current climate value at the current tick.
+        (WDI, Z-score of the current climate)
 
         Returns:
             float: Current climate value.
         """
         return self._climate[self.time.tick]
 
-    @property
+    @cached_property
     def climate_series(self) -> pd.Series:
         """Full climate time series.
 
@@ -84,28 +103,6 @@ class Model(MainModel):
             pd.Series: Climate values indexed by year.
         """
         return pd.Series(self._climate, index=range(self._years))
-
-    @property
-    def estimation(self) -> pd.DataFrame:
-        """Estimation DataFrame containing value, expected (mode), and classified series.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns 'value', 'expect', and 'classified'.
-        """
-        value = self.climate_series
-        expect = classify(self.collective_memory_climate)
-        classified = classify(self.climate_series)
-        return (
-            pd.DataFrame(
-                {
-                    "value": value,
-                    "expect": expect,
-                    "classified": classified,
-                }
-            )
-            .loc[self.spin_up_years :]
-            .dropna()
-        )
 
     @property
     def collective_memory_climate(self) -> pd.Series:
@@ -140,19 +137,24 @@ class Model(MainModel):
         Returns:
             MismatchReport: Mismatch report of the model.
         """
+        # Load simulated data
+        climate_series = self.climate_df["climate"]
+        collective_memory_climate = self.climate_df["collective_memory_climate"]
+        # Create mismatch report
         mismatch_report = MismatchReport(
-            pred=classify(self.collective_memory_climate),
-            true=classify(self.climate_series),
-            value_series=self.climate_series,
+            pred=classify(collective_memory_climate, handle_na="skip"),
+            true=classify(climate_series, handle_na="skip"),
+            value_series=climate_series,
         )
         mismatch_report.analyze_error_patterns()
         return mismatch_report
 
-    def write_down(self, extreme: int) -> None:
-        """Record an extreme climate event for the current tick.
+    def archive_it(self, extreme: int) -> None:
+        """Record an extreme climate event reported by an observer.
 
         Args:
             extreme (int): The classified extreme event level.
+            Archive is a dictionary of lists, the key is the tick, the value is the list of extreme event levels reported by observers.
         """
         loss_rate: float = self.p.get("loss_rate", 0.2)
         if np.random.random() < loss_rate:
@@ -160,15 +162,19 @@ class Model(MainModel):
         self._archive[self.time.tick].append(extreme)
         # Cache is tick-based, so no need to clear unless logic changes.
 
-    def step(self) -> None:
-        """Advance the model by one tick: update global info, spawn new agents, and step all agents."""
-        if self.time.tick == self._years - 1:
-            self.running = False
-        self.agents.new(ClimateObserver, self._new_agents, max_age=self._max_age)
-        self.agents.do("step")
-
     @property
-    def stable_df(self) -> pd.DataFrame:
+    def climate_df(self) -> pd.DataFrame:
+        """Climate DataFrame, sliced by spin-up years.
+        (Objective Climate, Collective Memory Climate)
+
+        Returns:
+            pd.DataFrame: DataFrame with columns 'climate' and 'collective_memory_climate'.
+
+        Raises:
+            ValueError: If the collective memory is all NaN.
+        """
+        if self.is_nan:
+            raise ValueError("Collective memory is all NaN, did you run the model?")
         slice_ = slice(self.spin_up_years, None)
         return pd.DataFrame(
             {
@@ -177,25 +183,57 @@ class Model(MainModel):
             }
         )
 
-    def end(self) -> None:
-        """Save estimation results and compute final correlations."""
+    def get_corr_curve(
+        self,
+        window_length: int = 100,
+        min_window: int = 2,
+        corr_method: CorrFunc = "kendall",
+        **rolling_kwargs,
+    ) -> pd.DataFrame:
+        """Get the correlation curve of the model."""
         min_period: int = self.p.get("min_period", 2)
         filter_side: str = self.p.get("filter_side", "right")
-        corr_method: CorrFunc = self.p.get("corr_method", "kendall")
-        windows = np.arange(2, 100)
-        min_periods = np.repeat(min_period, 98)
-        rs, _, _ = compare_corr_2d(
-            self.stable_df["collective_memory_climate"],
-            self.stable_df["climate"],
+        windows = np.arange(min_window, window_length)
+        min_periods = np.repeat(min_period, window_length - min_window)
+        corr = compare_corr_2d(
+            self.climate_df["collective_memory_climate"],
+            self.climate_df["climate"],
+            corr_method=corr_method,
             windows=windows,
             min_periods=min_periods,
             filter_func=calc_std_deviation,
-            corr_method=corr_method,
             filter_side=filter_side,
+            **rolling_kwargs,
         )
-        corr_series = pd.Series(
-            data=rs,
+        return pd.DataFrame(
+            {
+                corr_method: corr[0],
+                "p_value": corr[1],
+                "n_samples": corr[2],
+            },
             index=windows,
+        )
+
+    def step(self) -> None:
+        """Advance the model by one tick, including:
+        - Update global info
+        - Spawn new agents
+        - Step all agents, including:
+            - Update observer perception
+            - Update observer writing down
+        """
+        if self.time.tick == self._years - 1:
+            self.running = False
+        self.agents.new(ClimateObserver, self._new_agents, max_age=self._max_age)
+        self.agents.do("step")
+
+    def end(self) -> None:
+        """Save estimation results and compute final correlations."""
+        corr_method: CorrFunc = self.p.get("corr_method", "kendall")
+        corr_df = self.get_corr_curve()
+        corr_series = pd.Series(
+            data=corr_df[corr_method],
+            index=corr_df.index,
             name=f"model_{self.run_id}",
         )
         # if test mode, don't save any files
@@ -217,8 +255,12 @@ class Model(MainModel):
 class ClimateObserver(Actor):
     """Climate observer agent.
 
-    Observes, perceives, and records extreme climate events based on personal memory and collective memory (mode).
-    More likely to record extreme events than normal years.
+    Observes, perceives, and records extreme climate events.
+    An observer only has two methods: perceive and write_down.
+    1. perceive:
+        - Perceive the current climate and decide whether to record an event.
+    2. write_down:
+        - Write down the current climate. More likely to record extreme events than normal years.
 
     Attributes:
         _memory (deque): Personal memory of extreme events.
@@ -230,85 +272,97 @@ class ClimateObserver(Actor):
     def __init__(self, *args, max_age: int = MAX_AGE, **kwargs):
         super().__init__(*args, **kwargs)
         self._memory: deque = deque(maxlen=max_age)
-        self.age: int = 1
         self._max_age: int = max_age
         self._min_age: int = self.p.get("min_age", 10)
 
     @property
     def memory(self) -> np.ndarray:
-        """Personal memory of extreme climate events.
+        """Personal memory of extreme climate Z-score values.
 
         Returns:
-            np.ndarray: Array of remembered climate values.
+            np.ndarray: Array of remembered climate Z-score values.
         """
         return np.array(self._memory)
 
     def write_down(
         self,
-        event: float,
+        z_score: float,
         scale: float = 1,
         f0: float = 0.1,
     ) -> bool:
         """Decide whether to record an extreme event based on the 'negativity bias' principle.
 
         Args:
-            event (float): Standardized z-score of the event.
+            z_score (float): Standardized z-score of the event.
             scale (float): Scale for the z-score; higher means less likely to record.
-            f0 (float): Baseline probability to record the event (0 < f0 < 0.5).
+            f0 (float): Base probability to record the Z-score (0 < f0 < 0.5). When f0 is 0, the observer will never record the Z-score when there is no difference between the current climate z-score and the baseline. When f0 is 0.5, the observer will record the Z-score with a probability of 0.5.
         Returns:
-            bool: Whether the event is recorded.
+            bool: Whether the Z-score is recorded.
         Raises:
             ValueError: If f0 is not between 0 and 0.5.
         """
         if f0 > 0.5 or f0 < 0:
             raise ValueError("f0 must be between 0 and 0.5")
-        prob = norm.sf(abs(event), scale=scale)
+        prob = norm.sf(abs(z_score), scale=scale)
         return np.random.random() < f0 + 0.5 - prob
 
-    def perception(self, climate: float) -> float:
-        """Perceive the z-score of the current climate relative to memory.
+    def perceive(self, climate: float) -> float:
+        """Perceive the z-score of the current climate.
+        We assume that the observer always perceive the climate with a baseline.
+        Here, we have three types of baseline:
+        - personal: the observer's personal memory
+        - model: the model's climate time series (objective climate)
+        - collective: the collective memory of the model (collective memory climate)
+        We use the baseline to re-calculate the z-score of the current climate.
+        The hypothesis is that the observer will compare the current climatic extreme with the baseline.
 
         Args:
-            climate (float): Current climate value.
+            climate (float): Current climate Z-score value.
         Returns:
             float: Z-score of the current climate.
         """
+        # Personal baseline
         if self.model.p.memory_baseline == "personal":
             baseline = self.memory.mean()
             std = self.memory.std()
+        # Model baseline
         elif self.model.p.memory_baseline == "model":
             baseline = self.model.climate_series.mean()
             std = self.model.climate_series.std()
+        # Collective baseline
         elif self.model.p.memory_baseline == "collective":
             baseline = self.model.collective_memory_climate.mean()
             std = self.model.collective_memory_climate.std()
         else:
             raise ValueError("Invalid memory baseline")
+        # Handle NaN values
         if np.isnan(baseline):
             baseline = 0
         if np.isnan(std):
             std = 1
+        # Calculate the z-score of the current climate
         return climate - baseline / std
 
     def step(self) -> None:
         """Update observer state at each step.
 
         The observer:
-        - Increases age by 1.
         - Updates memory with current climate.
         - If the observer is old enough, it perceives the climate and decides whether to record an event. When it records an event, it will be re-judged based on collective memory (mode).
         - If the observer is too old, it dies.
         """
-        self.age += 1
         climate = self.model.climate_now
         self._memory.append(climate)
-        if self.age < self._min_age:
+        # If the observer is too young, it won't record any event
+        if self.age() < self._min_age:
             return
-        z = self.perception(climate)
-        if self.write_down(z):
-            extreme_level = classify_single_value(z)
-            self.model.write_down(extreme_level)
-        if self.age > self._max_age:
+        z_score = self.perceive(climate)
+        # If the observer records an event, it will be re-judged based on collective memory (mode)
+        if self.write_down(z_score):
+            extreme_level = classify_single_value(z_score)
+            self.model.archive_it(extreme_level)
+        # If the observer is too old, it dies
+        if self.age() > self._max_age:
             self.die()
 
 
@@ -322,7 +376,7 @@ def repeat_run(cfg: Optional[DictConfig] = None) -> None:
         AssertionError: If cfg is None.
     """
     assert cfg is not None, "cfg is None"
-    exp = Experiment.new(Model, cfg=cfg)
+    exp = Experiment.new(ClimateObservingModel, cfg=cfg)
     log.info(f"运行模式: {exp.cfg.model.mode}")
     repeats = exp.cfg.model.repeats
     num_process = exp.cfg.model.num_process

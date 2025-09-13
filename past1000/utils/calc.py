@@ -479,7 +479,9 @@ def get_interval(level: int) -> tuple[float, float]:
 
 
 def rand_generate_from_std_levels(
-    grade_matrix, mu: float = 0.0, sigma: float = 1.0
+    grade_matrix: np.ndarray | pd.Series | pd.DataFrame,
+    mu: float = 0.0,
+    sigma: float = 1.0,
 ) -> np.ndarray:
     """
     为任意形状的等级数组生成对应的原始值矩阵，每个值从截断正态分布采样。
