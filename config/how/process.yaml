@@ -1,8 +1,6 @@
 # 将原始数据进行处理，并保存到本地
 name: "数据预处理"
 
-# 输入原始数据目录
-input: "${ds.cmip6}"
 # CMIP6 数据存储的子目录模式
 subdir_pattern: "{freq}/{model}"
 
@@ -23,6 +21,7 @@ recon:
       open_dataarray:
         decode_times: False
       clip_data:
+
         shp: ${how.shp}
       convert_time_axis:
         begin_year: 1470

@@ -366,20 +366,34 @@ def rand_generate_from_std_levels(
     grade_matrix: np.ndarray | pd.Series | pd.DataFrame,
     mu: float = 0.0,
     sigma: float = 1.0,
+    n_samples: int = 1,
+    random_seed: int | None = None,
 ) -> np.ndarray:
     """
     为任意形状的等级数组生成对应的原始值矩阵，每个值从截断正态分布采样。
-    跳过 NA 值，在输出中保留 np.nan。
+    跳过 NA 值，在输出中保留 np.nan。支持重复采样以进行不确定性量化。
 
     参数:
     - grade_matrix: 任意形状的 numpy 数组、pandas Series 或 DataFrame。
                     元素为 {-2, -1, 0, 1, 2} 或 NA（字符串/None/pandas NA 均可）
     - mu: 正态分布均值 (默认 0.0)
     - sigma: 正态分布标准差 (默认 1.0)
-    - n_samples: 每个等级采样数量 (默认 100)
+    - n_samples: 重复采样次数 (默认 1)。当 > 1 时，输出会增加一个维度
+    - random_seed: 随机种子 (默认 None，使用当前时间)
+
     返回:
-    - numpy 数组，形状与输入相同，非 NA 元素为采样值，NA 元素为 np.nan
+    - numpy 数组：
+      * 当 n_samples=1 时：形状与输入相同，非 NA 元素为采样值，NA 元素为 np.nan
+      * 当 n_samples>1 时：形状为 (n_samples, *input_shape)，增加一个采样维度
     """
+    # 验证参数
+    if not isinstance(n_samples, int) or n_samples < 1:
+        raise ValueError("n_samples 必须大于等于 1 的整数")
+
+    # 设置随机种子
+    if random_seed is not None:
+        np.random.seed(random_seed)
+
     # 统一取 numpy array 视图与原始形状
     if isinstance(grade_matrix, pd.DataFrame):
         arr = grade_matrix.to_numpy()
@@ -393,9 +407,9 @@ def rand_generate_from_std_levels(
     else:
         raise ValueError("输入必须是 numpy.ndarray、pandas.Series 或 pandas.DataFrame")
 
-    # 检查数组维度
-    if arr.ndim != 2:
-        raise ValueError("输入必须是 2D 数组")
+    # 检查数组维度 - 支持1D和2D输入
+    if arr.ndim > 2:
+        raise ValueError("输入数组维度不能超过2维")
 
     # 为适配任意形状，扁平化到 1D
     flat = arr.ravel()
@@ -421,8 +435,15 @@ def rand_generate_from_std_levels(
     if non_na.size > 0 and not np.all(np.isin(non_na, valid_grades)):
         raise ValueError("非 NA 元素包含无效等级，必须为 {-2, -1, 0, 1, 2}")
 
-    # 结果扁平向量
-    out = np.full(coerced.shape, np.nan, dtype=float)
+    # 根据 n_samples 决定输出形状
+    if n_samples == 1:
+        # 单次采样：保持原始形状
+        out = np.full(coerced.shape, np.nan, dtype=float)
+        output_shape = orig_shape
+    else:
+        # 多次采样：增加采样维度
+        out = np.full((n_samples, *coerced.shape), np.nan, dtype=float)
+        output_shape = (n_samples, *orig_shape)
 
     # 对每个等级向量化采样并填充
     for grade in valid_grades:
@@ -432,8 +453,18 @@ def rand_generate_from_std_levels(
             lower, upper = get_interval(int(grade))
             a = (lower - mu) / sigma
             b = (upper - mu) / sigma
-            samples = truncnorm.rvs(a, b, size=cnt)
-            out[idx] = mu + samples * sigma
 
-    # 还原为原始形状
-    return out.reshape(orig_shape)
+            if n_samples == 1:
+                # 单次采样
+                samples = truncnorm.rvs(a, b, size=cnt)
+                out[idx] = mu + samples * sigma
+            else:
+                # 多次采样：为每个有效位置生成 n_samples 个值
+                samples = truncnorm.rvs(a, b, size=(n_samples, cnt))
+                # 将采样值转换回原始尺度
+                transformed_samples = mu + samples * sigma
+                # 填充到对应位置
+                out[:, idx] = transformed_samples
+
+    # 还原为最终形状
+    return out.reshape(output_shape)

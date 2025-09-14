@@ -203,16 +203,19 @@ class HistoricalRecords:
         if to_std == "mapping":
             self._data = self._data.replace(MAP)
         elif to_std == "sampling":
-            data, std = rand_generate_from_std_levels(
+            data = rand_generate_from_std_levels(
                 self._data,
                 mu=0.0,
                 sigma=1.0,
+                n_samples=100,
             )
             self._data = pd.DataFrame(
-                data, index=self._data.index, columns=self._data.columns
+                np.mean(data, axis=0),
+                index=self._data.index,
+                columns=self._data.columns,
             )
             self._std = pd.DataFrame(
-                std, index=self._data.index, columns=self._data.columns
+                np.std(data, axis=0), index=self._data.index, columns=self._data.columns
             )
         else:
             raise ValueError(f"无效的 to_std 方法: {to_std}")
