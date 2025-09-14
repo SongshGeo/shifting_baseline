@@ -40,8 +40,8 @@ from hydra import main
 from hydra.utils import get_original_cwd
 from omegaconf import OmegaConf
 
-from past1000.api.io import check_data_dir
-from past1000.ci.spei import DistributionType
+from shifting_baseline.api.io import check_data_dir
+from shifting_baseline.ci.spei import DistributionType
 
 # 配置参数
 START_YEAR = 2000

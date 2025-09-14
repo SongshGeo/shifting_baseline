@@ -1,6 +1,6 @@
 # Testing Guide
 
-This guide covers testing practices and strategies for the Past1000 library.
+This guide covers testing practices and strategies for the Shifting Baseline library.
 
 ## Testing Philosophy
 
@@ -59,7 +59,7 @@ tests/
 import pytest
 import pandas as pd
 import numpy as np
-from past1000.filters import classify_series
+from shifting_baseline.filters import classify_series
 
 class TestClassifySeries:
     """Test cases for classify_series function."""
@@ -99,7 +99,7 @@ class TestClassifySeries:
 ```python
 import pytest
 import pandas as pd
-from past1000.data import HistoricalRecords
+from shifting_baseline.data import HistoricalRecords
 
 @pytest.fixture
 def sample_climate_data():
@@ -150,7 +150,7 @@ def test_historical_records_aggregation(historical_records):
 
 ```python
 import pytest
-from past1000.filters import classify_single_value
+from shifting_baseline.filters import classify_single_value
 
 @pytest.mark.parametrize("value,expected", [
     (-2.0, -2),
@@ -173,7 +173,7 @@ def test_classify_single_value(value, expected):
 ])
 def test_correlation_methods(method, expected_range):
     """Test different correlation methods."""
-    from past1000.utils.calc import calc_corr
+    from shifting_baseline.utils.calc import calc_corr
 
     data1 = pd.Series([1, 2, 3, 4, 5])
     data2 = pd.Series([2, 4, 6, 8, 10])
@@ -190,10 +190,10 @@ def test_correlation_methods(method, expected_range):
 ```python
 import pytest
 from unittest.mock import Mock, patch
-from past1000.data import load_nat_data
+from shifting_baseline.data import load_nat_data
 
-@patch('past1000.data.get_files')
-@patch('past1000.data.pd.read_csv')
+@patch('shifting_baseline.data.get_files')
+@patch('shifting_baseline.data.pd.read_csv')
 def test_load_nat_data_mock(mock_read_csv, mock_get_files):
     """Test load_nat_data with mocked file operations."""
     # Setup mocks
@@ -235,7 +235,7 @@ Test individual functions and methods:
 ```python
 def test_calc_std_deviation():
     """Test standard deviation calculation."""
-    from past1000.filters import calc_std_deviation
+    from shifting_baseline.filters import calc_std_deviation
 
     data = pd.Series([1, 2, 3, 4, 5])
     result = calc_std_deviation(data)
@@ -246,7 +246,7 @@ def test_calc_std_deviation():
 
 def test_historical_records_initialization():
     """Test HistoricalRecords initialization."""
-    from past1000.data import HistoricalRecords
+    from shifting_baseline.data import HistoricalRecords
 
     # Test with valid parameters
     history = HistoricalRecords(
@@ -266,9 +266,9 @@ Test interactions between components:
 ```python
 def test_data_loading_and_processing():
     """Test complete data loading and processing workflow."""
-    from past1000.data import HistoricalRecords, load_nat_data
-    from past1000.filters import classify
-    from past1000.compare import compare_corr
+    from shifting_baseline.data import HistoricalRecords, load_nat_data
+    from shifting_baseline.filters import classify
+    from shifting_baseline.compare import compare_corr
 
     # Load data
     history = HistoricalRecords(
@@ -313,7 +313,7 @@ import pytest
 
 def test_data_loading_performance():
     """Test data loading performance."""
-    from past1000.data import load_nat_data
+    from shifting_baseline.data import load_nat_data
 
     start_time = time.time()
 
@@ -334,7 +334,7 @@ def test_data_loading_performance():
 @pytest.mark.slow
 def test_large_dataset_processing():
     """Test processing of large datasets."""
-    from past1000.filters import classify_series
+    from shifting_baseline.filters import classify_series
 
     # Create large dataset
     large_data = pd.Series(np.random.randn(10000))
@@ -367,7 +367,7 @@ addopts =
     --tb=short
     --strict-markers
     --disable-warnings
-    --cov=past1000
+    --cov=shifting_baseline
     --cov-report=html
     --cov-report=term-missing
 markers =
@@ -441,7 +441,7 @@ pytest tests/test_filters.py::TestClassifySeries::test_basic_classification
 pytest -v
 
 # Run with coverage
-pytest --cov=past1000 --cov-report=html
+pytest --cov=shifting_baseline --cov-report=html
 
 # Run only fast tests
 pytest -m "not slow"
@@ -484,7 +484,7 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest --cov=past1000 --cov-report=xml
+        pytest --cov=shifting_baseline --cov-report=xml
 
     - name: Upload coverage
       uses: codecov/codecov-action@v3

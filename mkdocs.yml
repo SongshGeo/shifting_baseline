@@ -1,7 +1,7 @@
-site_name: Past1000 API Documentation
-site_description: Comprehensive API documentation for the Past1000 climate reconstruction analysis library
+site_name: Shifting Baseline API Documentation
+site_description: Comprehensive API documentation for the Shifting Baseline climate reconstruction analysis library
 site_author: SongshGeo
-site_url: https://songshgeo.github.io/past1000
+site_url: https://songshgeo.github.io/shifting_baseline
 
 theme:
   name: material
@@ -31,8 +31,8 @@ theme:
   icon:
     repo: fontawesome/brands/github
 
-repo_name: SongshGeo/past1000
-repo_url: https://github.com/SongshGeo/past1000
+repo_name: SongshGeo/shifting_baseline
+repo_url: https://github.com/SongshGeo/shifting_baseline
 
 plugins:
   - search

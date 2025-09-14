@@ -1,6 +1,6 @@
 # Advanced Analysis Examples
 
-This guide demonstrates advanced analysis patterns and techniques using Past1000 for complex climate reconstruction research.
+This guide demonstrates advanced analysis patterns and techniques using Shifting Baseline for complex climate reconstruction research.
 
 ## Example 1: Multi-Scale Temporal Analysis
 
@@ -10,9 +10,9 @@ This guide demonstrates advanced analysis patterns and techniques using Past1000
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from past1000.data import HistoricalRecords
-from past1000.compare import sweep_slices, sweep_max_corr_year
-from past1000.filters import classify
+from shifting_baseline.data import HistoricalRecords
+from shifting_baseline.compare import sweep_slices, sweep_max_corr_year
+from shifting_baseline.filters import classify
 
 # Load data
 history = HistoricalRecords(
@@ -83,9 +83,9 @@ plt.show()
 ### Multi-Region Comparison
 
 ```python
-from past1000.data import HistoricalRecords
-from past1000.compare import compare_corr
-from past1000.calibration import MismatchReport
+from shifting_baseline.data import HistoricalRecords
+from shifting_baseline.compare import compare_corr
+from shifting_baseline.calibration import MismatchReport
 
 # Define regions to analyze
 regions = ["华北地区", "东北地区", "华东地区", "华中地区"]
@@ -143,8 +143,8 @@ plt.show()
 ### Monte Carlo Uncertainty Analysis
 
 ```python
-from past1000.mc import combine_reconstructions
-from past1000.calibration import MismatchReport
+from shifting_baseline.mc import combine_reconstructions
+from shifting_baseline.calibration import MismatchReport
 import numpy as np
 
 def monte_carlo_uncertainty_analysis(datasets, uncertainties, n_simulations=1000):
@@ -210,8 +210,8 @@ plt.show()
 ### Multi-Threshold Sensitivity Analysis
 
 ```python
-from past1000.filters import classify_series
-from past1000.calibration import MismatchReport
+from shifting_baseline.filters import classify_series
+from shifting_baseline.calibration import MismatchReport
 
 def sensitivity_analysis(data, threshold_sets):
     """Analyze sensitivity to different classification thresholds."""

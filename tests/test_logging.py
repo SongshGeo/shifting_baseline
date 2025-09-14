@@ -15,7 +15,7 @@ import pytest
 def _run_module(
     python_exe: str, cwd: Path, args: Iterable[str]
 ) -> subprocess.CompletedProcess:
-    """Run `python -m past1000` with given args.
+    """Run `python -m shifting_baseline` with given args.
 
     Args:
         python_exe: Path to Python executable.
@@ -25,7 +25,7 @@ def _run_module(
     Returns:
         CompletedProcess: Result including stdout/stderr for assertions.
     """
-    cmd = [python_exe, "-m", "past1000", *args]
+    cmd = [python_exe, "-m", "shifting_baseline", *args]
     return subprocess.run(
         cmd,
         cwd=str(cwd),

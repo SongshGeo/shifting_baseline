@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_series_equal
 
-from past1000.filters import (
+from shifting_baseline.filters import (
     calc_std_deviation,
     classify,
     classify_series,

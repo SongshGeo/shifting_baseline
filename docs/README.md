@@ -1,6 +1,6 @@
-# Past1000 Documentation
+# Shifting Baseline Documentation
 
-This directory contains the complete documentation for the Past1000 library, built with MkDocs and Material theme.
+This directory contains the complete documentation for the Shifting Baseline library, built with MkDocs and Material theme.
 
 ## Documentation Structure
 
@@ -121,12 +121,12 @@ def example_function():
 ```markdown
 === "Python"
     ```python
-    import past1000
+    import shifting_baseline
     ```
 
 === "R"
     ```r
-    library(past1000)
+    library(shifting_baseline)
     ```
 ```
 
@@ -202,7 +202,7 @@ class ExampleClass:
 The documentation is configured in `mkdocs.yml`:
 
 ```yaml
-site_name: Past1000 API Documentation
+site_name: Shifting Baseline API Documentation
 theme:
   name: material
   features:
@@ -275,4 +275,4 @@ plugins:
 
 ## License
 
-The documentation is licensed under the same license as the Past1000 library (MIT License).
+The documentation is licensed under the same license as the Shifting Baseline library (MIT License).

@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from past1000.utils.calc import calc_corr, find_top_max_indices
+from shifting_baseline.utils.calc import calc_corr, find_top_max_indices
 
 
 class TestFindTopMaxIndices1D:

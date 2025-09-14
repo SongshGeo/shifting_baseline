@@ -1,6 +1,6 @@
-# Contributing to Past1000
+# Contributing to Shifting Baseline
 
-Thank you for your interest in contributing to Past1000! This guide will help you get started with contributing to the project.
+Thank you for your interest in contributing to Shifting Baseline! This guide will help you get started with contributing to the project.
 
 ## Development Setup
 
@@ -15,8 +15,8 @@ Thank you for your interest in contributing to Past1000! This guide will help yo
 
 1. **Fork and clone the repository:**
    ```bash
-   git clone https://github.com/your-username/past1000.git
-   cd past1000
+   git clone https://github.com/your-username/shifting_baseline.git
+   cd shifting_baseline
    ```
 
 2. **Install dependencies:**
@@ -62,12 +62,12 @@ We use several tools to maintain code quality:
 
 ```bash
 # Format code
-black past1000/
-isort past1000/
+black shifting_baseline/
+isort shifting_baseline/
 
 # Check code style
-flake8 past1000/
-mypy past1000/
+flake8 shifting_baseline/
+mypy shifting_baseline/
 
 # Run all checks
 pre-commit run --all-files
@@ -133,7 +133,7 @@ pytest
 pytest tests/test_data.py
 
 # Run with coverage
-pytest --cov=past1000 --cov-report=html
+pytest --cov=shifting_baseline --cov-report=html
 
 # Run with verbose output
 pytest -v
@@ -154,7 +154,7 @@ Example test:
 ```python
 import pytest
 import pandas as pd
-from past1000.filters import classify_series
+from shifting_baseline.filters import classify_series
 
 class TestClassifySeries:
     """Test cases for classify_series function."""
@@ -280,15 +280,15 @@ def advanced_correlation_analysis(
 3. **Run quality checks:**
    ```bash
    # Format code
-   black past1000/
-   isort past1000/
+   black shifting_baseline/
+   isort shifting_baseline/
 
    # Run tests
    pytest
 
    # Check code quality
-   flake8 past1000/
-   mypy past1000/
+   flake8 shifting_baseline/
+   mypy shifting_baseline/
    ```
 
 4. **Commit your changes:**
@@ -504,8 +504,8 @@ We are committed to providing a welcoming and inclusive environment for all cont
 
 ## License
 
-By contributing to Past1000, you agree that your contributions will be licensed under the MIT License.
+By contributing to Shifting Baseline, you agree that your contributions will be licensed under the MIT License.
 
 ## Thank You
 
-Thank you for contributing to Past1000! Your contributions help make this project better for everyone.
+Thank you for contributing to Shifting Baseline! Your contributions help make this project better for everyone.

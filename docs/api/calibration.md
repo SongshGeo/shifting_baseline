@@ -1,6 +1,6 @@
 # Calibration Module
 
-The `past1000.calibration` module provides comprehensive tools for evaluating the accuracy and reliability of climate reconstruction data through mismatch analysis and statistical validation.
+The `shifting_baseline.calibration` module provides comprehensive tools for evaluating the accuracy and reliability of climate reconstruction data through mismatch analysis and statistical validation.
 
 ## Overview
 
@@ -19,7 +19,7 @@ This module handles:
 The main class for analyzing mismatches between predicted and observed climate data.
 
 ```python
-from past1000.calibration import MismatchReport
+from shifting_baseline.calibration import MismatchReport
 ```
 
 #### Constructor
@@ -41,8 +41,8 @@ MismatchReport(
 
 **Example:**
 ```python
-from past1000.calibration import MismatchReport
-from past1000.filters import classify
+from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.filters import classify
 
 # Create mismatch report
 report = MismatchReport(
@@ -235,8 +235,8 @@ print(p_values[p_values < 0.05])
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
-from past1000.calibration import MismatchReport
-from past1000.filters import classify
+from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.filters import classify
 
 def comprehensive_calibration_analysis(predicted, observed, raw_values):
     """Perform comprehensive calibration analysis."""
@@ -467,8 +467,8 @@ plt.show()
 ### With Comparison Module
 
 ```python
-from past1000.compare import compare_corr
-from past1000.calibration import MismatchReport
+from shifting_baseline.compare import compare_corr
+from shifting_baseline.calibration import MismatchReport
 
 # Calculate correlation
 r, p, n = compare_corr(historical_series, climate_series)
@@ -487,8 +487,8 @@ print(f"Calibration Kappa: {report.get_statistics_summary()['kappa']:.3f}")
 ### With Filters Module
 
 ```python
-from past1000.filters import classify
-from past1000.calibration import MismatchReport
+from shifting_baseline.filters import classify
+from shifting_baseline.calibration import MismatchReport
 
 # Classify data with different methods
 pred_classified = classify(predictions, handle_na="skip")

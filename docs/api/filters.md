@@ -1,6 +1,6 @@
 # Filters Module
 
-The `past1000.filters` module provides data filtering, classification, and preprocessing functions for climate reconstruction analysis.
+The `shifting_baseline.filters` module provides data filtering, classification, and preprocessing functions for climate reconstruction analysis.
 
 ## Overview
 
@@ -28,7 +28,7 @@ Calculate the standard deviation of the last value relative to the past window y
 
 **Example:**
 ```python
-from past1000.filters import calc_std_deviation
+from shifting_baseline.filters import calc_std_deviation
 import pandas as pd
 
 # Calculate standard deviation
@@ -55,7 +55,7 @@ Classify a single value based on standard deviation thresholds.
 
 **Example:**
 ```python
-from past1000.filters import classify_single_value
+from shifting_baseline.filters import classify_single_value
 
 # Classify single values
 print(classify_single_value(-1.5))  # -2 (severe drought)
@@ -87,7 +87,7 @@ Classify values in a series based on standard deviation thresholds.
 
 **Example:**
 ```python
-from past1000.filters import classify_series
+from shifting_baseline.filters import classify_series
 import pandas as pd
 import numpy as np
 
@@ -114,7 +114,7 @@ Backward compatibility alias for `classify_series`.
 
 **Example:**
 ```python
-from past1000.filters import classify
+from shifting_baseline.filters import classify
 
 # Same as classify_series
 classified = classify(data, handle_na="skip")
@@ -289,8 +289,8 @@ print(f"Classification quality: {quality}")
 ### With Data Module
 
 ```python
-from past1000.data import HistoricalRecords
-from past1000.filters import classify
+from shifting_baseline.data import HistoricalRecords
+from shifting_baseline.filters import classify
 
 # Load historical data
 history = HistoricalRecords(
@@ -308,8 +308,8 @@ climate_classified = classify(climate_series)
 ### With Comparison Module
 
 ```python
-from past1000.compare import compare_corr
-from past1000.filters import calc_std_deviation, classify
+from shifting_baseline.compare import compare_corr
+from shifting_baseline.filters import calc_std_deviation, classify
 
 # Use filter functions in correlation analysis
 r, p, n = compare_corr(
@@ -327,8 +327,8 @@ classified2 = classify(series2)
 ### With Calibration Module
 
 ```python
-from past1000.calibration import MismatchReport
-from past1000.filters import classify
+from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.filters import classify
 
 # Classify data for calibration analysis
 pred_classified = classify(predictions)

@@ -1,13 +1,13 @@
 # ABM Simulation Examples
 
-This guide demonstrates how to use the Agent-Based Model (ABM) module in Past1000 to simulate climate event recording and collective memory formation.
+This guide demonstrates how to use the Agent-Based Model (ABM) module in Shifting Baseline to simulate climate event recording and collective memory formation.
 
 ## Example 1: Basic ABM Simulation
 
 ### Simple Climate Observer Simulation
 
 ```python
-from past1000.abm import ClimateObservingModel, ClimateObserver
+from shifting_baseline.abm import ClimateObservingModel, ClimateObserver
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -534,8 +534,8 @@ plt.show()
 ### Compare with Historical Data
 
 ```python
-from past1000.data import HistoricalRecords
-from past1000.compare import compare_corr
+from shifting_baseline.data import HistoricalRecords
+from shifting_baseline.compare import compare_corr
 
 def compare_with_historical_data(model, historical_data_path):
     """Compare model results with real historical data."""

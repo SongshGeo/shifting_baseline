@@ -1,6 +1,6 @@
 # Configuration Guide
 
-Past1000 uses Hydra for flexible configuration management. This guide covers all configuration options and how to customize them.
+Shifting Baseline uses Hydra for flexible configuration management. This guide covers all configuration options and how to customize them.
 
 ## Configuration Structure
 
@@ -171,7 +171,7 @@ dpi: 300                           # Figure resolution
 logging:
   level: "INFO"                     # DEBUG, INFO, WARNING, ERROR
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "logs/past1000.log"         # Log file path
+  file: "logs/shifting_baseline.log"         # Log file path
 ```
 
 ## Environment-Specific Configurations
@@ -198,7 +198,7 @@ model:
   repeats: 100
   num_process: 8
 
-output_dir: "/data/past1000/outputs"
+output_dir: "/data/shifting_baseline/outputs"
 logging:
   level: "INFO"
 ```
@@ -209,24 +209,24 @@ You can override any configuration parameter from the command line:
 
 ```bash
 # Override specific parameters
-python -m past1000 model.years=200 model.repeats=20
+python -m shifting_baseline model.years=200 model.repeats=20
 
 # Override multiple parameters
-python -m past1000 model.years=200 model.repeats=20 corr_method=pearson
+python -m shifting_baseline model.years=200 model.repeats=20 corr_method=pearson
 
 # Use different config file
-python -m past1000 --config-name=production
+python -m shifting_baseline --config-name=production
 
 # Override with environment variables
-HYDRA_OVERRIDES="model.years=100" python -m past1000
+HYDRA_OVERRIDES="model.years=100" python -m shifting_baseline
 ```
 
 ## Configuration Validation
 
-Past1000 includes built-in validation for configuration parameters:
+Shifting Baseline includes built-in validation for configuration parameters:
 
 ```python
-from past1000.utils.config import validate_config
+from shifting_baseline.utils.config import validate_config
 
 # Validate configuration
 config = load_config("config/config.yaml")
@@ -287,6 +287,6 @@ model:
 **3. Invalid Parameters**
 ```python
 # Check available parameters
-from past1000.utils.config import get_available_parameters
+from shifting_baseline.utils.config import get_available_parameters
 print(get_available_parameters())
 ```

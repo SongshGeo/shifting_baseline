@@ -1,6 +1,6 @@
 # Data Module
 
-The `past1000.data` module provides comprehensive data loading, processing, and management capabilities for historical climate reconstruction analysis.
+The `shifting_baseline.data` module provides comprehensive data loading, processing, and management capabilities for historical climate reconstruction analysis.
 
 ## Overview
 
@@ -17,7 +17,7 @@ This module handles:
 The main class for handling historical drought/flood records from Chinese historical documents.
 
 ```python
-from past1000.data import HistoricalRecords
+from shifting_baseline.data import HistoricalRecords
 ```
 
 #### Constructor
@@ -198,7 +198,7 @@ Load natural and historical data with uncertainties.
 
 **Example:**
 ```python
-from past1000.data import load_data
+from shifting_baseline.data import load_data
 from omegaconf import DictConfig
 
 # Load all data
@@ -270,7 +270,7 @@ history_std = HistoricalRecords(
 )
 
 # Standardize climate data
-from past1000.mc import standardize_both
+from shifting_baseline.mc import standardize_both
 std_data, std_uncertainty = standardize_both(raw_data)
 ```
 
@@ -321,7 +321,7 @@ For large datasets, consider these optimization strategies:
 
 ```python
 # Example: Chunked processing for large datasets
-from past1000.process import load_and_combine_datasets_chunked
+from shifting_baseline.process import load_and_combine_datasets_chunked
 
 # Load data in chunks
 combined_data = load_and_combine_datasets_chunked(
@@ -337,8 +337,8 @@ combined_data = load_and_combine_datasets_chunked(
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
-from past1000.data import HistoricalRecords, load_data
-from past1000.compare import experiment_corr_2d
+from shifting_baseline.data import HistoricalRecords, load_data
+from shifting_baseline.compare import experiment_corr_2d
 
 # 1. Load data
 history = HistoricalRecords(

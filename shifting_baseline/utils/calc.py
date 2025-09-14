@@ -15,7 +15,7 @@ from scipy import stats
 from scipy.stats import truncnorm
 
 if TYPE_CHECKING:
-    from past1000.utils.types import CorrFunc
+    from shifting_baseline.utils.types import CorrFunc
 
 
 def get_coords(mask: np.ndarray) -> list[tuple[int, ...]]:

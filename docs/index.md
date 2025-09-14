@@ -1,10 +1,10 @@
-# Past1000
+# Shifting Baseline
 
 A comprehensive Python library for analyzing historical climate reconstruction data and comparing it with collective memory records from historical documents.
 
 ## Overview
 
-Past1000 is designed to bridge the gap between objective climate reconstructions and subjective historical records. The library provides tools for:
+Shifting Baseline is designed to bridge the gap between objective climate reconstructions and subjective historical records. The library provides tools for:
 
 - **Data Processing**: Loading and standardizing climate reconstruction data from various sources
 - **Historical Analysis**: Processing and analyzing historical drought/flood records
@@ -41,9 +41,9 @@ Past1000 is designed to bridge the gap between objective climate reconstructions
 ## Quick Start
 
 ```python
-from past1000 import HistoricalRecords, load_data
-from past1000.compare import experiment_corr_2d
-from past1000.calibration import MismatchReport
+from shifting_baseline import HistoricalRecords, load_data
+from shifting_baseline.compare import experiment_corr_2d
+from shifting_baseline.calibration import MismatchReport
 
 # Load historical records
 history = HistoricalRecords(
@@ -90,26 +90,26 @@ pip install -e .
 
 ## Citation
 
-If you use Past1000 in your research, please cite:
+If you use Shifting Baseline in your research, please cite:
 
 ```bibtex
-@software{past1000,
-  title={Past1000: A Python Library for Historical Climate Reconstruction Analysis},
+@software{shifting_baseline,
+  title={Shifting Baseline: A Python Library for Historical Climate Reconstruction Analysis},
   author={Song, Shuang},
   year={2025},
-  url={https://github.com/SongshGeo/past1000}
+  url={https://github.com/SongshGeo/shifting_baseline}
 }
 ```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/SongshGeo/past1000/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/SongshGeo/shifting_baseline/blob/main/LICENSE) file for details.
 
 ## Support
 
 - 📧 Email: [songshgeo@gmail.com](mailto:songshgeo@gmail.com)
-- 🐛 Issues: [GitHub Issues](https://github.com/SongshGeo/past1000/issues)
-- 📖 Documentation: [This site](https://songshgeo.github.io/past1000)
+- 🐛 Issues: [GitHub Issues](https://github.com/SongshGeo/shifting_baseline/issues)
+- 📖 Documentation: [This site](https://songshgeo.github.io/shifting_baseline)
 
 ---
 

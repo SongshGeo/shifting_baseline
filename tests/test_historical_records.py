@@ -15,8 +15,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from past1000.constants import GRADE_VALUES, STAGES_BINS, STD_THRESHOLDS
-from past1000.data import HistoricalRecords
+from shifting_baseline.constants import GRADE_VALUES, STAGES_BINS, STD_THRESHOLDS
+from shifting_baseline.data import HistoricalRecords
 
 
 def _make_fake_excel(

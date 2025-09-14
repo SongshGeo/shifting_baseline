@@ -8,7 +8,7 @@
 import numpy as np
 import pandas as pd
 
-from past1000.constants import LEVELS, THRESHOLDS
+from shifting_baseline.constants import LEVELS, THRESHOLDS
 
 
 def calc_std_deviation(series: pd.Series | np.ndarray) -> float:

@@ -1,6 +1,6 @@
 # Installation
 
-This guide will help you install Past1000 and its dependencies.
+This guide will help you install Shifting Baseline and its dependencies.
 
 ## Prerequisites
 
@@ -16,8 +16,8 @@ Poetry is the recommended package manager for this project as it ensures consist
 
 ```bash
 # Clone the repository
-git clone https://github.com/SongshGeo/past1000.git
-cd past1000
+git clone https://github.com/SongshGeo/shifting_baseline.git
+cd shifting_baseline
 
 # Install dependencies using Poetry
 poetry install
@@ -32,8 +32,8 @@ If you prefer using pip, you can install the package in development mode:
 
 ```bash
 # Clone the repository
-git clone https://github.com/SongshGeo/past1000.git
-cd past1000
+git clone https://github.com/SongshGeo/shifting_baseline.git
+cd shifting_baseline
 
 # Create a virtual environment
 python -m venv venv
@@ -45,7 +45,7 @@ pip install -e .
 
 ## Dependencies
 
-Past1000 relies on several scientific Python packages:
+Shifting Baseline relies on several scientific Python packages:
 
 ### Core Dependencies
 - **xarray** (>=2023): Multi-dimensional labeled arrays
@@ -80,17 +80,17 @@ Past1000 relies on several scientific Python packages:
 
 ## Verification
 
-After installation, verify that Past1000 is working correctly:
+After installation, verify that Shifting Baseline is working correctly:
 
 ```python
 # Test basic import
-import past1000
-print(f"Past1000 version: {past1000.__version__}")
+import shifting_baseline
+print(f"Shifting Baseline version: {shifting_baseline.__version__}")
 
 # Test core modules
-from past1000.data import HistoricalRecords
-from past1000.compare import experiment_corr_2d
-from past1000.calibration import MismatchReport
+from shifting_baseline.data import HistoricalRecords
+from shifting_baseline.compare import experiment_corr_2d
+from shifting_baseline.calibration import MismatchReport
 
 print("✅ All imports successful!")
 ```
@@ -137,7 +137,7 @@ export MALLOC_ARENA_MAX=2
 
 If you encounter issues during installation:
 
-1. Check the [GitHub Issues](https://github.com/SongshGeo/past1000/issues)
+1. Check the [GitHub Issues](https://github.com/SongshGeo/shifting_baseline/issues)
 2. Create a new issue with:
    - Operating system and version
    - Python version

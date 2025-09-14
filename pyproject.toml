@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "past1000"
+name = "shifting_baseline"
 version = "0.1.0"
-description = "Processing data from CMIP6 for 'past 1000' experiment."
+description = "Detecting Shifting Baseline Syndrome (SBS) behind data."
 authors = ["SongshGeo <songshgeo@gmail.com>"]
 readme = "README.md"
 include = [

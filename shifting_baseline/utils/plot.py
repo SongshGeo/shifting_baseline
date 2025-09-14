@@ -22,8 +22,8 @@ from matplotkit import with_axes
 from matplotlib.axes import Axes
 from pyproj import CRS
 
-from past1000.constants import LEVELS, TICK_LABELS
-from past1000.utils.calc import (
+from shifting_baseline.constants import LEVELS, TICK_LABELS
+from shifting_baseline.utils.calc import (
     calculate_rmse,
     fill_star_matrix,
     get_coords,

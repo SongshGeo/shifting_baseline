@@ -1,6 +1,6 @@
 # Process Module
 
-The `past1000.process` module provides comprehensive data processing pipelines for historical climate reconstruction data.
+The `shifting_baseline.process` module provides comprehensive data processing pipelines for historical climate reconstruction data.
 
 ## Overview
 
@@ -18,7 +18,7 @@ This module handles:
 A flexible data processing pipeline for historical reconstruction data.
 
 ```python
-from past1000.process import ProcessRecon
+from shifting_baseline.process import ProcessRecon
 ```
 
 #### Constructor
@@ -87,7 +87,7 @@ Convert time axis to actual years and preserve time attributes.
 
 **Example:**
 ```python
-from past1000.process import convert_time_axis
+from shifting_baseline.process import convert_time_axis
 
 # Convert time axis
 ds_converted = convert_time_axis(dataset, begin_year=1470)
@@ -106,7 +106,7 @@ Load and combine multiple NetCDF files efficiently.
 
 **Example:**
 ```python
-from past1000.process import load_and_combine_datasets
+from shifting_baseline.process import load_and_combine_datasets
 
 # Load and combine datasets
 combined = load_and_combine_datasets("data/netcdf_files/")
@@ -126,7 +126,7 @@ Load NetCDF files in chunks to reduce memory usage.
 
 **Example:**
 ```python
-from past1000.process import load_and_combine_datasets_chunked
+from shifting_baseline.process import load_and_combine_datasets_chunked
 
 # Load with chunking
 combined = load_and_combine_datasets_chunked("data/large_files/", chunk_size=3)
@@ -144,7 +144,7 @@ Load NetCDF files using lazy loading with dask.
 
 **Example:**
 ```python
-from past1000.process import load_and_combine_datasets_lazy
+from shifting_baseline.process import load_and_combine_datasets_lazy
 
 # Lazy loading
 combined = load_and_combine_datasets_lazy("data/netcdf_files/")
@@ -165,7 +165,7 @@ Extract summer precipitation and aggregate by year.
 
 **Example:**
 ```python
-from past1000.process import extract_summer_precipitation
+from shifting_baseline.process import extract_summer_precipitation
 
 # Extract summer precipitation
 summer_precip = extract_summer_precipitation(
@@ -187,7 +187,7 @@ Log current memory usage.
 
 **Example:**
 ```python
-from past1000.process import log_memory_usage
+from shifting_baseline.process import log_memory_usage
 
 # Log memory usage
 log_memory_usage("after loading data")
@@ -199,7 +199,7 @@ Force garbage collection to free memory.
 
 **Example:**
 ```python
-from past1000.process import force_garbage_collection
+from shifting_baseline.process import force_garbage_collection
 
 # Force garbage collection
 force_garbage_collection()
@@ -216,7 +216,7 @@ Batch process multiple reconstruction datasets.
 
 **Example:**
 ```python
-from past1000.process import batch_process_recon_data
+from shifting_baseline.process import batch_process_recon_data
 from omegaconf import DictConfig
 
 # Define batch processing configuration
@@ -477,8 +477,8 @@ except Exception as e:
 ### With Data Module
 
 ```python
-from past1000.data import load_data
-from past1000.process import extract_summer_precipitation
+from shifting_baseline.data import load_data
+from shifting_baseline.process import extract_summer_precipitation
 
 # Load data
 datasets, uncertainties, history = load_data(config)
@@ -490,8 +490,8 @@ processed_data = extract_summer_precipitation(datasets)
 ### With Comparison Module
 
 ```python
-from past1000.compare import compare_corr
-from past1000.process import convert_time_axis
+from shifting_baseline.compare import compare_corr
+from shifting_baseline.process import convert_time_axis
 
 # Process data
 processed_ds = convert_time_axis(dataset, begin_year=1470)

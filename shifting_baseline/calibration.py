@@ -17,9 +17,9 @@ from scipy.stats import kendalltau, norm
 from sklearn.metrics import cohen_kappa_score, confusion_matrix
 from tqdm.auto import tqdm
 
-from past1000.constants import LEVELS, LEVELS_PROB, TICK_LABELS
-from past1000.filters import classify
-from past1000.utils.plot import (
+from shifting_baseline.constants import LEVELS, LEVELS_PROB, TICK_LABELS
+from shifting_baseline.filters import classify
+from shifting_baseline.utils.plot import (
     heatmap_with_annot,
     plot_confusion_matrix,
     plot_mismatch_matrix,

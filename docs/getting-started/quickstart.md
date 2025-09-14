@@ -1,10 +1,10 @@
 # Quick Start Guide
 
-This guide will get you up and running with Past1000 in just a few minutes.
+This guide will get you up and running with Shifting Baseline in just a few minutes.
 
 ## Basic Workflow
 
-The typical workflow with Past1000 involves three main steps:
+The typical workflow with Shifting Baseline involves three main steps:
 
 1. **Load Data**: Import historical records and climate reconstruction data
 2. **Process Data**: Standardize and prepare data for analysis
@@ -15,9 +15,9 @@ The typical workflow with Past1000 involves three main steps:
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
-from past1000 import HistoricalRecords, load_data
-from past1000.compare import experiment_corr_2d
-from past1000.calibration import MismatchReport
+from shifting_baseline import HistoricalRecords, load_data
+from shifting_baseline.compare import experiment_corr_2d
+from shifting_baseline.calibration import MismatchReport
 
 # Step 1: Load historical records
 history = HistoricalRecords(
@@ -48,8 +48,8 @@ plt.show()
 ## Example 2: Classification and Mismatch Analysis
 
 ```python
-from past1000.filters import classify
-from past1000.calibration import MismatchReport
+from shifting_baseline.filters import classify
+from shifting_baseline.calibration import MismatchReport
 
 # Classify continuous data into discrete levels
 predicted_levels = classify(historical_series)
@@ -72,7 +72,7 @@ fig = report.generate_report_figure(save_path="mismatch_analysis.png")
 ## Example 3: Agent-Based Modeling
 
 ```python
-from past1000.abm import ClimateObservingModel, repeat_run
+from shifting_baseline.abm import ClimateObservingModel, repeat_run
 from abses import Experiment
 
 # Configure the model
@@ -98,7 +98,7 @@ mismatch_report = model.mismatch_report
 
 ## Configuration
 
-Past1000 uses Hydra for configuration management. Create a configuration file:
+Shifting Baseline uses Hydra for configuration management. Create a configuration file:
 
 ```yaml
 # config/config.yaml
@@ -154,14 +154,14 @@ history_mapping = HistoricalRecords(..., to_std="mapping")
 history_sampling = HistoricalRecords(..., to_std="sampling")
 
 # Manual standardization
-from past1000.mc import standardize_both
+from shifting_baseline.mc import standardize_both
 standardized_data, uncertainty = standardize_both(raw_data)
 ```
 
 ### Statistical Analysis
 ```python
 # Multiple correlation methods
-from past1000.utils.calc import calc_corr
+from shifting_baseline.utils.calc import calc_corr
 
 pearson_r, p_val, n = calc_corr(data1, data2, how="pearson")
 kendall_tau, p_val, n = calc_corr(data1, data2, how="kendall")
@@ -179,5 +179,5 @@ Now that you have the basics, explore:
 ## Getting Help
 
 - 📖 Check the [API documentation](api/) for detailed function descriptions
-- 🐛 Report issues on [GitHub](https://github.com/SongshGeo/past1000/issues)
+- 🐛 Report issues on [GitHub](https://github.com/SongshGeo/shifting_baseline/issues)
 - 💬 Ask questions via [email](mailto:songshgeo@gmail.com)

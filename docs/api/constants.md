@@ -1,6 +1,6 @@
 # Constants Module
 
-The `past1000.constants` module provides essential constants and configuration values used throughout the Past1000 library.
+The `shifting_baseline.constants` module provides essential constants and configuration values used throughout the Shifting Baseline library.
 
 ## Overview
 
@@ -16,7 +16,7 @@ This module defines:
 ### Grade Values
 
 ```python
-from past1000.constants import GRADE_VALUES
+from shifting_baseline.constants import GRADE_VALUES
 
 # Original grade values (1-5 scale)
 print(GRADE_VALUES)  # [5, 4, 3, 2, 1]
@@ -25,7 +25,7 @@ print(GRADE_VALUES)  # [5, 4, 3, 2, 1]
 ### Standard Deviation Thresholds
 
 ```python
-from past1000.constants import STD_THRESHOLDS
+from shifting_baseline.constants import STD_THRESHOLDS
 
 # Standard deviation thresholds for classification
 print(STD_THRESHOLDS)  # [-1.17, -0.33, 0, 0.33, 1.17]
@@ -34,7 +34,7 @@ print(STD_THRESHOLDS)  # [-1.17, -0.33, 0, 0.33, 1.17]
 ### Classification Levels
 
 ```python
-from past1000.constants import LEVELS
+from shifting_baseline.constants import LEVELS
 
 # Classification levels (-2 to 2)
 print(LEVELS)  # [-2, -1, 0, 1, 2]
@@ -43,7 +43,7 @@ print(LEVELS)  # [-2, -1, 0, 1, 2]
 ### Level Probabilities
 
 ```python
-from past1000.constants import LEVELS_PROB
+from shifting_baseline.constants import LEVELS_PROB
 
 # Probability distribution for each level
 print(LEVELS_PROB)  # [0.1, 0.25, 0.30, 0.25, 0.1]
@@ -52,7 +52,7 @@ print(LEVELS_PROB)  # [0.1, 0.25, 0.30, 0.25, 0.1]
 ### Classification Thresholds
 
 ```python
-from past1000.constants import THRESHOLDS
+from shifting_baseline.constants import THRESHOLDS
 
 # Thresholds for 5-level classification
 print(THRESHOLDS)  # [-1.17, -0.33, 0.33, 1.17]
@@ -63,7 +63,7 @@ print(THRESHOLDS)  # [-1.17, -0.33, 0.33, 1.17]
 ### Color Scheme
 
 ```python
-from past1000.constants import COLORS
+from shifting_baseline.constants import COLORS
 
 # Color palette for visualization
 print(COLORS)  # ["#EF7722", "#FAA533", "#BBDCE5", "#0BA6DF"]
@@ -72,7 +72,7 @@ print(COLORS)  # ["#EF7722", "#FAA533", "#BBDCE5", "#0BA6DF"]
 ### Tick Labels
 
 ```python
-from past1000.constants import TICK_LABELS
+from shifting_baseline.constants import TICK_LABELS
 
 # Labels for classification levels
 print(TICK_LABELS)  # ["SD", "MD", "N", "MW", "SW"]
@@ -81,7 +81,7 @@ print(TICK_LABELS)  # ["SD", "MD", "N", "MW", "SW"]
 ### Verbose Labels
 
 ```python
-from past1000.constants import VERBOSE_LABELS
+from shifting_baseline.constants import VERBOSE_LABELS
 
 # Descriptive labels for classification levels
 print(VERBOSE_LABELS)  # ["Very dry", "Moderate dry", "Normal", "Moderate wet", "Very wet"]
@@ -92,7 +92,7 @@ print(VERBOSE_LABELS)  # ["Very dry", "Moderate dry", "Normal", "Moderate wet", 
 ### Historical Periods
 
 ```python
-from past1000.constants import START, STAGE1, STAGE2, END, FINAL
+from shifting_baseline.constants import START, STAGE1, STAGE2, END, FINAL
 
 # Historical time periods
 print(f"Start: {START}")      # 1000
@@ -105,7 +105,7 @@ print(f"Final: {FINAL}")      # 2010
 ### Stage Bins
 
 ```python
-from past1000.constants import STAGES_BINS
+from shifting_baseline.constants import STAGES_BINS
 
 # Time period boundaries
 print(STAGES_BINS)  # [1000, 1469, 1659, 1900, 2010]
@@ -114,7 +114,7 @@ print(STAGES_BINS)  # [1000, 1469, 1659, 1900, 2010]
 ### Stage Labels
 
 ```python
-from past1000.constants import LABELS
+from shifting_baseline.constants import LABELS
 
 # Labels for each stage
 print(LABELS)  # ["1000-1469", "1469-1659", "1659-1900", "1900-2021"]
@@ -125,7 +125,7 @@ print(LABELS)  # ["1000-1469", "1469-1659", "1659-1900", "1900-2021"]
 ### Level to Standard Deviation Mapping
 
 ```python
-from past1000.constants import MAP
+from shifting_baseline.constants import MAP
 
 # Mapping from levels to standard deviations
 print(MAP)  # {-2: -1.5, -1: -0.5, 0: 0, 1: 0.5, 2: 1.5}
@@ -136,7 +136,7 @@ print(MAP)  # {-2: -1.5, -1: -0.5, 0: 0, 1: 0.5, 2: 1.5}
 ### Maximum Age
 
 ```python
-from past1000.constants import MAX_AGE
+from shifting_baseline.constants import MAX_AGE
 
 # Maximum age for climate observers
 print(MAX_AGE)  # 40
@@ -147,8 +147,8 @@ print(MAX_AGE)  # 40
 ### 1. Classification Setup
 
 ```python
-from past1000.constants import LEVELS, THRESHOLDS, TICK_LABELS
-from past1000.filters import classify_series
+from shifting_baseline.constants import LEVELS, THRESHOLDS, TICK_LABELS
+from shifting_baseline.filters import classify_series
 
 # Use constants for classification
 data = pd.Series([-1.5, -0.5, 0.0, 0.5, 1.5])
@@ -167,7 +167,7 @@ print(labeled)
 ### 2. Time Period Analysis
 
 ```python
-from past1000.constants import STAGES_BINS, LABELS
+from shifting_baseline.constants import STAGES_BINS, LABELS
 
 # Define time periods
 def get_stage_info(stage_number):
@@ -185,7 +185,7 @@ print(f"Stage 2: {label} ({start}-{end})")
 
 ```python
 import matplotlib.pyplot as plt
-from past1000.constants import COLORS, TICK_LABELS
+from shifting_baseline.constants import COLORS, TICK_LABELS
 
 # Create a color-coded plot
 def plot_classification(data, classified):
@@ -210,7 +210,7 @@ plt.show()
 ### 4. Probability Weighted Analysis
 
 ```python
-from past1000.constants import LEVELS_PROB, MAP
+from shifting_baseline.constants import LEVELS_PROB, MAP
 
 # Calculate probability-weighted values
 def probability_weighted_value(level):
@@ -228,8 +228,8 @@ print(weighted_values)
 ### 5. Agent-Based Model Configuration
 
 ```python
-from past1000.constants import MAX_AGE
-from past1000.abm import ClimateObservingModel
+from shifting_baseline.constants import MAX_AGE
+from shifting_baseline.abm import ClimateObservingModel
 
 # Use constants in model configuration
 model_config = {
@@ -393,8 +393,8 @@ print(constants_config)
 ### With Data Module
 
 ```python
-from past1000.data import HistoricalRecords
-from past1000.constants import STAGES_BINS, LABELS
+from shifting_baseline.data import HistoricalRecords
+from shifting_baseline.constants import STAGES_BINS, LABELS
 
 # Use constants in data loading
 history = HistoricalRecords(
@@ -411,8 +411,8 @@ for i, (start, end) in enumerate(zip(STAGES_BINS[:-1], STAGES_BINS[1:])):
 ### With Comparison Module
 
 ```python
-from past1000.compare import experiment_corr_2d
-from past1000.constants import COLORS
+from shifting_baseline.compare import experiment_corr_2d
+from shifting_baseline.constants import COLORS
 
 # Use constants in visualization
 corr_df, r_benchmark, ax = experiment_corr_2d(
@@ -427,8 +427,8 @@ ax.set_prop_cycle(color=COLORS)
 ### With Calibration Module
 
 ```python
-from past1000.calibration import MismatchReport
-from past1000.constants import TICK_LABELS
+from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.constants import TICK_LABELS
 
 # Use constants in calibration
 report = MismatchReport(

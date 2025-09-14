@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Past1000 will be documented in this file.
+All notable changes to Shifting Baseline will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-01-08
 
 ### Added
-- Initial release of Past1000 library
+- Initial release of Shifting Baseline library
 - Core data processing modules
 - Historical records analysis
 - Climate reconstruction data handling
@@ -138,14 +138,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Before (v0.0.1):**
 ```python
 # Old API (example)
-from past1000.old_module import old_function
+from shifting_baseline.old_module import old_function
 result = old_function(data)
 ```
 
 **After (v0.1.0):**
 ```python
 # New API
-from past1000.filters import classify_series
+from shifting_baseline.filters import classify_series
 result = classify_series(data)
 ```
 
@@ -226,7 +226,7 @@ result = classify_series(data)
 ### Getting Help
 - Documentation: [docs/](docs/)
 - Examples: [examples/](examples/)
-- Issues: [GitHub Issues](https://github.com/SongshGeo/past1000/issues)
+- Issues: [GitHub Issues](https://github.com/SongshGeo/shifting_baseline/issues)
 - Email: songshgeo@gmail.com
 
 ### Community
@@ -245,7 +245,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Community contributors
 
 ### Dependencies
-- Thanks to all open-source projects that make Past1000 possible
+- Thanks to all open-source projects that make Shifting Baseline possible
 
 ### Research
 - Based on climate reconstruction research

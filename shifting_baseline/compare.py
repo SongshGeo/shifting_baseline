@@ -16,11 +16,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from past1000.utils.calc import calc_corr, find_top_max_indices
-from past1000.utils.plot import plot_corr_heatmap
+from shifting_baseline.utils.calc import calc_corr, find_top_max_indices
+from shifting_baseline.utils.plot import plot_corr_heatmap
 
 if TYPE_CHECKING:
-    from past1000.utils.types import CorrFunc, FilterSide
+    from shifting_baseline.utils.types import CorrFunc, FilterSide
 
 # A logger for this file
 log = logging.getLogger(__name__)

@@ -10,7 +10,7 @@
 import pytest
 from omegaconf import DictConfig
 
-from past1000.utils.config import format_by_config
+from shifting_baseline.utils.config import format_by_config
 
 
 @pytest.mark.parametrize(

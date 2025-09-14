@@ -1,11 +1,9 @@
 # 项目根目录
-root: /Users/songshgeo/Documents/VSCode/past1000
+root: /Users/songshgeo/Documents/VSCode/shifting_baseline
 # 项目数据目录
 processed: ${ds.root}/data
 multirun: ${ds.root}/multirun
 
-# 数据目录
-cmip6: /Volumes/CMIP6/past1000
 # 其它数据文件夹
 data: /Users/songshgeo/Documents/Datasets
 # 重建数据

@@ -1,6 +1,6 @@
 # Agent-Based Model Module
 
-The `past1000.abm` module provides a comprehensive agent-based modeling framework for simulating climate event recording and collective memory formation.
+The `shifting_baseline.abm` module provides a comprehensive agent-based modeling framework for simulating climate event recording and collective memory formation.
 
 ## Overview
 
@@ -18,7 +18,7 @@ This module implements:
 The main model class that simulates a world with climate observers who record extreme climate events.
 
 ```python
-from past1000.abm import ClimateObservingModel
+from shifting_baseline.abm import ClimateObservingModel
 ```
 
 #### Constructor
@@ -123,7 +123,7 @@ model.archive_it(2)  # Record severe wet event
 Individual climate observer agent.
 
 ```python
-from past1000.abm import ClimateObserver
+from shifting_baseline.abm import ClimateObserver
 ```
 
 #### Constructor
@@ -499,7 +499,7 @@ print(experiment_results.groupby("config")["final_correlation"].describe())
 ### With Calibration Module
 
 ```python
-from past1000.calibration import MismatchReport
+from shifting_baseline.calibration import MismatchReport
 
 # Get mismatch report from model
 mismatch_report = model.mismatch_report
@@ -514,7 +514,7 @@ fig = mismatch_report.generate_report_figure()
 ### With Comparison Module
 
 ```python
-from past1000.compare import compare_corr
+from shifting_baseline.compare import compare_corr
 
 # Compare objective and collective memory
 climate_df = model.climate_df
@@ -530,7 +530,7 @@ print(f"Correlation: {r:.3f}, P-value: {p:.3f}")
 ### With Data Module
 
 ```python
-from past1000.data import HistoricalRecords
+from shifting_baseline.data import HistoricalRecords
 
 # Compare with historical data
 history = HistoricalRecords(

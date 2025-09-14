@@ -1,6 +1,6 @@
 # Comparison Module
 
-The `past1000.compare` module provides comprehensive tools for statistical comparison and correlation analysis between different climate datasets.
+The `shifting_baseline.compare` module provides comprehensive tools for statistical comparison and correlation analysis between different climate datasets.
 
 ## Overview
 
@@ -33,14 +33,14 @@ Compare two time series and calculate correlation coefficients.
 
 **Example:**
 ```python
-from past1000.compare import compare_corr
+from shifting_baseline.compare import compare_corr
 import pandas as pd
 
 # Basic correlation
 r, p, n = compare_corr(series1, series2, corr_method="kendall")
 
 # With filtering
-from past1000.filters import calc_std_deviation
+from shifting_baseline.filters import calc_std_deviation
 r, p, n = compare_corr(
     series1,
     series2,
@@ -71,7 +71,7 @@ Batch correlation analysis with multiple window sizes.
 **Example:**
 ```python
 import numpy as np
-from past1000.compare import compare_corr_2d
+from shifting_baseline.compare import compare_corr_2d
 
 # Define window parameters
 windows = np.arange(5, 50, 5)
@@ -110,8 +110,8 @@ Complete experimental correlation analysis with visualization.
 
 **Example:**
 ```python
-from past1000.compare import experiment_corr_2d
-from past1000.filters import calc_std_deviation
+from shifting_baseline.compare import experiment_corr_2d
+from shifting_baseline.filters import calc_std_deviation
 
 # Complete correlation experiment
 corr_df, r_benchmark, ax = experiment_corr_2d(
@@ -147,7 +147,7 @@ Generate all possible time windows for analysis.
 
 **Example:**
 ```python
-from past1000.compare import sweep_slices
+from shifting_baseline.compare import sweep_slices
 
 # Generate 200-year windows with 20-year steps
 slices, mid_years, labels = sweep_slices(
@@ -180,7 +180,7 @@ Find maximum correlation for each time window.
 
 **Example:**
 ```python
-from past1000.compare import sweep_max_corr_year
+from shifting_baseline.compare import sweep_max_corr_year
 import numpy as np
 
 # Define parameters
@@ -217,7 +217,7 @@ Filter correlation results based on significance and sample size.
 
 **Example:**
 ```python
-from past1000.compare import get_filtered_corr
+from shifting_baseline.compare import get_filtered_corr
 
 # Filter correlations
 filtered_rs = get_filtered_corr(
@@ -236,7 +236,7 @@ filtered_rs = get_filtered_corr(
 
 ```python
 import pandas as pd
-from past1000.compare import compare_corr
+from shifting_baseline.compare import compare_corr
 
 # Compare different correlation methods
 methods = ["pearson", "kendall", "spearman"]
@@ -260,7 +260,7 @@ print(results_df)
 ```python
 import numpy as np
 import matplotlib.pyplot as plt
-from past1000.compare import compare_corr_2d
+from shifting_baseline.compare import compare_corr_2d
 
 # Define rolling window parameters
 window_sizes = np.arange(10, 100, 10)
@@ -290,7 +290,7 @@ plt.show()
 ### 3. Time Period Comparison
 
 ```python
-from past1000.compare import experiment_corr_2d
+from shifting_baseline.compare import experiment_corr_2d
 
 # Define time periods
 periods = {
@@ -418,8 +418,8 @@ except ValueError as e:
 ### With Calibration Module
 
 ```python
-from past1000.calibration import MismatchReport
-from past1000.compare import compare_corr
+from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.compare import compare_corr
 
 # Calculate correlation
 r, p, n = compare_corr(historical_series, climate_series)
@@ -439,8 +439,8 @@ print(f"Mismatch statistics: {report.get_statistics_summary(as_str=True)}")
 ### With Filters Module
 
 ```python
-from past1000.filters import calc_std_deviation, classify
-from past1000.compare import experiment_corr_2d
+from shifting_baseline.filters import calc_std_deviation, classify
+from shifting_baseline.compare import experiment_corr_2d
 
 # Use filter functions in correlation analysis
 corr_df, r_benchmark, ax = experiment_corr_2d(

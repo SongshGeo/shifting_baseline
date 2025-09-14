@@ -7,7 +7,7 @@
 import numpy as np
 import pytest
 
-from past1000.utils.calc import rand_generate_from_std_levels
+from shifting_baseline.utils.calc import rand_generate_from_std_levels
 
 
 class TestGenerateFrom2DLevels:

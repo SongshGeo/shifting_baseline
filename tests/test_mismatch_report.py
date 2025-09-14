@@ -16,8 +16,8 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
-from past1000.calibration import MismatchReport
-from past1000.constants import LEVELS, TICK_LABELS
+from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.constants import LEVELS, TICK_LABELS
 
 
 @pytest.fixture(name="perfect_data")

@@ -1,6 +1,6 @@
 # Utils Module
 
-The `past1000.utils` module provides utility functions and helper classes for various operations throughout the Past1000 library.
+The `shifting_baseline.utils` module provides utility functions and helper classes for various operations throughout the Shifting Baseline library.
 
 ## Overview
 
@@ -28,7 +28,7 @@ Calculate correlation between two time series.
 
 **Example:**
 ```python
-from past1000.utils.calc import calc_corr
+from shifting_baseline.utils.calc import calc_corr
 
 # Calculate correlation
 r, p, n = calc_corr(series1, series2, how="kendall")
@@ -49,7 +49,7 @@ Generate random values from standard deviation levels.
 
 **Example:**
 ```python
-from past1000.utils.calc import rand_generate_from_std_levels
+from shifting_baseline.utils.calc import rand_generate_from_std_levels
 
 # Generate values from levels
 values, stds = rand_generate_from_std_levels(level_data, mu=0.0, sigma=1.0)
@@ -68,7 +68,7 @@ Find indices of top maximum values in an array.
 
 **Example:**
 ```python
-from past1000.utils.calc import find_top_max_indices
+from shifting_baseline.utils.calc import find_top_max_indices
 
 # Find top 10% of values
 top_indices = find_top_max_indices(correlation_array, ratio=0.1)
@@ -88,7 +88,7 @@ Format configuration object.
 
 **Example:**
 ```python
-from past1000.utils.config import format_by_config
+from shifting_baseline.utils.config import format_by_config
 
 # Format configuration
 formatted_cfg = format_by_config(raw_config)
@@ -103,7 +103,7 @@ Get output directory path.
 
 **Example:**
 ```python
-from past1000.utils.config import get_output_dir
+from shifting_baseline.utils.config import get_output_dir
 
 # Get output directory
 output_dir = get_output_dir()
@@ -123,7 +123,7 @@ Send email notification about process completion.
 
 **Example:**
 ```python
-from past1000.utils.email import send_notification_email
+from shifting_baseline.utils.email import send_notification_email
 from datetime import datetime
 
 # Send success notification
@@ -139,10 +139,10 @@ send_notification_email(success=False, error_msg="Process failed", start_time=st
 ### Logging Configuration
 
 ```python
-from past1000.utils.log import setup_logging
+from shifting_baseline.utils.log import setup_logging
 
 # Setup logging
-setup_logging(level="INFO", log_file="past1000.log")
+setup_logging(level="INFO", log_file="shifting_baseline.log")
 ```
 
 ## Plotting Utilities (`utils.plot`)
@@ -162,7 +162,7 @@ Plot correlation windows visualization.
 
 **Example:**
 ```python
-from past1000.utils.plot import plot_correlation_windows
+from shifting_baseline.utils.plot import plot_correlation_windows
 
 # Plot correlation windows
 ax = plot_correlation_windows(
@@ -188,7 +188,7 @@ Plot confusion matrix.
 
 **Example:**
 ```python
-from past1000.utils.plot import plot_confusion_matrix
+from shifting_baseline.utils.plot import plot_confusion_matrix
 
 # Plot confusion matrix
 ax = plot_confusion_matrix(confusion_matrix, title="Classification Results")
@@ -210,7 +210,7 @@ Plot mismatch analysis matrix.
 
 **Example:**
 ```python
-from past1000.utils.plot import plot_mismatch_matrix
+from shifting_baseline.utils.plot import plot_mismatch_matrix
 
 # Plot mismatch matrix
 ax = plot_mismatch_matrix(
@@ -235,7 +235,7 @@ Create annotated heatmap.
 
 **Example:**
 ```python
-from past1000.utils.plot import heatmap_with_annot
+from shifting_baseline.utils.plot import heatmap_with_annot
 
 # Create annotated heatmap
 ax = heatmap_with_annot(data_matrix, p_value=significance_matrix)
@@ -247,7 +247,7 @@ plt.show()
 ### Type Aliases
 
 ```python
-from past1000.utils.types import (
+from shifting_baseline.utils.types import (
     PathLike,
     Region,
     Stages,
@@ -272,8 +272,8 @@ from past1000.utils.types import (
 ### 1. Custom Calculation Pipeline
 
 ```python
-from past1000.utils.calc import calc_corr, find_top_max_indices
-from past1000.utils.plot import plot_correlation_windows
+from shifting_baseline.utils.calc import calc_corr, find_top_max_indices
+from shifting_baseline.utils.plot import plot_correlation_windows
 
 def custom_correlation_analysis(data1, data2, window_sizes):
     """Custom correlation analysis pipeline."""
@@ -318,8 +318,8 @@ plt.show()
 ### 2. Configuration Management
 
 ```python
-from past1000.utils.config import format_by_config, get_output_dir
-from past1000.utils.log import setup_logging
+from shifting_baseline.utils.config import format_by_config, get_output_dir
+from shifting_baseline.utils.log import setup_logging
 
 def setup_analysis_environment(config):
     """Setup analysis environment with proper configuration."""
@@ -344,7 +344,7 @@ config, output_dir = setup_analysis_environment(raw_config)
 ### 3. Email Notifications
 
 ```python
-from past1000.utils.email import send_notification_email
+from shifting_baseline.utils.email import send_notification_email
 from datetime import datetime
 import traceback
 
@@ -382,7 +382,7 @@ result = run_analysis_with_notification(my_analysis_function, data)
 ### 4. Custom Plotting
 
 ```python
-from past1000.utils.plot import plot_confusion_matrix, heatmap_with_annot
+from shifting_baseline.utils.plot import plot_confusion_matrix, heatmap_with_annot
 import matplotlib.pyplot as plt
 
 def create_analysis_dashboard(data, results):
@@ -424,7 +424,7 @@ plt.show()
 ### 5. Type-Safe Operations
 
 ```python
-from past1000.utils.types import Stages, CorrFunc, FilterSide
+from shifting_baseline.utils.types import Stages, CorrFunc, FilterSide
 from typing import Union, List
 
 def type_safe_analysis(
@@ -500,7 +500,7 @@ r, p, n = robust_calc_corr(problematic_series1, problematic_series2)
 
 ```python
 from functools import lru_cache
-from past1000.utils.calc import calc_corr
+from shifting_baseline.utils.calc import calc_corr
 
 @lru_cache(maxsize=128)
 def cached_calc_corr(data1_hash, data2_hash, how):
@@ -540,9 +540,9 @@ def efficient_correlation_analysis(datasets, methods):
 ### With Data Module
 
 ```python
-from past1000.data import HistoricalRecords
-from past1000.utils.calc import calc_corr
-from past1000.utils.plot import plot_correlation_windows
+from shifting_baseline.data import HistoricalRecords
+from shifting_baseline.utils.calc import calc_corr
+from shifting_baseline.utils.plot import plot_correlation_windows
 
 # Load data
 history = HistoricalRecords("data/regions.shp", "data/historical_data.xlsx")
@@ -558,8 +558,8 @@ plt.show()
 ### With Comparison Module
 
 ```python
-from past1000.compare import experiment_corr_2d
-from past1000.utils.plot import heatmap_with_annot
+from shifting_baseline.compare import experiment_corr_2d
+from shifting_baseline.utils.plot import heatmap_with_annot
 
 # Run experiment
 corr_df, r_benchmark, ax = experiment_corr_2d(data1, data2)
@@ -572,8 +572,8 @@ plt.show()
 ### With Calibration Module
 
 ```python
-from past1000.calibration import MismatchReport
-from past1000.utils.plot import plot_confusion_matrix
+from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.utils.plot import plot_confusion_matrix
 
 # Create report
 report = MismatchReport(pred, true)

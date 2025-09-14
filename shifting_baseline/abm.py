@@ -21,15 +21,19 @@ from hydra import main
 from omegaconf import DictConfig
 from scipy.stats import norm
 
-from past1000.calibration import MismatchReport
-from past1000.compare import compare_corr_2d
-from past1000.constants import MAX_AGE
-from past1000.filters import calc_std_deviation, classify, classify_single_value
-from past1000.utils.calc import rand_generate_from_std_levels
-from past1000.utils.email import send_notification_email
+from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.compare import compare_corr_2d
+from shifting_baseline.constants import MAX_AGE
+from shifting_baseline.filters import (
+    calc_std_deviation,
+    classify,
+    classify_single_value,
+)
+from shifting_baseline.utils.calc import rand_generate_from_std_levels
+from shifting_baseline.utils.email import send_notification_email
 
 if TYPE_CHECKING:
-    from past1000.utils.types import CorrFunc
+    from shifting_baseline.utils.types import CorrFunc
 
 log = logging.getLogger(__name__)
 

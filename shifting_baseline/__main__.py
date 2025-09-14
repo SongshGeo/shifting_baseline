@@ -6,7 +6,7 @@
 # Website: https://cv.songshgeo.com/
 
 """
-past1000 是一个用于对比历史集体记忆和气候重建资料的 Python 库。
+shifting_baseline 是一个用于对比历史集体记忆和气候重建资料的 Python 库。
 """
 
 import logging
@@ -17,20 +17,24 @@ import numpy as np
 from hydra import main
 from omegaconf import DictConfig
 
-from past1000.calibration import MismatchReport
-from past1000.compare import experiment_corr_2d, sweep_max_corr_year, sweep_slices
-from past1000.constants import END, STAGE1
-from past1000.data import HistoricalRecords, load_data
-from past1000.filters import calc_std_deviation, classify
-from past1000.mc import combine_reconstructions
-from past1000.process import batch_process_recon_data
-from past1000.utils.config import format_by_config, get_output_dir
-from past1000.utils.plot import plot_correlation_windows
+from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.compare import (
+    experiment_corr_2d,
+    sweep_max_corr_year,
+    sweep_slices,
+)
+from shifting_baseline.constants import END, STAGE1
+from shifting_baseline.data import HistoricalRecords, load_data
+from shifting_baseline.filters import calc_std_deviation, classify
+from shifting_baseline.mc import combine_reconstructions
+from shifting_baseline.process import batch_process_recon_data
+from shifting_baseline.utils.config import format_by_config, get_output_dir
+from shifting_baseline.utils.plot import plot_correlation_windows
 
 if TYPE_CHECKING:
     from geo_dskit.utils.path import PathLike
 
-    from past1000.utils.types import Stages
+    from shifting_baseline.utils.types import Stages
 
 __version__ = "0.1.0"
 __all__ = [

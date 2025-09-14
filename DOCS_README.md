@@ -1,6 +1,6 @@
-# Past1000 文档系统使用说明
+# Shifting Baseline 文档系统使用说明
 
-我已经为您的 Past1000 项目创建了完整的英文 API 文档系统，使用 MkDocs 和 Material 主题。
+我已经为您的 Shifting Baseline 项目创建了完整的英文 API 文档系统，使用 MkDocs 和 Material 主题。
 
 ## 📁 文档结构
 

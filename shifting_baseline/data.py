@@ -22,7 +22,7 @@ from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
 from geo_dskit.utils.path import filter_files, get_files
 from omegaconf import DictConfig
 
-from past1000.constants import (
+from shifting_baseline.constants import (
     END,
     FINAL,
     GRADE_VALUES,
@@ -33,14 +33,18 @@ from past1000.constants import (
     START,
     STD_THRESHOLDS,
 )
-from past1000.filters import classify
-from past1000.mc import standardize_both
-from past1000.utils.calc import calc_corr, rand_generate_from_std_levels
+from shifting_baseline.filters import classify
+from shifting_baseline.mc import standardize_both
+from shifting_baseline.utils.calc import calc_corr, rand_generate_from_std_levels
 
 if TYPE_CHECKING:
     from geo_dskit.core.types import PathLike, Region
 
-    from past1000.utils.types import HistoricalAggregateType, Stages, ToStdMethod
+    from shifting_baseline.utils.types import (
+        HistoricalAggregateType,
+        Stages,
+        ToStdMethod,
+    )
 
 log = logging.getLogger(__name__)
 # 常用的分布

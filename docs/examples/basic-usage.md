@@ -1,6 +1,6 @@
 # Basic Usage Examples
 
-This guide provides practical examples of using Past1000 for common climate reconstruction analysis tasks.
+This guide provides practical examples of using Shifting Baseline for common climate reconstruction analysis tasks.
 
 ## Example 1: Loading and Analyzing Historical Data
 
@@ -9,7 +9,7 @@ This guide provides practical examples of using Past1000 for common climate reco
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
-from past1000.data import HistoricalRecords
+from shifting_baseline.data import HistoricalRecords
 
 # Load historical drought/flood records
 history = HistoricalRecords(
@@ -55,8 +55,8 @@ plt.show()
 ### Load and Standardize Climate Data
 
 ```python
-from past1000.data import load_nat_data
-from past1000.mc import standardize_both
+from shifting_baseline.data import load_nat_data
+from shifting_baseline.mc import standardize_both
 
 # Load tree ring reconstruction data
 datasets, uncertainties = load_nat_data(
@@ -77,7 +77,7 @@ print(f"Standardized data range: {std_data.min():.3f} to {std_data.max():.3f}")
 ### Classify Climate Data
 
 ```python
-from past1000.filters import classify
+from shifting_baseline.filters import classify
 
 # Classify continuous data into discrete levels
 classified_data = classify(std_data)
@@ -108,8 +108,8 @@ plt.show()
 ### Basic Correlation Analysis
 
 ```python
-from past1000.compare import compare_corr, experiment_corr_2d
-from past1000.filters import calc_std_deviation
+from shifting_baseline.compare import compare_corr, experiment_corr_2d
+from shifting_baseline.filters import calc_std_deviation
 
 # Prepare data
 historical_series = history.aggregate("mean")
@@ -153,7 +153,7 @@ plt.show()
 ### Create Mismatch Report
 
 ```python
-from past1000.calibration import MismatchReport
+from shifting_baseline.calibration import MismatchReport
 
 # Classify both datasets
 historical_classified = classify(historical_series)
@@ -267,7 +267,7 @@ plt.show()
 ### Rolling Correlation Analysis
 
 ```python
-from past1000.compare import sweep_slices, sweep_max_corr_year
+from shifting_baseline.compare import sweep_slices, sweep_max_corr_year
 import numpy as np
 
 # Generate time windows
@@ -307,7 +307,7 @@ plt.show()
 ### Check Data Distribution
 
 ```python
-from past1000.data import check_distribution
+from shifting_baseline.data import check_distribution
 
 # Check distribution of climate data
 dist_results = check_distribution(datasets, only_best=True)
