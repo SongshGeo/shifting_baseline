@@ -21,14 +21,10 @@ import xarray as xr
 from matplotkit import with_axes
 from matplotlib.axes import Axes
 from pyproj import CRS
+from sklearn.metrics import root_mean_squared_error
 
 from shifting_baseline.constants import LEVELS, TICK_LABELS
-from shifting_baseline.utils.calc import (
-    calculate_rmse,
-    fill_star_matrix,
-    get_coords,
-    low_pass_filter,
-)
+from shifting_baseline.utils.calc import fill_star_matrix, get_coords, low_pass_filter
 
 
 def is_significant(p_value: float, threshold: float = 0.1) -> bool:
@@ -224,7 +220,6 @@ def plot_corr_heatmap(
         vmin=v_min,
         vmax=v_max,
         cbar_kws={
-            "shrink": 0.4,  # 缩小 colorbar
             # "location": "bottom",  # 移到上方
             "pad": 0.05,  # 调整间距
         },
@@ -269,25 +264,25 @@ def plot_corr_heatmap(
     #     label="window = period",
     # )
 
-    # 标记最大值点
-    std_value = np.nanstd(filtered)
-    lower_bound = v_max - std_offset * std_value
-    points = get_coords(filtered >= lower_bound)
+    # # 标记最大值点
+    # std_value = np.nanstd(filtered)
+    # lower_bound = v_max - std_offset * std_value
+    # points = get_coords(filtered >= lower_bound)
 
-    for i, point in enumerate(points):
-        if i == 0:
-            ax.scatter(
-                point[1],
-                point[0],
-                s=10,
-                c="r",
-                alpha=0.8,
-                label=f"~Max: {v_max:.2f} - {std_offset:.2f}σ",
-            )
-        else:
-            ax.scatter(point[1], point[0], s=10, c="r", alpha=0.8)
-        ax.axvline(point[1], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
-        ax.axhline(point[0], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
+    # for i, point in enumerate(points):
+    #     if i == 0:
+    #         ax.scatter(
+    #             point[1],
+    #             point[0],
+    #             s=10,
+    #             c="r",
+    #             alpha=0.8,
+    #             label=f"~Max: {v_max:.2f} - {std_offset:.2f}σ",
+    #         )
+    #     else:
+    #         ax.scatter(point[1], point[0], s=10, c="r", alpha=0.8)
+    #     ax.axvline(point[1], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
+    #     ax.axhline(point[0], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
 
     # 将图例移到上方
     ax.legend(
@@ -517,13 +512,13 @@ def plot_std_times(
         color_options = {
             "positive": "#689B8A",
             "negative": "#E43636",
-            "zero": "gray",
+            "zero": "lightgray",
         }
     colors = np.where(
-        data.values > 0,
+        data.values > 0.33,
         color_options["positive"],  # 正数用蓝色
         np.where(
-            data.values < 0, color_options["negative"], color_options["zero"]
+            data.values < -0.33, color_options["negative"], color_options["zero"]
         ),  # 负数用红色，零值用灰色
     )
 
@@ -535,16 +530,16 @@ def plot_std_times(
         ax.vlines(x, 0, y, colors=color, linewidth=1, **kwargs)
 
         # 根据数值类型确定标签
-        if y > 0:
-            label = "Positive" if "positive" not in added_labels else None
+        if y > 0.33:
+            label = "Wet Year" if "positive" not in added_labels else None
             if label:
                 added_labels.add("positive")
-        elif y < 0:
-            label = "Negative" if "negative" not in added_labels else None
+        elif y < -0.33:
+            label = "Dry Year" if "negative" not in added_labels else None
             if label:
                 added_labels.add("negative")
         else:
-            label = "Zero" if "zero" not in added_labels else None
+            label = "Normal Year" if "zero" not in added_labels else None
             if label:
                 added_labels.add("zero")
             else:
@@ -689,7 +684,7 @@ def plot_correlation_windows(
         sm.set_array(valid_improvements)  # 设置实际数据数组
 
         cbar = plt.colorbar(sm, ax=ax)
-        cbar.set_label("Avg. Correlation Improvement (%)", rotation=270, labelpad=15)
+        cbar.set_label("Avg. Improvement of $Tau$ (%)", rotation=270, labelpad=15)
     lims = ax.get_xlim()
     ax.set_xlim(lims)
     ax.spines["top"].set_visible(False)
@@ -706,15 +701,11 @@ def plot_time_series_with_lowpass(
     baseline: float | None = None,
     rmse_data: pd.Series | None = None,
     ax: Optional[Axes] = None,
-    title: str = "Time Series with Low-pass Filter",
-    xlabel: str = "Year (CE)",
-    ylabel: str = "Value",
     show_annual: bool = True,
     show_filtered: bool = True,
     show_baseline: bool = True,
     show_rmse: bool = True,
     colors: dict[str, str] | None = None,
-    **kwargs,
 ) -> Axes:
     """绘制带低通滤波的时间序列图，支持基准线着色和误差范围显示。
 
@@ -786,7 +777,10 @@ def plot_time_series_with_lowpass(
         # 使用原始数据与滤波数据的差异作为RMSE的近似
         valid_mask = ~filtered_data.isna()
         if valid_mask.any():
-            rmse_value = calculate_rmse(data[valid_mask], filtered_data[valid_mask])
+            rmse_value = root_mean_squared_error(
+                y_true=data[valid_mask],
+                y_pred=filtered_data[valid_mask],
+            )
             rmse_data = pd.Series([rmse_value] * len(data), index=data.index)
 
     assert isinstance(ax, Axes), "ax must be an instance of Axes"

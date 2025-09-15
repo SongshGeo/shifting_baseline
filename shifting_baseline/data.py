@@ -210,12 +210,14 @@ class HistoricalRecords:
                 n_samples=100,
             )
             self._data = pd.DataFrame(
-                np.mean(data, axis=0),
+                np.nanmean(data, axis=0),
                 index=self._data.index,
                 columns=self._data.columns,
             )
             self._std = pd.DataFrame(
-                np.std(data, axis=0), index=self._data.index, columns=self._data.columns
+                np.nanstd(data, axis=0),
+                index=self._data.index,
+                columns=self._data.columns,
             )
         else:
             raise ValueError(f"无效的 to_std 方法: {to_std}")
@@ -857,7 +859,7 @@ class HistoricalRecords:
             split: 是否拆分
 
         Returns:
-            pd.DataFrame | tuple[pd.Series, pd.Series]: 合并后的数据集，如果 split 为 True，则返回两个 Series
+            pd.DataFrame | tuple[pd.Series, pd.Series]: 合并后的数据集，如果 split 为 True，则返回两个 Series，第一个是历史数据，第二个是其它数据
         """
         # 获取历史记录数据
         data = self.period(time_range)

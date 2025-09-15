@@ -34,7 +34,6 @@ def compare_corr(
     corr_method: CorrFunc = "pearson",
     window_error: str = "raise",
     n_diff_w: int | float = 2,
-    penalty: bool = False,
     **rolling_kwargs,
 ) -> tuple[float, float, int]:
     """
@@ -61,7 +60,9 @@ def compare_corr(
     default_kwargs.update(rolling_kwargs)
     if default_kwargs["window"] <= default_kwargs["min_periods"] + n_diff_w:
         if window_error == "raise":
-            raise ValueError("窗口太小，请增大窗口范围")
+            raise ValueError(
+                f"窗口{default_kwargs['window']}太小，n_periods={default_kwargs['min_periods']}，n_diff_w={n_diff_w}，请增大窗口范围"
+            )
         elif window_error == "nan":
             return np.nan, np.nan, n
         else:
@@ -90,7 +91,6 @@ def compare_corr_2d(
     filter_func: Callable | None = None,
     corr_method: CorrFunc = "pearson",
     n_diff_w: int | float = 2,
-    penalty: bool = False,
     **rolling_kwargs,
 ) -> tuple[float | np.ndarray, float | np.ndarray, int | np.ndarray]:
     """
@@ -121,7 +121,6 @@ def compare_corr_2d(
         corr_method=corr_method,
         window_error="nan",
         n_diff_w=n_diff_w,
-        penalty=penalty,
         **rolling_kwargs,
     )
     # 批量计算相关性
@@ -158,7 +157,6 @@ def experiment_corr_2d(
     sample_threshold: float = 1,
     std_offset: float = 0.2,
     p_threshold: float = 5e-2,
-    penalty: bool = False,
     n_diff_w: int | float = 2,
     ax: plt.Axes | None = None,
 ) -> tuple[pd.DataFrame, float, plt.Axes]:
@@ -182,7 +180,6 @@ def experiment_corr_2d(
         tuple[pd.DataFrame, float, plt.Axes]: 过滤后的相关性系数，基准相关性系数，绘图轴
     """
     log.info("开始计算相关性 %s，时间切片: %s", corr_method, time_slice)
-    # TODO pearson 系数还需要再核对一下为什么不能运行
     # 计算基准相关系数
     base_corr = compare_corr(
         data1.loc[time_slice],
@@ -204,7 +201,6 @@ def experiment_corr_2d(
         windows=windows_mesh,
         min_periods=min_periods_mesh,
         filter_side=filter_side,
-        penalty=penalty,
         n_diff_w=n_diff_w,
     )
     filtered = get_filtered_corr(

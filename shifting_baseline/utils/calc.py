@@ -324,30 +324,6 @@ def low_pass_filter(
         raise ValueError(f"Unknown filtering method: {method}")
 
 
-def calculate_rmse(
-    observed: pd.Series | np.ndarray,
-    predicted: pd.Series | np.ndarray,
-    axis: int | None = None,
-) -> float:
-    """Calculate Root Mean Square Error (RMSE).
-
-    Args:
-        observed: Observed values
-        predicted: Predicted values
-        axis: Axis along which to calculate RMSE
-
-    Returns:
-        float: RMSE value
-    """
-    if isinstance(observed, pd.Series):
-        observed = observed.values
-    if isinstance(predicted, pd.Series):
-        predicted = predicted.values
-
-    mse = np.mean((observed - predicted) ** 2, axis=axis)
-    return np.sqrt(mse)
-
-
 def get_interval(level: int) -> tuple[float, float]:
     """根据等级返回标准化下限和上限（标准差倍数）。"""
     boundaries = {
