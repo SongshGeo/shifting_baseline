@@ -4,6 +4,9 @@ root: /Users/songshgeo/Documents/VSCode/shifting_baseline
 processed: ${ds.root}/data
 multirun: ${ds.root}/multirun
 
+# 最终作图输出目录
+figs: /Users/songshgeo/Documents/SongshGeo/Outputs/ColMemo_MS/figs
+
 # 其它数据文件夹
 data: /Users/songshgeo/Documents/Datasets
 # 重建数据
@@ -57,3 +60,10 @@ out:
   precip_z: ${ds.processed}/summer_precip_z.csv
   sites_corr: ${ds.processed}/sites_corr.csv
   tree_ring_uncertainty: ${ds.processed}/combined_uncertainty.csv
+
+
+fig1: ${ds.figs}/CollMemo_figure1.png
+fig2: ${ds.figs}/CollMemo_figure2.png
+fig3: ${ds.figs}/CollMemo_figure3.png
+fig4: ${ds.figs}/CollMemo_figure4.png
+fig5: ${ds.figs}/CollMemo_figure5.png

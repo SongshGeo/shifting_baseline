@@ -140,6 +140,7 @@ class MismatchReport:
     def analyze_error_patterns(
         self,
         value_series: pd.Series | None = None,
+        shift: int = 1,
         mc_runs: int = 1000,
     ) -> pd.DataFrame:
         """分析分类错误的模式（公开方法）
@@ -173,22 +174,22 @@ class MismatchReport:
         # 检查分类准确性
         df["exact"] = df["pred"] == df["true"]
         # 计算同类别内的差异
-        df["last"] = self._generate_last_column(df)
+        df["last"] = self._generate_last_column(df, shift=shift)
         df["diff"] = df["value"] - df["last"]
 
         # 创建错误分析矩阵
         self.diff_matrix = self._create_misclassification_matrix(df)
         self._analyzed = True
-        self._run_significance_test(mc_runs=mc_runs)
+        self._run_significance_test(mc_runs=mc_runs, shift=shift)
         return self.diff_matrix
 
-    def _generate_last_column(self, df: pd.DataFrame) -> pd.Series:
+    def _generate_last_column(self, df: pd.DataFrame, shift: int = 1) -> pd.Series:
         """生成上一次同类别的值"""
         df = df.copy()
         df["last"] = np.nan
         for c in df["true"].unique():
             mask = df["true"] == c
-            df.loc[mask, "last"] = df.loc[mask, "value"].shift(1)
+            df.loc[mask, "last"] = df.loc[mask, "value"].shift(shift)
         return df["last"]
 
     def _create_misclassification_matrix(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -212,7 +213,7 @@ class MismatchReport:
         # 确保所有等级都存在
         return pivot_matrix.reindex(index=LEVELS, columns=LEVELS, fill_value=np.nan)
 
-    def _run_significance_test(self, mc_runs: int = 1000):
+    def _run_significance_test(self, mc_runs: int = 1000, shift: int = 1):
         """运行蒙特卡洛显著性检验"""
         logger.info("开始蒙特卡洛模拟 (n=%d)", mc_runs)
 
@@ -234,7 +235,7 @@ class MismatchReport:
 
             # 计算差异矩阵
             random_df["exact"] = random_df["pred"] == random_df["true"]
-            random_df["last"] = self._generate_last_column(random_df)
+            random_df["last"] = self._generate_last_column(random_df, shift=shift)
             random_df["diff"] = random_df["value"] - random_df["last"]
 
             diff_matrix = self._create_misclassification_matrix(random_df)

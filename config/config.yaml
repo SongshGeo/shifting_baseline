@@ -45,3 +45,4 @@ low_pass:
   window_size: 30
   method: rolling_mean  # rolling_mean, gaussian, butterworth
   center: true
+

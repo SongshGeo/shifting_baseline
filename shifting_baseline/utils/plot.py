@@ -24,7 +24,7 @@ from pyproj import CRS
 from sklearn.metrics import root_mean_squared_error
 
 from shifting_baseline.constants import LEVELS, TICK_LABELS
-from shifting_baseline.utils.calc import fill_star_matrix, get_coords, low_pass_filter
+from shifting_baseline.utils.calc import fill_star_matrix, low_pass_filter
 
 
 def is_significant(p_value: float, threshold: float = 0.1) -> bool:
@@ -127,10 +127,12 @@ def plot_confusion_matrix(
         square=True,
         linewidths=2,
         linecolor="white",
-        cbar_kws={"shrink": 0.6, "label": "Mismatches"},
+        cbar_kws={"shrink": 0.6, "label": "Number of Mismatches"},
         mask=mask | zero_mask,  # 对角线不显示颜色
         **kwargs,
     )
+    ax.figure.axes[-1].yaxis.label.set_size(9)
+    ax.figure.axes[-1].yaxis.set_ticks(np.arange(0, 31, 10))
 
     # 手动在对角线上写黑色数字
     for i in range(len(cm_df)):
@@ -151,8 +153,8 @@ def plot_confusion_matrix(
     ax.grid(True, linestyle=":", color="gray", alpha=0.3)
     ax.set_xticklabels(TICK_LABELS)
     ax.set_yticklabels(TICK_LABELS)
-    ax.set_xlabel("Natural")
-    ax.set_ylabel("Recorded")
+    ax.set_xlabel("Natural Proxies")
+    ax.set_ylabel("Historical Archives")
     if title is not None:
         ax.set_title(title, fontsize=9)
     return ax
@@ -222,6 +224,7 @@ def plot_corr_heatmap(
         cbar_kws={
             # "location": "bottom",  # 移到上方
             "pad": 0.05,  # 调整间距
+            "shrink": 0.7,
         },
         ax=ax,
         square=True,
@@ -249,49 +252,6 @@ def plot_corr_heatmap(
         cbar.ax.set_yticks(np.linspace(v_min, v_max, 5))
         # 2位小数点
         cbar.ax.set_yticklabels([f"{v:.2f}" for v in np.linspace(v_min, v_max, 5)])
-
-    # 绘制对角线
-    # min_period = filtered.index.values.min()
-    # max_period = filtered.index.values.max()
-    # min_window = filtered.columns.values.min()
-    # max_window = filtered.columns.values.max()
-    # ax.plot(
-    #     [min_window, max_period],
-    #     [min_period, max_window],
-    #     color="black",
-    #     linestyle=":",
-    #     linewidth=1,
-    #     label="window = period",
-    # )
-
-    # # 标记最大值点
-    # std_value = np.nanstd(filtered)
-    # lower_bound = v_max - std_offset * std_value
-    # points = get_coords(filtered >= lower_bound)
-
-    # for i, point in enumerate(points):
-    #     if i == 0:
-    #         ax.scatter(
-    #             point[1],
-    #             point[0],
-    #             s=10,
-    #             c="r",
-    #             alpha=0.8,
-    #             label=f"~Max: {v_max:.2f} - {std_offset:.2f}σ",
-    #         )
-    #     else:
-    #         ax.scatter(point[1], point[0], s=10, c="r", alpha=0.8)
-    #     ax.axvline(point[1], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
-    #     ax.axhline(point[0], color="lightgray", linestyle="--", alpha=0.8, lw=0.5)
-
-    # 将图例移到上方
-    ax.legend(
-        loc="lower right",
-        bbox_to_anchor=(0.5, 1.15),  # 移到图的上方
-        ncol=2,  # 水平排列
-        fontsize=8,
-        frameon=False,  # 去掉边框
-    )
     return ax
 
 
@@ -399,7 +359,7 @@ def plot_mismatch_matrix(
     ax.set_ylim(-2.5, 2.5)
     ax.set_yticks(np.arange(-2, 2.1, 1))
     ax.set_xticks([0, 1])
-    ax.set_xticklabels(["Natural", "Recorded"])
+    ax.set_xticklabels(["Natural", "Historical"])
     ax.set_yticklabels(TICK_LABELS)
     sns.despine(ax=ax, left=False, right=False, top=False, bottom=False)
 
@@ -410,7 +370,7 @@ def plot_mismatch_matrix(
     cbar = plt.colorbar(sm, ax=ax, orientation="horizontal", pad=0.18, fraction=0.15)
     # cbar.set_label('Standardized difference', labelpad=8, fontsize=10, loc='center')
     cbar.ax.xaxis.set_label_position("bottom")  # 标签放到上方
-    cbar.ax.set_xlabel("Std. diff. between last/current")
+    cbar.ax.set_xlabel("WDIs' diff. (current - last)")
 
     # 不显示轴线
     ax.spines["top"].set_visible(False)
@@ -426,7 +386,7 @@ def plot_mismatch_matrix(
     ax.text(
         0.5, 2.5, "Expected diff. = 0", color="gray", fontsize=9, ha="center", va="top"
     )
-    ax.set_xlabel("Recorded level diff.")
+    ax.set_xlabel("Wet/Dry Index diff.", fontsize=9)
 
     return ax
 
