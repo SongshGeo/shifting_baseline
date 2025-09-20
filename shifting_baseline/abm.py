@@ -352,7 +352,7 @@ class ClimateObserver(Actor):
 
         The observer:
         - Updates memory with current climate.
-        - If the observer is old enough, it perceives the climate and decides whether to record an event. When it records an event, it will be re-judged based on collective memory (mode).
+        - If the observer is old enough, it perceives the climate and decides whether to record an event.
         - If the observer is too old, it dies.
         """
         climate = self.model.climate_now
@@ -361,7 +361,7 @@ class ClimateObserver(Actor):
         if self.age() < self._min_age:
             return
         z_score = self.perceive(climate)
-        # If the observer records an event, it will be re-judged based on collective memory (mode)
+        # If the observer records an event, classify and archive it
         if self.write_down(z_score):
             extreme_level = classify_single_value(z_score)
             self.model.archive_it(extreme_level)
