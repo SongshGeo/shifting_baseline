@@ -284,6 +284,7 @@ class TestMismatchReportStatistics:
             "accuracy",
             "n_samples",
             "n_raw_samples",
+            "n_mismatches",
         }
         assert set(stats_dict.keys()) == expected_keys
         assert all(

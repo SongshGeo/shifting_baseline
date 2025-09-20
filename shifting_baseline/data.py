@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import logging
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal, Optional, Tuple, overload
@@ -46,7 +45,9 @@ if TYPE_CHECKING:
         ToStdMethod,
     )
 
-log = logging.getLogger(__name__)
+from shifting_baseline.utils.log import get_logger
+
+log = get_logger(__name__)
 # 常用的分布
 common_distributions = get_common_distributions()
 common_distributions.append("t")
@@ -940,7 +941,7 @@ def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRe
             start_year=start_year,
         )
     else:
-        log.info("加载本地自然数据 ...")
+        log.info("从文件加载处理后的自然数据 ...")
         datasets = pd.read_csv(cfg.ds.out.tree_ring, index_col=0)
         uncertainties = pd.read_csv(cfg.ds.out.tree_ring_uncertainty, index_col=0)
     log.info("加载历史数据 ...")

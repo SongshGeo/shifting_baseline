@@ -5,7 +5,8 @@ processed: ${ds.root}/data
 multirun: ${ds.root}/multirun
 
 # 最终作图输出目录
-figs: /Users/songshgeo/Documents/SongshGeo/Outputs/ColMemo_MS/figs
+longform: /Users/songshgeo/Documents/SongshGeo/Outputs/ColMemo_MS
+figs: ${ds.longform}/figs
 
 # 其它数据文件夹
 data: /Users/songshgeo/Documents/Datasets
@@ -62,8 +63,11 @@ out:
   tree_ring_uncertainty: ${ds.processed}/combined_uncertainty.csv
 
 
-fig1: ${ds.figs}/CollMemo_figure1.png
+# Figure 1: QGIS 制作
 fig2: ${ds.figs}/CollMemo_figure2.png
 fig3: ${ds.figs}/CollMemo_figure3.png
 fig4: ${ds.figs}/CollMemo_figure4.png
 fig5: ${ds.figs}/CollMemo_figure5.png
+
+# 报告数据
+results: ${ds.longform}/results.json

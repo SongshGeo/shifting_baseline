@@ -29,7 +29,9 @@ if TYPE_CHECKING:
     from geo_dskit.core.types import PathLike
 
 
-log = logging.getLogger(__name__)
+from shifting_baseline.utils.log import get_logger
+
+log = get_logger(__name__)
 
 __all__ = [
     "open_dataarray",

@@ -307,6 +307,7 @@ class MismatchReport:
             "accuracy": accuracy,
             "n_samples": self.n_samples,
             "n_raw_samples": self.n_raw_samples,
+            "n_mismatches": self.n_mismatches,
         }
 
         if as_str:
@@ -321,8 +322,10 @@ class MismatchReport:
         """绘制混淆矩阵"""
         if title is None:
             title = self.get_statistics_summary(as_str=True)
-
-        return plot_confusion_matrix(cm_df=self.cm_df, title=title, ax=ax)
+        ax = plot_confusion_matrix(cm_df=self.cm_df, title=title, ax=ax)
+        ax.spines["bottom"].set_visible(True)
+        ax.spines["left"].set_visible(True)
+        return ax
 
     def plot_mismatch_analysis(self, ax: plt.Axes | None = None) -> plt.Axes:
         """绘制不匹配分析图"""
@@ -330,6 +333,8 @@ class MismatchReport:
             raise ValueError("需要先调用 analyze_error_patterns() 进行错误分析")
         if self.n_mismatches == 0:
             logger.warning("没有发现分类错误，无法绘制不匹配分析图")
+            if ax is None:
+                fig, ax = plt.subplots(figsize=(2, 3.5))
             return ax
         return plot_mismatch_matrix(
             actual_diff_aligned=self.diff_matrix,

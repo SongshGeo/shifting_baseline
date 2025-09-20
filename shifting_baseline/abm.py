@@ -35,7 +35,9 @@ from shifting_baseline.utils.email import send_notification_email
 if TYPE_CHECKING:
     from shifting_baseline.utils.types import CorrFunc
 
-log = logging.getLogger(__name__)
+from shifting_baseline.utils.log import get_logger
+
+log = get_logger(__name__)
 
 
 class ClimateObservingModel(MainModel):

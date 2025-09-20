@@ -17,7 +17,9 @@ from scipy import stats
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 
-log = logging.getLogger(__name__)
+from shifting_baseline.utils.log import get_logger
+
+log = get_logger(__name__)
 
 
 def _identify_variable_types(

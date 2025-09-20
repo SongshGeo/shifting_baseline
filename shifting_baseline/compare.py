@@ -8,7 +8,6 @@
 """对比两个序列的相关性"""
 from __future__ import annotations
 
-import logging
 from functools import partial
 from typing import TYPE_CHECKING, Callable, Literal
 
@@ -22,8 +21,10 @@ from shifting_baseline.utils.plot import plot_corr_heatmap
 if TYPE_CHECKING:
     from shifting_baseline.utils.types import CorrFunc, FilterSide
 
+from shifting_baseline.utils.log import get_logger
+
 # A logger for this file
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 def compare_corr(
