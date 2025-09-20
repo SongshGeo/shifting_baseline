@@ -522,7 +522,7 @@ def plot_std_times(
 @with_axes(figsize=(8, 3.5))
 def plot_correlation_windows(
     max_corr_year: list[np.ndarray],
-    max_corr: list[np.ndarray],
+    max_corr_improvment: list[np.ndarray],
     mid_years: list[int],
     slice_labels: list[str] | None = None,
     ax: Optional[Axes] = None,
@@ -534,8 +534,8 @@ def plot_correlation_windows(
     -----------
     max_corr_year : list of arrays
         每个时间窗口的最大相关性年份数据
-    max_corr : list of arrays
-        每个时间窗口的最大相关性值数据
+    max_corr_improvment : list of arrays
+        每个时间窗口的最大相关性改进值数据
     slice_labels : list, optional
         时间窗口标签
     figsize : tuple
@@ -548,16 +548,16 @@ def plot_correlation_windows(
 
     # 过滤负相关性，转换为改进百分比
     corr_improvements = []
-    for arr in max_corr:
-        mean_corr = arr.mean()
-        corr_improvements.append(mean_corr * 100 if mean_corr >= 0 else np.nan)
+    for improved_ratio in max_corr_improvment:
+        mean_improvement = improved_ratio.mean()
+        corr_improvements.append(mean_improvement if mean_improvement >= 0 else np.nan)
 
-    corr_improvements = np.array(corr_improvements)
+    corr_improvements = np.array(corr_improvements) * 100
     valid_mask = ~np.isnan(corr_improvements)
 
     # 设置颜色映射
     if np.any(valid_mask):
-        vmin, vmax = 0, np.nanmax(corr_improvements) + 0.01
+        vmin, vmax = 0, np.nanmax(corr_improvements) + 1
         # 确保 vmax > vmin 避免颜色映射问题
         if vmax <= vmin:
             vmax = vmin + 1

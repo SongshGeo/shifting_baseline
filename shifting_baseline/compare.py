@@ -264,13 +264,14 @@ def sweep_max_corr_year(
     min_periods: np.ndarray,
     ratio: float = 0.1,
     **compare_kwargs,
-) -> tuple[list, list]:
+) -> tuple[list, list, list]:
     """
     遍历所有切片，计算相关性系数，并返回最大相关性系数和对应的窗口
     """
     assert 0 < ratio < 1, "ratio must be between 0 and 1"
     max_corr = []
     max_corr_year = []
+    r_benchmark_list = []
     for slice_now in slices:
         base_corr = compare_corr(
             data1.loc[slice_now],
@@ -278,6 +279,7 @@ def sweep_max_corr_year(
             **compare_kwargs,
         )
         r_benchmark = base_corr[0]
+        r_benchmark_list.append(r_benchmark)
         rs, _, _ = compare_corr_2d(
             data1=data1.loc[slice_now],
             data2=data2.loc[slice_now],
@@ -288,6 +290,6 @@ def sweep_max_corr_year(
         assert isinstance(rs, np.ndarray), "rs must be a numpy array"
         top_max_indices = find_top_max_indices(rs, ratio)
         max_corr_year.append(top_max_indices)
-        max_corr.append((rs[top_max_indices] - r_benchmark) / r_benchmark)
+        max_corr.append(rs[top_max_indices])
 
-    return max_corr_year, max_corr
+    return max_corr_year, max_corr, r_benchmark_list
