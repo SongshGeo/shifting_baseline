@@ -27,7 +27,7 @@ test_mode: false
 # 中间变量数据的路径为 {ds.processed}/*.csv
 # 可以在 ds/mac.yaml 中配置需要重新计算的数据
 # 如果需要重新计算数据，则将 recalculate_data 设置为 true
-recalculate_data: false
+recalculate_data: true
 
 # 相关性计算方法
 corr_method: kendall
@@ -45,4 +45,3 @@ low_pass:
   window_size: 30
   method: rolling_mean  # rolling_mean, gaussian, butterworth
   center: true
-

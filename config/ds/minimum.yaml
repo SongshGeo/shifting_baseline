@@ -47,14 +47,14 @@ includes:
 - "li2015b"  # not good
 - "li2019a"  # not good
 - "liu2020"  # not good
-- "shi2017"
-- "shi2018"
-- "tan2011"  # not good
+# - "shi2017"
+# - "shi2018"
+# - "tan2011"  # not good
 - "xu2023c"  # great
 - "yang2016"  # great
 # - "yang2019d"  # terrible
-- "yi2010"  # very good
-- "yi2012"  # very good
+# - "yi2010"  # very good
+# - "yi2012"  # very good
 
 out:
   tree_ring: ${ds.processed}/combined_mean.csv

@@ -13,6 +13,7 @@ from typing import Optional
 import geopandas as gpd
 import matplotlib as mpl
 import matplotlib.cm as cm
+import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -20,11 +21,20 @@ import seaborn as sns
 import xarray as xr
 from matplotkit import with_axes
 from matplotlib.axes import Axes
+from matplotlib.gridspec import GridSpec
+from mksci_font import config_font
 from pyproj import CRS
 from sklearn.metrics import root_mean_squared_error
 
 from shifting_baseline.constants import LEVELS, TICK_LABELS
-from shifting_baseline.utils.calc import fill_star_matrix, low_pass_filter
+from shifting_baseline.utils.calc import calc_corr, fill_star_matrix, low_pass_filter
+
+# 全局设置
+# 设置seaborn风格
+sns.set_style("ticks")
+sns.set_context("paper")
+# 设置字体大小
+config_font({"font.size": 9})
 
 
 def is_significant(p_value: float, threshold: float = 0.1) -> bool:
@@ -841,7 +851,6 @@ def plot_corr_map(
     base_maps: dict[str, str] | None = None,
     crs: str | None | CRS = None,
     add_colorbar: bool = True,
-    **kwargs,
 ) -> plt.Axes:
     """绘制相关性地图
 
@@ -911,3 +920,102 @@ def plot_corr_map(
     ax.set_title("")  # 清空标题
     ax.set_xlabel("")  # 清空x轴标签
     return ax
+
+
+def plot_spatial_corr_panels(
+    datasets, summer_precip_z, crs=None, base_maps=None
+) -> plt.Figure:
+    """使用seaborn风格绘制相关性地图"""
+    if base_maps is None:
+        base_maps = {}
+    if crs is None:
+        assert hasattr(
+            summer_precip_z, "rio"
+        ), "summer_precip_z must have rio attribute"
+        crs = summer_precip_z.rio.crs
+
+    n_datasets = len(datasets.columns)
+    ncols = 3
+    nrows = (n_datasets + ncols - 1) // ncols
+
+    # 创建图形和网格 - 为colorbar预留空间
+    fig = plt.figure(figsize=(8.2, 2.2 * nrows))
+    gs = GridSpec(
+        nrows,
+        ncols + 1,
+        figure=fig,
+        hspace=0,
+        wspace=0.02,
+        width_ratios=[1, 1, 1, 0.08],
+    )  # 最后一列给colorbar
+
+    for idx, col in enumerate(datasets.columns):
+        row = idx // ncols
+        col_idx = idx % ncols
+
+        # 创建子图
+        ax = fig.add_subplot(gs[row, col_idx])
+
+        # 计算相关性
+        series = datasets[col].to_xarray()
+        common_years = np.intersect1d(series.year.values, summer_precip_z.year.values)
+
+        corr = xr.apply_ufunc(
+            calc_corr,
+            summer_precip_z.sel(year=common_years),
+            series.sel(year=common_years),
+            input_core_dims=[["year"], ["year"]],
+            output_core_dims=[[], [], []],
+            vectorize=True,
+            output_dtypes=[float, float, int],
+        )
+
+        # 绘制地图 - 禁用单个colorbar
+        plot_corr_map(
+            corr[0],
+            corr[1],
+            threshold=0.1,
+            ax=ax,
+            mask=False,
+            add_colorbar=False,
+            base_maps=base_maps,
+            crs=crs,
+        )
+
+        # 设置数据集名称
+        label = chr(ord("`") + 1 + idx) + ". " + col
+        ax.text(75, 20, label, ha="left", va="center", fontsize=9)
+
+        # seaborn风格的坐标轴设置
+        ax.tick_params(labelsize=8, direction="in", length=3)
+
+        # 只在边缘显示标签
+        if row == nrows - 1:  # 最后一行
+            ax.set_xlabel("Longitude", fontsize=9)
+        if col_idx == 0:  # 第一列
+            ax.set_ylabel("Latitude", fontsize=9)
+
+    # 添加共享colorbar - 使用简单的mappable方法
+    cbar_ax = fig.add_subplot(gs[-1, -1])
+
+    # 创建简单的mappable对象
+    norm = colors.Normalize(vmin=-0.5, vmax=0.5)
+    sm = cm.ScalarMappable(cmap="RdBu_r", norm=norm)
+    sm.set_array([])
+
+    # 创建colorbar
+    cbar = plt.colorbar(
+        sm,
+        cax=cbar_ax,
+        shrink=0.6,
+        aspect=20,
+        pad=0.1,
+    )
+    cbar.set_label(
+        "Pearson Correlation Coefficient",
+        fontsize=9,
+        labelpad=5,
+    )
+    cbar.ax.tick_params(labelsize=8)
+
+    return fig

@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Callable, Literal, Optional, Tuple, overload
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import rioxarray as rxr
 import xarray as xr
 from fitter import Fitter, get_common_distributions
 from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
@@ -33,7 +32,7 @@ from shifting_baseline.constants import (
     STD_THRESHOLDS,
 )
 from shifting_baseline.filters import classify
-from shifting_baseline.mc import standardize_both
+from shifting_baseline.mc import combine_reconstructions, standardize_both
 from shifting_baseline.utils.calc import calc_corr, rand_generate_from_std_levels
 
 if TYPE_CHECKING:
@@ -197,13 +196,17 @@ class HistoricalRecords:
     def _setup_level_data(self, to_level: bool, to_std: Optional[ToStdMethod]):
         """处理对称等级和标准化"""
         if to_level:
+            log.info("处理为对称等级 ...")
             self._data = 3 - self._data
         if to_std is None:
             return
         assert to_level, "to_std 必须设置 to_level 同时为 True"
+        log.info("处理为标准化等级 ...")
         if to_std == "mapping":
+            log.info("通过映射表处理为标准化等级 ...")
             self._data = self._data.replace(MAP)
         elif to_std == "sampling":
+            log.info("通过随机采样处理为标准化等级，生成 100 个样本 ...")
             data = rand_generate_from_std_levels(
                 self._data,
                 mu=0.0,
@@ -909,20 +912,67 @@ class HistoricalRecords:
         return pd.Series(levels, index=data.columns, name="levels")
 
 
-def load_validation_data(data_path: PathLike, resolution: float = 0.25) -> xr.DataArray:
+def regional_precip_z(
+    summer_precip: xr.DataArray, sel_dict: Optional[dict] = None
+) -> pd.Series:
+    """计算区域降水 z-score"""
+    if sel_dict is None:
+        sel_dict = {}
+    series = summer_precip.sel(sel_dict).mean(dim=["x", "y"]).to_series()
+    return (series - series.mean()) / series.std()
+
+
+def load_validation_data(
+    data_path: PathLike,
+    resolution: float = 0.25,
+    crs: str = "EPSG:4326",
+    recalculate_zscore: bool = False,
+    nc_save_to: PathLike | None = None,
+    regional_csv: PathLike | None = None,
+    sel_dict: Optional[dict] = None,
+) -> xr.DataArray:
     """加载验证数据
 
     Args:
         data_path: 数据路径
-
+        resolution: 分辨率
+        crs: 坐标系
+        recalculate_zscore: 是否重新计算zscore
     Returns:
         pd.DataFrame: 验证数据
     """
-    summer_precip = rxr.open_rasterio(data_path)
-    return summer_precip.rio.reproject(
-        dst_crs="EPSG:4326",
+    log.info("从 %s 加载验证数据 ...", data_path)
+    if recalculate_zscore is False:
+        log.info("从文件加载处理后的 z-score 验证数据 ...")
+        summer_precip_z = xr.open_dataarray(data_path).rio.write_crs(crs)
+        resolution_loaded = summer_precip_z.rio.resolution()[0]
+        if resolution_loaded != resolution:
+            log.warning("加载的数据分辨率是: %s，与期望的分辨率: %s 不一致！", resolution_loaded, resolution)
+        log.info("从 %s 加载区域降水 z-score 验证数据 ...", regional_csv)
+        regional_z = pd.read_csv(regional_csv, index_col=0)["pre"]
+        return summer_precip_z, regional_z
+    log.info("加载原始验证数据（非 z-score） ...")
+    summer_precip = xr.open_dataarray(data_path).rio.set_spatial_dims("lon", "lat")
+    summer_precip.rio.write_crs(crs, inplace=True)
+    log.debug("验证数据形状: %s", summer_precip.shape)
+    log.debug("验证数据分辨率: %s", str(summer_precip.rio.resolution()))
+    reprojected = summer_precip.rio.reproject(
+        dst_crs=crs,
         resolution=resolution,
     )
+    log.info("对原始数据计算 z-score ...")
+    regional_z = regional_precip_z(reprojected, sel_dict)
+    summer_precip_z = (reprojected - reprojected.mean(dim="year")) / reprojected.std(
+        dim="year"
+    )
+    summer_precip_z.name = "summer_precip_z"
+    if nc_save_to is not None:
+        log.info("保存 z-score 验证数据到 %s ...", nc_save_to)
+        summer_precip_z.to_netcdf(nc_save_to)
+    if regional_csv is not None:
+        log.info("保存区域降水 z-score 验证数据到 %s ...", regional_csv)
+        regional_z.to_csv(regional_csv)
+    return summer_precip_z, regional_z
 
 
 def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRecords]:
@@ -940,6 +990,7 @@ def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRe
             index_name="year",
             start_year=start_year,
         )
+        datasets, _ = combine_reconstructions(datasets, uncertainties, standardize=True)
     else:
         log.info("从文件加载处理后的自然数据 ...")
         datasets = pd.read_csv(cfg.ds.out.tree_ring, index_col=0)
