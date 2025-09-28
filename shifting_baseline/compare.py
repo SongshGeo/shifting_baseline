@@ -23,8 +23,8 @@ if TYPE_CHECKING:
 
 from shifting_baseline.utils.log import get_logger
 
-# A logger for this file
-log = get_logger(__name__)
+# 使用主logger，避免重复设置
+log = get_logger()
 
 
 def compare_corr(
@@ -219,6 +219,10 @@ def experiment_corr_2d(
         std_offset=std_offset,
         ax=ax,
     )
+    max_corr = np.nanmax(filtered)
+    improvement = (max_corr - r_benchmark) / r_benchmark * 100
+    log.info("最大相关性系数: %.5f，改进百分比: %.2f%%", max_corr, float(improvement))
+    log.info("最大相关性系数年份: %s", float(filtered_df.idxmax().max()))
     ax.set_title(f"{corr_method.capitalize()} Corr. Coef.")
     return filtered_df, r_benchmark, ax
 
@@ -265,7 +269,7 @@ def sweep_max_corr_year(
     min_periods: np.ndarray,
     ratio: float = 0.1,
     **compare_kwargs,
-) -> tuple[list, list, list]:
+) -> tuple[list, list, list, list]:
     """
     遍历所有切片，计算相关性系数，并返回最大相关性系数和对应的窗口
     """
@@ -273,13 +277,15 @@ def sweep_max_corr_year(
     max_corr = []
     max_corr_year = []
     r_benchmark_list = []
+    p_value_list = []
     for slice_now in slices:
-        base_corr = compare_corr(
+        r_benchmark, p_value, _ = compare_corr(
             data1.loc[slice_now],
             data2.loc[slice_now],
+            window_error="nan",
             **compare_kwargs,
         )
-        r_benchmark = base_corr[0]
+        p_value_list.append(p_value)
         r_benchmark_list.append(r_benchmark)
         rs, _, _ = compare_corr_2d(
             data1=data1.loc[slice_now],
@@ -293,4 +299,4 @@ def sweep_max_corr_year(
         max_corr_year.append(top_max_indices)
         max_corr.append(rs[top_max_indices])
 
-    return max_corr_year, max_corr, r_benchmark_list
+    return max_corr_year, max_corr, r_benchmark_list, p_value_list

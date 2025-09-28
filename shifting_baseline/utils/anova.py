@@ -19,7 +19,8 @@ from statsmodels.stats.anova import anova_lm
 
 from shifting_baseline.utils.log import get_logger
 
-log = get_logger(__name__)
+# 使用主logger，避免重复设置
+log = get_logger()
 
 
 def _identify_variable_types(

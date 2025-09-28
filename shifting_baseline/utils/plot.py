@@ -334,7 +334,7 @@ def plot_mismatch_matrix(
     assert isinstance(ax, Axes), "ax must be an instance of Axes"
 
     # 1. 设置渐变色和归一化
-    vmax = np.nanmean(np.abs(actual_diff_aligned.values)) * 1.2
+    vmax = np.nanmean(np.abs(actual_diff_aligned.values)) * 1.1
     cmap = mpl.cm.coolwarm  # 或 mpl.cm.RdBu
     # 使用线性归一化，对于对称的数据分布更合适
     norm = mpl.colors.Normalize(vmin=-vmax, vmax=vmax)
@@ -534,6 +534,7 @@ def plot_correlation_windows(
     max_corr_improvment: list[np.ndarray],
     mid_years: list[int],
     slice_labels: list[str] | None = None,
+    p_value_list: list[float] | None = None,
     ax: Optional[Axes] = None,
 ) -> Axes:
     """
@@ -557,19 +558,23 @@ def plot_correlation_windows(
 
     # 过滤负相关性，转换为改进百分比
     corr_improvements = []
-    for improved_ratio in max_corr_improvment:
-        mean_improvement = improved_ratio.mean()
-        corr_improvements.append(mean_improvement if mean_improvement >= 0 else np.nan)
+    for improved in max_corr_improvment:
+        mean_improvement = improved.mean()
+        if mean_improvement < 0:
+            corr_improvements.append(np.nan)
+        if mean_improvement > 1:
+            corr_improvements.append(np.nan)
+        corr_improvements.append(mean_improvement)
 
-    corr_improvements = np.array(corr_improvements) * 100
+    corr_improvements = np.array(corr_improvements)
     valid_mask = ~np.isnan(corr_improvements)
 
     # 设置颜色映射
     if np.any(valid_mask):
-        vmin, vmax = 0, np.nanmax(corr_improvements) + 1
+        vmin, vmax = 0, np.nanmax(corr_improvements)
         # 确保 vmax > vmin 避免颜色映射问题
         if vmax <= vmin:
-            vmax = vmin + 1
+            vmax = vmin + 0.1
     else:
         vmin, vmax = 0, 1
 
@@ -620,7 +625,15 @@ def plot_correlation_windows(
                 elinewidth=2,
                 markersize=8,
             )
-
+        if p_value_list is not None:
+            ax.text(
+                mid,
+                0,
+                get_marker(p_value_list[i]),
+                fontsize=8,
+                ha="center",
+                va="bottom",
+            )
         i += 1
 
     # 添加趋势线
@@ -653,7 +666,7 @@ def plot_correlation_windows(
         sm.set_array(valid_improvements)  # 设置实际数据数组
 
         cbar = plt.colorbar(sm, ax=ax)
-        cbar.set_label("Avg. Improvement of $Tau$ (%)", rotation=270, labelpad=15)
+        cbar.set_label("Avg. Improvement of $Tau$", rotation=270, labelpad=15)
     lims = ax.get_xlim()
     ax.set_xlim(lims)
     ax.spines["top"].set_visible(False)

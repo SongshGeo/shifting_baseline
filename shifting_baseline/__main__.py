@@ -9,10 +9,6 @@
 shifting_baseline 是一个用于对比历史集体记忆和气候重建资料的 Python 库。
 """
 
-import logging
-from typing import TYPE_CHECKING
-
-import matplotlib.pyplot as plt
 import numpy as np
 from hydra import main
 from omegaconf import DictConfig
@@ -26,16 +22,10 @@ from shifting_baseline.compare import (
 from shifting_baseline.constants import END, STAGE1
 from shifting_baseline.data import load_data, load_validation_data
 from shifting_baseline.filters import calc_std_deviation, classify
-from shifting_baseline.mc import combine_reconstructions
 from shifting_baseline.process import batch_process_recon_data
 from shifting_baseline.utils.config import format_by_config, get_output_dir
 from shifting_baseline.utils.log import get_logger, setup_logger_from_hydra
 from shifting_baseline.utils.plot import plot_correlation_windows
-
-if TYPE_CHECKING:
-    from geo_dskit.utils.path import PathLike
-
-    from shifting_baseline.utils.types import Stages
 
 __version__ = "0.1.0"
 __all__ = [
@@ -74,10 +64,13 @@ def _main(cfg: DictConfig | None = None):
     log.info("实验开始，配置文件请参看 %s", out_dir / ".hydra/config.yaml")
     log.info("Step 1: 加载数据 ...")
     combined, uncertainties, history = load_data(cfg)
+    best_val_data = cfg.using_val_data
+    ds = cfg.ds.validation[best_val_data]
     _, regional_prec_z = load_validation_data(
-        cfg.ds.out.precip_z,
+        data_path=ds.nc,
+        nc_save_to=ds.z_nc,
         resolution=cfg.resolution,
-        regional_csv=cfg.ds.out.regional_csv,
+        csv_save_to=ds.csv,
     )
     # log.info("Step 2: 整合树轮数据")
     log.info("Step 3: 比较每个树轮数据")
@@ -134,7 +127,7 @@ def _main(cfg: DictConfig | None = None):
     )
 
     data1, data2 = history.merge_with(combined["mean"], split=True)
-    max_corr_year, max_corr, r_benchmark_list = sweep_max_corr_year(
+    max_corr_year, max_corr, r_benchmark_list, p_value_list = sweep_max_corr_year(
         data1=data1,
         data2=data2,
         slices=slices,
@@ -153,6 +146,7 @@ def _main(cfg: DictConfig | None = None):
         max_corr_improvment,
         mid_year,
         slice_labels,
+        p_value_list=p_value_list,
     )
     ax.figure.savefig(out_dir / "correlation_windows.png")
 

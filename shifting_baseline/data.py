@@ -46,7 +46,8 @@ if TYPE_CHECKING:
 
 from shifting_baseline.utils.log import get_logger
 
-log = get_logger(__name__)
+# 使用主logger，避免重复设置
+log = get_logger()
 # 常用的分布
 common_distributions = get_common_distributions()
 common_distributions.append("t")
@@ -231,13 +232,30 @@ class HistoricalRecords:
         lon_name: str = "lon",
         lat_name: str = "lat",
         resolution: float | None = None,
+        lat_monotonic_increasing: bool = True,
     ) -> dict[str, slice]:
-        """获取所有数据点的范围"""
+        """获取所有数据点的范围
+
+        Args:
+            lon_name: 经度名称
+            lat_name: 纬度名称
+            resolution: 分辨率
+            lat_monotonic_increasing: 纬度是否单调递增。同样的区域，有的要“正着”切，有的要“反着”切，这不是数据值不同，而是坐标排序不同（常见于不同机构/产品的 CF-Conventions 写法差异）。
+                - 如果为 True，则纬度范围为从最小纬度到最大纬度
+                - 如果为 False，则纬度范围为从最大纬度到最小纬度
+        Returns:
+            dict[str, slice]: 范围
+                - lon_name: 经度范围
+                - lat_name: 纬度范围
+        """
         mins = self.shp.bounds.min()
         maxs = self.shp.bounds.max()
-
+        if lat_monotonic_increasing:
+            lat_slice = slice(mins.miny, maxs.maxy, resolution)
+        else:
+            lat_slice = slice(maxs.maxy, mins.miny, resolution)
         return {
-            lat_name: slice(maxs.maxy, mins.miny, resolution),
+            lat_name: lat_slice,
             lon_name: slice(mins.minx, maxs.maxx, resolution),
         }
 
@@ -913,23 +931,30 @@ class HistoricalRecords:
 
 
 def regional_precip_z(
-    summer_precip: xr.DataArray, sel_dict: Optional[dict] = None
+    summer_precip: xr.DataArray, sel_dict: Optional[dict | HistoricalRecords] = None
 ) -> pd.Series:
     """计算区域降水 z-score"""
     if sel_dict is None:
         sel_dict = {}
+    if isinstance(sel_dict, HistoricalRecords):
+        sel_dict = sel_dict.get_bounds(
+            lon_name="x",
+            lat_name="y",
+            lat_monotonic_increasing=summer_precip.indexes["y"].is_monotonic_increasing,
+        )
     series = summer_precip.sel(sel_dict).mean(dim=["x", "y"]).to_series()
+    series.name = "pre"
     return (series - series.mean()) / series.std()
 
 
 def load_validation_data(
     data_path: PathLike,
+    csv_save_to: PathLike,
+    nc_save_to: PathLike,
     resolution: float = 0.25,
     crs: str = "EPSG:4326",
     recalculate_zscore: bool = False,
-    nc_save_to: PathLike | None = None,
-    regional_csv: PathLike | None = None,
-    sel_dict: Optional[dict] = None,
+    sel_bound_by: Optional[dict | HistoricalRecords] = None,
 ) -> xr.DataArray:
     """加载验证数据
 
@@ -944,15 +969,33 @@ def load_validation_data(
     log.info("从 %s 加载验证数据 ...", data_path)
     if recalculate_zscore is False:
         log.info("从文件加载处理后的 z-score 验证数据 ...")
+        assert Path(csv_save_to).exists(), f"文件不存在: {csv_save_to}"
+        assert Path(data_path).exists(), f"文件不存在: {data_path}"
         summer_precip_z = xr.open_dataarray(data_path).rio.write_crs(crs)
         resolution_loaded = summer_precip_z.rio.resolution()[0]
         if resolution_loaded != resolution:
             log.warning("加载的数据分辨率是: %s，与期望的分辨率: %s 不一致！", resolution_loaded, resolution)
-        log.info("从 %s 加载区域降水 z-score 验证数据 ...", regional_csv)
-        regional_z = pd.read_csv(regional_csv, index_col=0)["pre"]
+        log.info("从 %s 加载区域降水 z-score 验证数据 ...", csv_save_to)
+        regional_z = pd.read_csv(csv_save_to, index_col=0)["pre"]
         return summer_precip_z, regional_z
+    # 重新计算 z-score
     log.info("加载原始验证数据（非 z-score） ...")
-    summer_precip = xr.open_dataarray(data_path).rio.set_spatial_dims("lon", "lat")
+    lower_data_path = data_path.lower()
+    if "china" in lower_data_path:
+        log.info("加载 China 数据 ...")
+        summer_precip = xr.open_dataarray(data_path).rio.set_spatial_dims("lon", "lat")
+    elif "gpcc" in lower_data_path:
+        log.info("加载 GPCC 数据 ...")
+        summer_precip = xr.open_dataset(data_path, decode_times=True, engine="netcdf4")[
+            "precip"
+        ].rio.set_spatial_dims("lon", "lat")
+    elif "cru" in lower_data_path:
+        log.info("加载 CRU 数据 ...")
+        summer_precip = xr.open_dataarray(
+            data_path, engine="netcdf4"
+        ).rio.set_spatial_dims("lon", "lat")
+    else:
+        raise ValueError(f"未知数据路径: {data_path}")
     summer_precip.rio.write_crs(crs, inplace=True)
     log.debug("验证数据形状: %s", summer_precip.shape)
     log.debug("验证数据分辨率: %s", str(summer_precip.rio.resolution()))
@@ -961,7 +1004,7 @@ def load_validation_data(
         resolution=resolution,
     )
     log.info("对原始数据计算 z-score ...")
-    regional_z = regional_precip_z(reprojected, sel_dict)
+    regional_z = regional_precip_z(reprojected, sel_bound_by)
     summer_precip_z = (reprojected - reprojected.mean(dim="year")) / reprojected.std(
         dim="year"
     )
@@ -969,9 +1012,9 @@ def load_validation_data(
     if nc_save_to is not None:
         log.info("保存 z-score 验证数据到 %s ...", nc_save_to)
         summer_precip_z.to_netcdf(nc_save_to)
-    if regional_csv is not None:
-        log.info("保存区域降水 z-score 验证数据到 %s ...", regional_csv)
-        regional_z.to_csv(regional_csv)
+    if csv_save_to is not None:
+        log.info("保存区域降水 z-score 验证数据到 %s ...", csv_save_to)
+        regional_z.to_csv(csv_save_to)
     return summer_precip_z, regional_z
 
 

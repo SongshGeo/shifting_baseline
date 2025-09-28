@@ -1,23 +1,9 @@
 defaults:
-- ds: mac
+- ds: pure
 - how: process
 - model: exp
 - override hydra/job_logging: log
 - _self_
-
-
-# # 历史记录数据的时间段
-# START = 1000
-# STAGE1 = 1469
-# STAGE2 = 1659
-# END = 1900
-# FINAL = 2010
-years:
-  start: 1000
-  stage1: 1469
-  stage2: 1659
-  end: 1900
-  final: 2010
 
 # Testing mode - when enabled, only test logging and exit
 # 测试模式 - 当启用时，仅测试日志并退出
@@ -27,7 +13,7 @@ test_mode: false
 # 中间变量数据的路径为 {ds.processed}/*.csv
 # 可以在 ds/mac.yaml 中配置需要重新计算的数据
 # 如果需要重新计算数据，则将 recalculate_data 设置为 true
-recalculate_data: true
+recalculate_data: false
 
 # 相关性计算方法
 corr_method: kendall
@@ -39,9 +25,19 @@ to_int: true
 resolution: 0.5
 to_std: sampling
 # 在相关性计算时，控制默认的最小样本数，至少为 3，但 5+ 计算 std 更合理
-min_period: 5
+min_period: 10
+# 前百分之 % 的最大值区间
+ratio: 0.05
 
 low_pass:
   window_size: 30
   method: rolling_mean  # rolling_mean, gaussian, butterworth
   center: true
+
+# 使用指定的校验数据
+using_val_data: 'china'  # china, gpcc, cru
+
+violin_windows:
+- 20
+- 40
+- 60

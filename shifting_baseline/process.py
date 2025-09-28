@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import gc
 import inspect
-import logging
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List
@@ -28,10 +27,10 @@ from xarray import DataArray, open_dataarray
 if TYPE_CHECKING:
     from geo_dskit.core.types import PathLike
 
+from shifting_baseline.utils.log import adjust_log_level, get_logger
 
-from shifting_baseline.utils.log import get_logger
-
-log = get_logger(__name__)
+log = get_logger()
+adjust_log_level(console_level="INFO", file_level="DEBUG")
 
 __all__ = [
     "open_dataarray",
@@ -177,10 +176,10 @@ def batch_process_recon_data(cfg: DictConfig):
 def load_and_combine_datasets_chunked(extract_dir, chunk_size=5):
     """Load netCDF files in chunks to reduce memory usage"""
     extract_path = Path(extract_dir)
-    nc_files = sorted(extract_path.glob("pre_*.nc"))
+    nc_files = sorted(extract_path.glob("*.nc"))
 
     if not nc_files:
-        raise FileNotFoundError("No netCDF files found in extract directory")
+        raise FileNotFoundError(f"No netCDF files found in {extract_path}")
 
     log.info("Found %d netCDF files to process", len(nc_files))
     log.info("Processing in chunks of %d files to optimize memory usage", chunk_size)
@@ -232,7 +231,7 @@ def load_and_combine_datasets_chunked(extract_dir, chunk_size=5):
 def load_and_combine_datasets_lazy(extract_dir):
     """Load netCDF files using lazy loading with dask for memory efficiency"""
     extract_path = Path(extract_dir)
-    nc_files = sorted(extract_path.glob("pre_*.nc"))
+    nc_files = sorted(extract_path.glob("*.nc"))
 
     if not nc_files:
         raise FileNotFoundError("No netCDF files found in extract directory")
@@ -340,16 +339,7 @@ def extract_summer_precipitation(dataset, aggregation="sum", agg_months=None):
     return summer_agg
 
 
-@main(config_path="../config", config_name="config", version_base=None)
-def _main(cfg: DictConfig | None = None):
-    assert cfg is not None, "cfg is None"
-    data_dir = cfg.ds.instrumental.input
-    output_file = cfg.ds.instrumental.output
-    agg_months = cfg.ds.instrumental.agg_months
-    agg_method = cfg.ds.instrumental.agg_method
-
-    log_memory_usage("at start")
-
+def process_gpcc_china(data_dir, output_file, agg_method, agg_months):
     try:
         # Step 1: Load and combine datasets
         log.info("Step 1: Loading and combining datasets...")
@@ -381,7 +371,7 @@ def _main(cfg: DictConfig | None = None):
             log.info("- Variables: %s", list(combined_ds.data_vars))
         else:
             log.info("- Variable: %s", combined_ds.name)
-        log.info("- Dimensions: %s", dict(combined_ds.dims))
+        log.info("- Dimensions: %s", dict(combined_ds.indexes))
 
         # Step 2: Extract summer precipitation
         log.info("Step 2: Extracting summer precipitation...")
@@ -428,6 +418,52 @@ def _main(cfg: DictConfig | None = None):
         log.error("Error: %s", e)
         log_memory_usage("at error")
         sys.exit(1)
+
+
+def process_cru(data_path, output_file, agg_method, agg_months):
+    """Process CRU data"""
+    summer_months = agg_months
+    data = xr.open_dataarray(data_path)
+    summer_data = data.sel(time=data.time.dt.month.isin(summer_months))
+    # 按年份分组并求和（得到每年6-9月的总降水量）
+    summer_total = summer_data.groupby(summer_data.time.dt.year).sum("time")
+    summer_total.to_netcdf(output_file)
+
+
+@main(config_path="../config", config_name="config", version_base=None)
+def _main(cfg: DictConfig | None = None):
+    assert cfg is not None, "cfg is None"
+
+    log_memory_usage("at start")
+    agg_months = cfg.ds.instrumental.agg_months
+    agg_method = cfg.ds.instrumental.agg_method
+    for name, data_path in cfg.ds.instrumental.input.items():
+        output_file = cfg.ds.instrumental.output[name]
+        log.info("Processing %s...", data_path)
+        if Path(output_file).exists():
+            log.warning("Output file for %s already exists...", name)
+            if cfg.recalculate_data is False:
+                log.warning("Recalculate is disabled, skipping...")
+                log.warning(
+                    "If you want to recalculate, set `recalculate_data` to True"
+                )
+                return
+            else:
+                log.info("Recalculating...")
+
+        assert Path(data_path).exists(), f"Data path not found: {data_path}"
+        if name == "cru":
+            log.info("Processing CRU data...")
+            process_cru(data_path, output_file, agg_method, agg_months)
+        elif name == "gpcc":
+            log.info("Processing GPCC data...")
+            process_gpcc_china(data_path, output_file, agg_method, agg_months)
+        elif name == "china":
+            log.info("Processing China data...")
+            process_gpcc_china(data_path, output_file, agg_method, agg_months)
+        else:
+            raise ValueError(f"Unknown data path: {name}")
+        log.info("Output to %s...", output_file)
 
 
 if __name__ == "__main__":

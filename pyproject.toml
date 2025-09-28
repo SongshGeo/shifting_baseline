@@ -37,6 +37,7 @@ fitter = "^1.7.1"
 abses = ">=0.7.5"
 python-dotenv = "^1.1.1"
 json-tricks = "^3.17.3"
+cftime = "^1.6.4.post1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"

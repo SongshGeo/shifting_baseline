@@ -1,3 +1,7 @@
+# 数据集配置
+setname: "best" # 数据集名称
+description: "和校验数据相关性最好的重建数据" # 数据集描述
+
 # 项目根目录
 root: /Users/songshgeo/Documents/VSCode/shifting_baseline
 # 项目数据目录
@@ -23,44 +27,62 @@ atlas:
   shp: ${ds.data}/中国历史千年旱涝数据/point.shp
   region: 华北地区
 
-spei:
-  folder: ${ds.data}/黄河流域SPEI干旱指数
-  pet: ${ds.spei.folder}/month_pet_0.1degree.nc
-  pr: ${ds.spei.folder}/month_pre_0.1degree.nc
-  pattern: ${ds.spei.folder}/spei_penman/spei_spei_{dist}_{freq}.nc
-
 # abm: ${ds.multirun}/2025-07-27/23-18-33  # 之前的
 abm: ${ds.multirun}/2025-09-11/15-46-18
 
 # 整合校验数据，提取夏季降水，并保存为nc文件
+# 用于计算自然数据，调用 process.py 脚本
 instrumental:
-  input: ${ds.data}/中国1900以来逐月降水
-  output: ${ds.processed}/JAS_precipitation_1900-2017.nc
+  input:
+    china: ${ds.data}/中国1900以来逐月降水
+    gpcc: ${ds.data}/全球1900年以来降水数据/GPCC_05deg
+    cru: ${ds.data}/全球1900年以来降水数据/cru_ts4.08.1901.2023.pre.dat.nc
+
+  # 输出 nc 文件，用于计算自然数据
+  output:
+    china: ${ds.processed}/JAS_precip_China_1900-2017.nc
+    cru: ${ds.processed}/JAS_precip_CRU_1900-2017.nc
+    gpcc: ${ds.processed}/JAS_precip_GPCC_1900-2017.nc
   agg_months:
+    - 6
     - 7
     - 8
     - 9
   agg_method: sum
 
+# 用于提取和存储验证数据
+validation:
+  china:
+    nc: ${ds.processed}/JAS_precip_China_1900-2017.nc
+    z_nc: ${ds.processed}/JAS_z_China_1900-2017.nc
+    csv: ${ds.processed}/JAS_z_China.csv
+  gpcc:
+    nc: ${ds.processed}/JAS_precip_GPCC_1900-2017.nc
+    z_nc: ${ds.processed}/JAS_z_GPCC_1900-2017.nc
+    csv: ${ds.processed}/JAS_z_GPCC.csv
+  cru:
+    nc: ${ds.processed}/JAS_precip_CRU_1900-2017.nc
+    z_nc: ${ds.processed}/JAS_z_CRU_1900-2017.nc
+    csv: ${ds.processed}/JAS_z_CRU.csv
+
 includes:
-- "chen2020f"  # not good
 - "li2015b"  # not good
-- "li2019a"  # not good
-- "liu2020"  # not good
+# - "li2019a"  # not good
+# - "liu2020"  # not good
 # - "shi2017"
 # - "shi2018"
 # - "tan2011"  # not good
 - "xu2023c"  # great
-- "yang2016"  # great
+# - "yang2016"  # great
 # - "yang2019d"  # terrible
 # - "yi2010"  # very good
 # - "yi2012"  # very good
 
+
 out:
   tree_ring: ${ds.processed}/combined_mean.csv
-  precip_z: ${ds.processed}/summer_precip_z.nc
-  regional_csv: ${ds.processed}/summer_precip_z.csv
   sites_corr: ${ds.processed}/sites_corr.csv
+  # 不确定性数据，在读取时加载，但是目前的分析中没有用。
   tree_ring_uncertainty: ${ds.processed}/combined_uncertainty.csv
 
 

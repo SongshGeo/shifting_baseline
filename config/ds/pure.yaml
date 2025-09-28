@@ -1,6 +1,6 @@
 # 数据集配置
-setname: "mac" # 数据集名称
-description: "所有重建数据都用到了" # 数据集描述
+setname: "pure" # 数据集名称
+description: "纯重建数据，不包括任何文献数据" # 数据集描述
 
 # 项目根目录
 root: /Users/songshgeo/Documents/VSCode/shifting_baseline
@@ -69,14 +69,15 @@ includes:
 - "li2015b"  # not good
 - "li2019a"  # not good
 - "liu2020"  # not good
-- "shi2017"
-- "shi2018"
-- "tan2011"  # not good
+# - "shi2017"
+# - "shi2018"
+# - "tan2011"  # not good
 - "xu2023c"  # great
-- "yang2016"  # great
+# - "yang2016"  # great
 - "yang2019d"  # terrible
-- "yi2010"  # very good
-- "yi2012"  # very good
+# - "yi2010"  # very good
+# - "yi2012"  # very good
+
 
 out:
   tree_ring: ${ds.processed}/combined_mean.csv
