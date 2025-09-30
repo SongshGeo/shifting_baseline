@@ -27,7 +27,7 @@ to_std: sampling
 # 在相关性计算时，控制默认的最小样本数，至少为 3，但 5+ 计算 std 更合理
 min_period: 10
 # 前百分之 % 的最大值区间
-ratio: 0.05
+ratio: 0.10
 
 low_pass:
   window_size: 30

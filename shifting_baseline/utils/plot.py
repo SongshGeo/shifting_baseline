@@ -22,6 +22,7 @@ import xarray as xr
 from matplotkit import with_axes
 from matplotlib.axes import Axes
 from matplotlib.gridspec import GridSpec
+from matplotlib.patches import Patch, Rectangle
 from mksci_font import config_font
 from pyproj import CRS
 from sklearn.metrics import root_mean_squared_error
@@ -142,7 +143,6 @@ def plot_confusion_matrix(
         **kwargs,
     )
     ax.figure.axes[-1].yaxis.label.set_size(9)
-    ax.figure.axes[-1].yaxis.set_ticks(np.arange(0, 31, 10))
 
     # 手动在对角线上写黑色数字
     for i in range(len(cm_df)):
@@ -1032,3 +1032,236 @@ def plot_spatial_corr_panels(
     cbar.ax.tick_params(labelsize=8)
 
     return fig
+
+
+@with_axes(figsize=(9, 2.6))
+def plot_mismatch_bar(
+    diff_df: pd.DataFrame,
+    count_df: pd.DataFrame,
+    pval_df: pd.DataFrame,
+    ax: Optional[Axes] = None,
+    show_pair_labels: bool = False,
+    show_legend: bool = False,
+    legend_loc: str = "upper right",
+) -> Axes:
+    """Plot mismatch bars for all (true, pred) pairs without aggregation.
+
+    This draws 20 bars (excluding diagonal), grouped by absolute level
+    difference from negative to positive buckets. Bar color encodes the sign
+    of `diff` (red for positive, blue for negative). Statistical significance
+    is shown via alpha (opaque if significant, 0.4 if not).
+
+    Args:
+        diff_df: Values to display on the y-axis per (true, pred).
+        count_df: Count matrix (kept for completeness; not used for color).
+        pval_df: Per-cell p-values to determine significance.
+        ax: Matplotlib axes.
+        show_pair_labels: Whether to annotate each bar with label like
+            "SD→MW" on top of the bar.
+
+    Returns:
+        Axes: The axes with the plot.
+    """
+    assert isinstance(ax, Axes), "ax must be an instance of Axes"
+
+    # 明确轴名称，避免 reset_index 后出现 level_0/level_1
+    diff_df = diff_df.rename_axis(index="true", columns="pred")
+    count_df = count_df.rename_axis(index="true", columns="pred")
+    pval_df = pval_df.rename_axis(index="true", columns="pred")
+
+    # 所有 20 个组合（排除对角线），确保缺失也占位
+    all_pairs = [(t, p) for t in LEVELS for p in LEVELS if t != p]
+    base = pd.DataFrame(all_pairs, columns=["true", "pred"])  # 保序容器
+
+    # 展开为长表并合并到基表
+    diff_long = diff_df.stack().reset_index(name="diff")
+    cnt_long = count_df.stack().reset_index(name="count")
+    p_long = pval_df.stack().reset_index(name="p_value")
+
+    long = (
+        base.merge(diff_long, on=["true", "pred"], how="left")
+        .merge(cnt_long, on=["true", "pred"], how="left")
+        .merge(p_long, on=["true", "pred"], how="left")
+    )
+
+    # 计算差值与排序键；不改变原始数据类型
+    long = long.assign(
+        offset=lambda d: d["true"] - d["pred"],
+        abs_offset=lambda d: (d["true"] - d["pred"]).abs(),
+        label=lambda d: d["true"].astype(str) + "-" + d["pred"].astype(str),
+    )
+
+    # 缺失值处理：没有观测的组合 y=0，count=0，p 为 NaN（不标星）
+    long["diff"] = long["diff"].fillna(0)
+    long["count"] = long["count"].fillna(0)
+
+    # 排序：等极差、再按 signed offset
+    long = long.sort_values(["abs_offset", "offset", "pred", "true"])  # 稳定顺序
+
+    # —— 分组到等极差桶：'----' 到 '++++'（不含 0） ——
+    groups = [o for o in range(-len(LEVELS) + 1, len(LEVELS)) if o not in [-4, 4]]
+    group_labels = {o: ("-" * abs(o) if o < 0 else "+" * abs(o)) for o in groups}
+    # 构造等级到文本的映射：{-2:'SD',...}
+    level_to_name = {lvl: name for lvl, name in zip(LEVELS, TICK_LABELS)}
+
+    # 为每条记录设置其所在桶与在桶内的展示标签
+    long = long.assign(
+        group=lambda d: d["offset"],
+        group_label=lambda d: d["offset"].map(group_labels),
+        pair_label=lambda d: d.apply(
+            lambda r: f"{level_to_name[r['pred']]}\n→\n{level_to_name[r['true']]}",
+            axis=1,
+        ),
+    )
+
+    # 仅保留定义好的分组顺序
+    long = long[long["group"].isin(groups)]
+
+    # 计算每个分组内的成员数与顺序（先 true 后 pred 升序）
+    long = long.sort_values(["group", "true", "pred"])  # 组内稳定排序
+
+    # 为条形定位：每组中心在整数 x 处，组宽 0.8，等距排布
+    group_counts = long.groupby("group").size().reindex(groups, fill_value=0)
+    centers = {g: i for i, g in enumerate(groups)}
+    bar_width = 0.8
+    half = bar_width / 2
+    offsets = {}
+    for g in groups:
+        n = int(group_counts.loc[g])
+        if n <= 0:
+            continue
+        # 等距分布在 [center-half, center+half]
+        xs = np.linspace(
+            centers[g] - half + bar_width / (2 * n),
+            centers[g] + half - bar_width / (2 * n),
+            n,
+        )
+        offsets[g] = list(xs)
+
+    # 收集并绘制条形：显著性填充，非显著空心
+    # Colors: positive red, negative blue（更高对比度）
+    pos_color = "#D73027"  # vivid red
+    neg_color = "#225EA8"  # deep blue
+    # edge styles defined inline per significance case
+    # Normalize alpha by absolute diff magnitude（非线性拉伸差异）
+    max_abs_diff = (
+        np.nanmax(np.abs(diff_df.values))
+        if np.isfinite(np.nanmax(np.abs(diff_df.values)))
+        else 1.0
+    )
+
+    def diff_to_alpha(val: float) -> float:
+        if not np.isfinite(val) or max_abs_diff == 0:
+            return 0.25
+        r = min(abs(val) / max_abs_diff, 1.0)
+        r = r**3.0  # gamma to expand contrast
+        return 0.25 + 0.75 * r  # alpha in [0.25, 1.0]
+
+    # Total mismatches for proportion
+    total_count = np.nansum(count_df.values)
+    if not np.isfinite(total_count) or total_count == 0:
+        total_count = 1.0
+    xs_plot = []
+    for g, sub in long.groupby("group", sort=False):
+        if g not in offsets:
+            continue
+        xs = offsets[g]
+        for i, (_, row) in enumerate(sub.iterrows()):
+            x = xs[i]
+            # y as proportion of total mismatches
+            count_val = 0.0 if pd.isna(row["count"]) else float(row["count"])
+            y = count_val / total_count
+            # color by sign of diff; alpha by magnitude of diff
+            diff_val = 0.0 if pd.isna(row["diff"]) else float(row["diff"])
+            face = pos_color if diff_val >= 0 else neg_color
+            # significance decision
+            marker = "" if pd.isna(row["p_value"]) else get_marker(row["p_value"])
+            is_sig = marker != ""
+            if is_sig:
+                # filled bar with same-color edge，突出显著
+                ax.bar(
+                    x,
+                    y,
+                    width=bar_width / max(1, len(xs)),
+                    facecolor=face,
+                    edgecolor=face,
+                    linewidth=1.0,
+                    alpha=1.0,
+                )
+            else:
+                # hollow bar with colored edge, thicker line
+                ax.bar(
+                    x,
+                    y,
+                    width=bar_width / max(1, len(xs)),
+                    facecolor="none",
+                    edgecolor=face,
+                    linewidth=1.2,
+                    alpha=1.0,
+                )
+            if show_pair_labels:
+                txt = row["pair_label"]
+                ax.text(x, y, txt, ha="center", va="bottom", fontsize=6, rotation=0)
+            # significance stars on top
+            if marker:
+                ax.text(
+                    x, y, marker, ha="center", va="bottom", fontsize=9, color="black"
+                )
+            xs_plot.append((x, row["group_label"]))
+
+    # 设置 x 轴为组中心并标注 '----'...'++++'
+    tick_positions = [centers[g] for g in groups]
+    tick_labels = [group_labels[g] for g in groups]
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(tick_labels)
+
+    # ax.grid(True, alpha=0.3, linestyle=":")
+    ax.axhline(0, color="black", linewidth=0.6)
+    # 组间竖向分隔线（在组中心之间的中点处）
+    ymin, ymax = ax.get_ylim()
+    for i in range(len(groups) - 1):
+        x = (centers[groups[i]] + centers[groups[i + 1]]) / 2
+        ax.vlines(
+            x, ymin, ymax, colors="lightgray", linestyles=":", linewidth=1.6, alpha=0.7
+        )
+    ax.set_ylim(ymin, ymax)
+    ax.set_xlabel("Relative level difference (pred - true)")
+    ax.set_ylabel("Proportion of mismatches")
+    # Optional legend
+    if show_legend:
+        handles = [
+            Patch(facecolor="#D73027", edgecolor="#D73027", label="Positive (sig.)"),
+            Patch(facecolor="#225EA8", edgecolor="#225EA8", label="Negative (sig.)"),
+            Rectangle(
+                (0, 0),
+                1,
+                1,
+                fill=False,
+                edgecolor="#D73027",
+                linewidth=1.2,
+                label="Positive",
+            ),
+            Rectangle(
+                (0, 0),
+                1,
+                1,
+                fill=False,
+                edgecolor="#225EA8",
+                linewidth=1.2,
+                label="Negative",
+            ),
+        ]
+        ax.legend(
+            title="Legend",
+            title_fontsize=8,
+            handles=handles,
+            loc=legend_loc,
+            frameon=True,
+            fontsize=7,
+            handlelength=1.0,  # length of the legend handles
+            handletextpad=0.2,  # space between handle and text
+            columnspacing=0.8,  # space between columns
+            labelspacing=0.4,  # vertical space between rows
+            borderpad=0.2,  # padding inside the legend box
+        )
+    return ax

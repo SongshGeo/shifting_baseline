@@ -22,6 +22,7 @@ from shifting_baseline.filters import classify
 from shifting_baseline.utils.plot import (
     heatmap_with_annot,
     plot_confusion_matrix,
+    plot_mismatch_bar,
     plot_mismatch_matrix,
 )
 
@@ -317,12 +318,12 @@ class MismatchReport:
         return stats
 
     def plot_confusion_matrix(
-        self, ax: plt.Axes | None = None, title: str | None = None
+        self, ax: plt.Axes | None = None, title: str | None = None, **kwargs
     ) -> plt.Axes:
         """绘制混淆矩阵"""
         if title is None:
             title = self.get_statistics_summary(as_str=True)
-        ax = plot_confusion_matrix(cm_df=self.cm_df, title=title, ax=ax)
+        ax = plot_confusion_matrix(cm_df=self.cm_df, title=title, ax=ax, **kwargs)
         ax.spines["bottom"].set_visible(True)
         ax.spines["left"].set_visible(True)
         return ax
@@ -399,3 +400,31 @@ class MismatchReport:
             result["p_value_matrix"] = self.p_value_matrix.to_dict()
 
         return result
+
+    def get_mean_diff(
+        self, direction: Literal["positive", "negative", "all"] = "all"
+    ) -> float:
+        """计算平均差异"""
+        assert self.diff_matrix is not None, "需要先调用 analyze_error_patterns() 进行错误分析"
+        if direction == "positive":
+            return self.diff_matrix[self.diff_matrix > 0].abs().mean().mean()
+        elif direction == "negative":
+            return self.diff_matrix[self.diff_matrix < 0].abs().mean().mean()
+        elif direction == "all":
+            return self.diff_matrix.abs().mean().mean()
+        else:
+            raise ValueError(f"Invalid direction: {direction}")
+
+    def plot_mismatch_bar(
+        self,
+        ax: plt.Axes | None = None,
+        **kwargs,
+    ) -> plt.Axes:
+        """绘制不匹配条形图"""
+        return plot_mismatch_bar(
+            diff_df=self.diff_matrix,
+            count_df=self.false_count_matrix,
+            pval_df=self.p_value_matrix,
+            ax=ax,
+            **kwargs,
+        )

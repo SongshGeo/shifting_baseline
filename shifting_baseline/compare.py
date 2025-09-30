@@ -159,6 +159,7 @@ def experiment_corr_2d(
     std_offset: float = 0.2,
     p_threshold: float = 5e-2,
     n_diff_w: int | float = 2,
+    max_window: int = 100,
     ax: plt.Axes | None = None,
 ) -> tuple[pd.DataFrame, float, plt.Axes]:
     """做一次完整的实验
@@ -189,7 +190,7 @@ def experiment_corr_2d(
     )
     r_benchmark = base_corr[0]
     log.info("基准相关系数: %.5f", r_benchmark)
-    windows = np.arange(2, 100, 2)
+    windows = np.arange(2, max_window, 2)
     min_periods = np.arange(2, 20, 1)
     windows_mesh, min_periods_mesh = np.meshgrid(windows, min_periods)
 
