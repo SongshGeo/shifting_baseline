@@ -470,7 +470,7 @@ def _create_visualization(
                     ax = axes[i // n_cols, i % n_cols]
 
                 sns.boxplot(data=df, x=col, y=target_col, ax=ax)
-                ax.set_title(f"{col} 对 {target_col} 的影响")
+                ax.set_title(f"{col} -> {target_col}")
                 ax.tick_params(axis="x", rotation=45)
 
         # 隐藏多余的子图

@@ -1034,46 +1034,31 @@ def plot_spatial_corr_panels(
     return fig
 
 
-@with_axes(figsize=(9, 2.6))
-def plot_mismatch_bar(
+def _prepare_mismatch_data(
     diff_df: pd.DataFrame,
     count_df: pd.DataFrame,
     pval_df: pd.DataFrame,
-    ax: Optional[Axes] = None,
-    show_pair_labels: bool = False,
-    show_legend: bool = False,
-    legend_loc: str = "upper right",
-) -> Axes:
-    """Plot mismatch bars for all (true, pred) pairs without aggregation.
-
-    This draws 20 bars (excluding diagonal), grouped by absolute level
-    difference from negative to positive buckets. Bar color encodes the sign
-    of `diff` (red for positive, blue for negative). Statistical significance
-    is shown via alpha (opaque if significant, 0.4 if not).
+) -> pd.DataFrame:
+    """Prepare and merge mismatch data into a long-format DataFrame.
 
     Args:
-        diff_df: Values to display on the y-axis per (true, pred).
-        count_df: Count matrix (kept for completeness; not used for color).
-        pval_df: Per-cell p-values to determine significance.
-        ax: Matplotlib axes.
-        show_pair_labels: Whether to annotate each bar with label like
-            "SD→MW" on top of the bar.
+        diff_df: Difference values per (true, pred) pair.
+        count_df: Count values per (true, pred) pair.
+        pval_df: P-values per (true, pred) pair.
 
     Returns:
-        Axes: The axes with the plot.
+        Long-format DataFrame with all pairs and computed metrics.
     """
-    assert isinstance(ax, Axes), "ax must be an instance of Axes"
-
-    # 明确轴名称，避免 reset_index 后出现 level_0/level_1
+    # Rename axes to avoid level_0/level_1 after reset_index
     diff_df = diff_df.rename_axis(index="true", columns="pred")
     count_df = count_df.rename_axis(index="true", columns="pred")
     pval_df = pval_df.rename_axis(index="true", columns="pred")
 
-    # 所有 20 个组合（排除对角线），确保缺失也占位
+    # Create base with all 20 pairs (exclude diagonal)
     all_pairs = [(t, p) for t in LEVELS for p in LEVELS if t != p]
-    base = pd.DataFrame(all_pairs, columns=["true", "pred"])  # 保序容器
+    base = pd.DataFrame(all_pairs, columns=["true", "pred"])
 
-    # 展开为长表并合并到基表
+    # Convert to long format and merge
     diff_long = diff_df.stack().reset_index(name="diff")
     cnt_long = count_df.stack().reset_index(name="count")
     p_long = pval_df.stack().reset_index(name="p_value")
@@ -1084,27 +1069,37 @@ def plot_mismatch_bar(
         .merge(p_long, on=["true", "pred"], how="left")
     )
 
-    # 计算差值与排序键；不改变原始数据类型
+    # Compute offset and labels
     long = long.assign(
         offset=lambda d: d["true"] - d["pred"],
         abs_offset=lambda d: (d["true"] - d["pred"]).abs(),
         label=lambda d: d["true"].astype(str) + "-" + d["pred"].astype(str),
     )
 
-    # 缺失值处理：没有观测的组合 y=0，count=0，p 为 NaN（不标星）
+    # Fill missing values
     long["diff"] = long["diff"].fillna(0)
     long["count"] = long["count"].fillna(0)
 
-    # 排序：等极差、再按 signed offset
-    long = long.sort_values(["abs_offset", "offset", "pred", "true"])  # 稳定顺序
+    # Sort by absolute offset, then signed offset
+    long = long.sort_values(["abs_offset", "offset", "pred", "true"])
 
-    # —— 分组到等极差桶：'----' 到 '++++'（不含 0） ——
+    return long
+
+
+def _assign_groups_and_labels(long: pd.DataFrame) -> pd.DataFrame:
+    """Assign group buckets and pair labels to long-format data.
+
+    Args:
+        long: Long-format DataFrame from _prepare_mismatch_data.
+
+    Returns:
+        DataFrame with group, group_label, and pair_label columns added.
+    """
+    # Define groups excluding extreme offsets
     groups = [o for o in range(-len(LEVELS) + 1, len(LEVELS)) if o not in [-4, 4]]
     group_labels = {o: ("-" * abs(o) if o < 0 else "+" * abs(o)) for o in groups}
-    # 构造等级到文本的映射：{-2:'SD',...}
     level_to_name = {lvl: name for lvl, name in zip(LEVELS, TICK_LABELS)}
 
-    # 为每条记录设置其所在桶与在桶内的展示标签
     long = long.assign(
         group=lambda d: d["offset"],
         group_label=lambda d: d["offset"].map(group_labels),
@@ -1114,23 +1109,33 @@ def plot_mismatch_bar(
         ),
     )
 
-    # 仅保留定义好的分组顺序
+    # Keep only defined groups
     long = long[long["group"].isin(groups)]
+    long = long.sort_values(["group", "true", "pred"])
 
-    # 计算每个分组内的成员数与顺序（先 true 后 pred 升序）
-    long = long.sort_values(["group", "true", "pred"])  # 组内稳定排序
+    return long
 
-    # 为条形定位：每组中心在整数 x 处，组宽 0.8，等距排布
+
+def _compute_bar_positions(long: pd.DataFrame, groups: list) -> tuple[dict, dict]:
+    """Compute x-axis positions for bars within each group.
+
+    Args:
+        long: Long-format DataFrame with group column.
+        groups: List of group identifiers.
+
+    Returns:
+        Tuple of (centers dict, offsets dict) for bar positioning.
+    """
     group_counts = long.groupby("group").size().reindex(groups, fill_value=0)
     centers = {g: i for i, g in enumerate(groups)}
     bar_width = 0.8
     half = bar_width / 2
     offsets = {}
+
     for g in groups:
         n = int(group_counts.loc[g])
         if n <= 0:
             continue
-        # 等距分布在 [center-half, center+half]
         xs = np.linspace(
             centers[g] - half + bar_width / (2 * n),
             centers[g] + half - bar_width / (2 * n),
@@ -1138,86 +1143,317 @@ def plot_mismatch_bar(
         )
         offsets[g] = list(xs)
 
-    # 收集并绘制条形：显著性填充，非显著空心
-    # Colors: positive red, negative blue（更高对比度）
-    pos_color = "#D73027"  # vivid red
-    neg_color = "#225EA8"  # deep blue
-    # edge styles defined inline per significance case
-    # Normalize alpha by absolute diff magnitude（非线性拉伸差异）
+    return centers, offsets
+
+
+def _compute_y_value(
+    count_val: float,
+    diff_val: float,
+    y_metric: str,
+    y_weight: float,
+    weighted_signed: bool,
+    total_count: float,
+    max_abs_diff: float,
+    contrib_den: float,
+) -> float:
+    """Compute y-axis value based on selected metric.
+
+    Args:
+        count_val: Count for this pair.
+        diff_val: Diff value for this pair.
+        y_metric: Metric type (proportion, count, diff, etc.).
+        y_weight: Weight for weighted metric.
+        weighted_signed: Whether weighted metric keeps sign.
+        total_count: Total mismatch count.
+        max_abs_diff: Maximum absolute diff value.
+        contrib_den: Denominator for normalized contribution.
+
+    Returns:
+        Computed y-axis value.
+    """
+    if y_metric == "count":
+        return count_val
+    elif y_metric == "diff":
+        return diff_val
+    elif y_metric == "abs_diff":
+        return abs(diff_val)
+    elif y_metric == "weighted":
+        prop = count_val / total_count
+        norm_abs_diff = 0.0 if max_abs_diff == 0 else abs(diff_val) / max_abs_diff
+        y = float(y_weight) * prop + (1.0 - float(y_weight)) * norm_abs_diff
+        if weighted_signed:
+            y = (1 if diff_val >= 0 else -1) * y
+        return y
+    elif y_metric == "contribution":
+        return (count_val / total_count) * diff_val
+    elif y_metric == "abs_contribution":
+        return (count_val / total_count) * abs(diff_val)
+    elif y_metric == "norm_contribution":
+        return (count_val * diff_val) / contrib_den
+    else:  # "proportion"
+        return count_val / total_count
+
+
+def _draw_single_bar(
+    ax: Axes,
+    x: float,
+    y: float,
+    bar_width: float,
+    n_bars: int,
+    diff_val: float,
+    p_value: float,
+    pair_label: str,
+    show_pair_labels: bool,
+    pos_color: str = "#D73027",
+    neg_color: str = "#225EA8",
+) -> None:
+    """Draw a single bar with appropriate styling.
+
+    Args:
+        ax: Matplotlib axes.
+        x: X-axis position.
+        y: Y-axis value (bar height).
+        bar_width: Total width allocated to this group.
+        n_bars: Number of bars in this group.
+        diff_val: Diff value to determine color.
+        p_value: P-value to determine significance.
+        pair_label: Label to show on bar.
+        show_pair_labels: Whether to show pair labels.
+        pos_color: Color for positive values.
+        neg_color: Color for negative values.
+    """
+    face = pos_color if diff_val >= 0 else neg_color
+    marker = "" if pd.isna(p_value) else get_marker(p_value)
+    is_sig = marker != ""
+    width = bar_width / max(1, n_bars)
+
+    if is_sig:
+        # Filled bar for significant results
+        ax.bar(
+            x, y, width=width, facecolor=face, edgecolor=face, linewidth=1.0, alpha=1.0
+        )
+    else:
+        # Hollow bar for non-significant results
+        ax.bar(
+            x,
+            y,
+            width=width,
+            facecolor="none",
+            edgecolor=face,
+            linewidth=1.2,
+            alpha=1.0,
+        )
+
+    # Add pair label if requested
+    if show_pair_labels:
+        txt = ax.text(
+            x, max(0, y), pair_label, ha="center", va="bottom", fontsize=6, rotation=0
+        )
+        txt.set_linespacing(0.8)
+
+    # Add significance marker
+    if marker:
+        va = "top" if y < 0 else "bottom"
+        ax.text(x, y, marker, ha="center", va=va, fontsize=9, color="black")
+
+
+def _set_y_axis_label(
+    ax: Axes, y_metric: str, y_weight: float, weighted_signed: bool
+) -> None:
+    """Set appropriate y-axis label based on metric type.
+
+    Args:
+        ax: Matplotlib axes.
+        y_metric: Metric type.
+        y_weight: Weight for weighted metric.
+        weighted_signed: Whether weighted metric keeps sign.
+    """
+    labels = {
+        "count": "Mismatch count",
+        "diff": "Diff value",
+        "abs_diff": "Absolute diff value",
+        "contribution": "Signed contribution: P(pair) × diff",
+        "abs_contribution": "Magnitude contribution: P(pair) × |diff|",
+        "norm_contribution": "Normalized signed contribution",
+        "proportion": "Proportion of mismatches",
+    }
+
+    if y_metric == "weighted":
+        prefix = "Signed " if weighted_signed else ""
+        ax.set_ylabel(f"{prefix}Weighted (w={y_weight:.2f})")
+    else:
+        ax.set_ylabel(labels.get(y_metric, "Proportion of mismatches"))
+
+
+def _add_legend(ax: Axes, legend_loc: str) -> None:
+    """Add legend showing color and style meanings.
+
+    Args:
+        ax: Matplotlib axes.
+        legend_loc: Location string for legend.
+    """
+    handles = [
+        Patch(facecolor="#D73027", edgecolor="#D73027", label="Positive (sig.)"),
+        Patch(facecolor="#225EA8", edgecolor="#225EA8", label="Negative (sig.)"),
+        Rectangle(
+            (0, 0),
+            1,
+            1,
+            fill=False,
+            edgecolor="#D73027",
+            linewidth=1.2,
+            label="Positive",
+        ),
+        Rectangle(
+            (0, 0),
+            1,
+            1,
+            fill=False,
+            edgecolor="#225EA8",
+            linewidth=1.2,
+            label="Negative",
+        ),
+    ]
+    ax.legend(
+        title="Legend",
+        title_fontsize=8,
+        handles=handles,
+        loc=legend_loc,
+        frameon=True,
+        fontsize=7,
+        handlelength=1.0,
+        handletextpad=0.2,
+        columnspacing=0.8,
+        labelspacing=0.4,
+        borderpad=0.2,
+    )
+
+
+@with_axes(figsize=(9, 2.6))
+def plot_mismatch_bar(
+    diff_df: pd.DataFrame,
+    count_df: pd.DataFrame,
+    pval_df: pd.DataFrame,
+    ax: Optional[Axes] = None,
+    show_pair_labels: bool = False,
+    show_legend: bool = False,
+    legend_loc: str = "upper right",
+    y_metric: str = "proportion",
+    y_weight: float = 0.5,
+    weighted_signed: bool = False,
+    **kwargs,
+) -> Axes:
+    """Plot mismatch bars for all (true, pred) pairs without aggregation.
+
+    This function visualizes mismatch patterns by drawing 20 bars (excluding
+    diagonal pairs), grouped by the absolute level difference between predicted
+    and true values. The bars are colored based on the sign of the difference
+    (red for positive, blue for negative), with filled bars indicating
+    statistically significant results and hollow bars for non-significant ones.
+
+    Args:
+        diff_df: Values to display on the y-axis per (true, pred).
+        count_df: Count matrix (kept for completeness; not used for color).
+        pval_df: Per-cell p-values to determine significance.
+        ax: Matplotlib axes.
+        show_pair_labels: Whether to annotate each bar with label like
+            "SD→MW" on top of the bar.
+        show_legend: Whether to show legend.
+        legend_loc: Location of legend.
+        y_metric: Which quantity to plot on y-axis. One of:
+            - "proportion" (default): count / total mismatches
+            - "count": raw count
+            - "diff": signed diff value
+            - "abs_diff": absolute diff value
+            - "weighted": composite of proportion and |diff| normalized
+              as: y = w * proportion + (1-w) * (|diff|/max_abs_diff).
+              If `weighted_signed` is True, multiply by sign(diff).
+            - "contribution": (count/total) * diff; signed expected
+              mismatch contribution per event
+            - "abs_contribution": (count/total) * |diff|; magnitude
+              contribution ignoring sign
+            - "norm_contribution": (count*diff) / sum(count*|diff|);
+              signed, normalized to [-1, 1] when diff is bounded
+        y_weight: Weight w in [0,1] for the composite metric when
+            y_metric="weighted".
+        weighted_signed: Whether the weighted metric keeps the sign of diff.
+
+    Returns:
+        The axes with the plot.
+    """
+    assert isinstance(ax, Axes), "ax must be an instance of Axes"
+
+    # Prepare data
+    long = _prepare_mismatch_data(diff_df, count_df, pval_df)
+    long = _assign_groups_and_labels(long)
+
+    # Define groups and compute positions
+    groups = [o for o in range(-len(LEVELS) + 1, len(LEVELS)) if o not in [-4, 4]]
+    group_labels = {o: ("-" * abs(o) if o < 0 else "+" * abs(o)) for o in groups}
+    centers, offsets = _compute_bar_positions(long, groups)
+
+    # Compute normalization constants
     max_abs_diff = (
         np.nanmax(np.abs(diff_df.values))
         if np.isfinite(np.nanmax(np.abs(diff_df.values)))
         else 1.0
     )
-
-    def diff_to_alpha(val: float) -> float:
-        if not np.isfinite(val) or max_abs_diff == 0:
-            return 0.25
-        r = min(abs(val) / max_abs_diff, 1.0)
-        r = r**3.0  # gamma to expand contrast
-        return 0.25 + 0.75 * r  # alpha in [0.25, 1.0]
-
-    # Total mismatches for proportion
     total_count = np.nansum(count_df.values)
     if not np.isfinite(total_count) or total_count == 0:
         total_count = 1.0
-    xs_plot = []
+    contrib_den = np.nansum(np.abs(count_df.values * diff_df.values))
+    if not np.isfinite(contrib_den) or contrib_den == 0:
+        contrib_den = 1.0
+
+    # Set y-axis limits if specified
+    if "ylim" in kwargs:
+        ax.set_ylim(*kwargs.get("ylim"))
+
+    # Draw bars for each group
+    bar_width = 0.8
     for g, sub in long.groupby("group", sort=False):
         if g not in offsets:
             continue
         xs = offsets[g]
         for i, (_, row) in enumerate(sub.iterrows()):
             x = xs[i]
-            # y as proportion of total mismatches
             count_val = 0.0 if pd.isna(row["count"]) else float(row["count"])
-            y = count_val / total_count
-            # color by sign of diff; alpha by magnitude of diff
             diff_val = 0.0 if pd.isna(row["diff"]) else float(row["diff"])
-            face = pos_color if diff_val >= 0 else neg_color
-            # significance decision
-            marker = "" if pd.isna(row["p_value"]) else get_marker(row["p_value"])
-            is_sig = marker != ""
-            if is_sig:
-                # filled bar with same-color edge，突出显著
-                ax.bar(
-                    x,
-                    y,
-                    width=bar_width / max(1, len(xs)),
-                    facecolor=face,
-                    edgecolor=face,
-                    linewidth=1.0,
-                    alpha=1.0,
-                )
-            else:
-                # hollow bar with colored edge, thicker line
-                ax.bar(
-                    x,
-                    y,
-                    width=bar_width / max(1, len(xs)),
-                    facecolor="none",
-                    edgecolor=face,
-                    linewidth=1.2,
-                    alpha=1.0,
-                )
-            if show_pair_labels:
-                txt = row["pair_label"]
-                ax.text(x, y, txt, ha="center", va="bottom", fontsize=6, rotation=0)
-            # significance stars on top
-            if marker:
-                ax.text(
-                    x, y, marker, ha="center", va="bottom", fontsize=9, color="black"
-                )
-            xs_plot.append((x, row["group_label"]))
 
-    # 设置 x 轴为组中心并标注 '----'...'++++'
+            # Compute y-value based on metric
+            y = _compute_y_value(
+                count_val,
+                diff_val,
+                y_metric,
+                y_weight,
+                weighted_signed,
+                total_count,
+                max_abs_diff,
+                contrib_den,
+            )
+
+            # Draw the bar
+            _draw_single_bar(
+                ax,
+                x,
+                y,
+                bar_width,
+                len(xs),
+                diff_val,
+                row["p_value"],
+                row["pair_label"],
+                show_pair_labels,
+            )
+
+    # Configure x-axis
     tick_positions = [centers[g] for g in groups]
-    tick_labels = [group_labels[g] for g in groups]
+    tick_labels_list = [group_labels[g] for g in groups]
     ax.set_xticks(tick_positions)
-    ax.set_xticklabels(tick_labels)
+    ax.set_xticklabels(tick_labels_list)
+    ax.set_xlabel("Relative level difference (pred - true)")
 
-    # ax.grid(True, alpha=0.3, linestyle=":")
+    # Add reference line and separators
     ax.axhline(0, color="black", linewidth=0.6)
-    # 组间竖向分隔线（在组中心之间的中点处）
     ymin, ymax = ax.get_ylim()
     for i in range(len(groups) - 1):
         x = (centers[groups[i]] + centers[groups[i + 1]]) / 2
@@ -1225,43 +1461,12 @@ def plot_mismatch_bar(
             x, ymin, ymax, colors="lightgray", linestyles=":", linewidth=1.6, alpha=0.7
         )
     ax.set_ylim(ymin, ymax)
-    ax.set_xlabel("Relative level difference (pred - true)")
-    ax.set_ylabel("Proportion of mismatches")
-    # Optional legend
+
+    # Set y-axis label
+    _set_y_axis_label(ax, y_metric, y_weight, weighted_signed)
+
+    # Add legend if requested
     if show_legend:
-        handles = [
-            Patch(facecolor="#D73027", edgecolor="#D73027", label="Positive (sig.)"),
-            Patch(facecolor="#225EA8", edgecolor="#225EA8", label="Negative (sig.)"),
-            Rectangle(
-                (0, 0),
-                1,
-                1,
-                fill=False,
-                edgecolor="#D73027",
-                linewidth=1.2,
-                label="Positive",
-            ),
-            Rectangle(
-                (0, 0),
-                1,
-                1,
-                fill=False,
-                edgecolor="#225EA8",
-                linewidth=1.2,
-                label="Negative",
-            ),
-        ]
-        ax.legend(
-            title="Legend",
-            title_fontsize=8,
-            handles=handles,
-            loc=legend_loc,
-            frameon=True,
-            fontsize=7,
-            handlelength=1.0,  # length of the legend handles
-            handletextpad=0.2,  # space between handle and text
-            columnspacing=0.8,  # space between columns
-            labelspacing=0.4,  # vertical space between rows
-            borderpad=0.2,  # padding inside the legend box
-        )
+        _add_legend(ax, legend_loc)
+
     return ax
