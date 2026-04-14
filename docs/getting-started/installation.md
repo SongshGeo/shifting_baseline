@@ -5,25 +5,25 @@ This guide will help you install Shifting Baseline and its dependencies.
 ## Prerequisites
 
 - Python 3.11+ (required)
-- Poetry (recommended) or pip
+- uv
 - Git (for development)
 
 ## Installation Methods
 
-### Method 1: Using Poetry (Recommended)
+### Method 1: Using uv (Recommended)
 
-Poetry is the recommended package manager for this project as it ensures consistent dependency management.
+uv is the recommended package manager for this project and is the default workflow for dependency syncing and command execution.
 
 ```bash
 # Clone the repository
 git clone https://github.com/SongshGeo/shifting_baseline.git
 cd shifting_baseline
 
-# Install dependencies using Poetry
-poetry install
+# Install dependencies
+uv sync
 
 # Activate the virtual environment
-poetry shell
+source .venv/bin/activate
 ```
 
 ### Method 2: Using pip
@@ -99,13 +99,12 @@ print("✅ All imports successful!")
 
 ### Common Issues
 
-**1. Poetry Installation Issues**
+**1. uv Installation Issues**
 ```bash
-# Update Poetry
-curl -sSL https://install.python-poetry.org | python3 -
-
-# Clear Poetry cache
-poetry cache clear --all pypi
+# Install or update uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Refresh the environment
+uv sync --refresh
 ```
 
 **2. NetCDF4 Installation Problems**
@@ -150,11 +149,11 @@ If you encounter issues during installation:
 For development work, install with additional development dependencies:
 
 ```bash
-# Using Poetry
-poetry install --with dev
+# Install the default development environment
+uv sync
 
-# Using pip
-pip install -e ".[dev]"
+# Or install all groups explicitly
+uv sync --all-groups
 ```
 
 This includes:

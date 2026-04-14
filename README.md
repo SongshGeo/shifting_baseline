@@ -50,7 +50,7 @@ shifting_baseline/
 ### Prerequisites
 
 - Python 3.11
-- Poetry (recommended for dependency management)
+- uv
 
 ### Setup
 
@@ -60,19 +60,19 @@ git clone https://github.com/SongshGeo/shifting_baseline.git
 cd shifting_baseline
 ```
 
-2. Install dependencies using Poetry:
+2. Install dependencies using uv:
 ```bash
-poetry install
+uv sync
 ```
 
-Or using pip:
+Install documentation tooling when needed:
 ```bash
-pip install -r requirements-docs.txt
+uv sync --group docs
 ```
 
 3. Activate the environment:
 ```bash
-poetry shell
+source .venv/bin/activate
 ```
 
 ## Usage
@@ -135,12 +135,12 @@ The analysis integrates multiple data sources:
 Run tests using pytest:
 
 ```bash
-poetry run pytest
+uv run python -m pytest
 ```
 
 With coverage:
 ```bash
-poetry run pytest --cov=shifting_baseline
+uv run python -m pytest --cov=shifting_baseline
 ```
 
 ## Documentation

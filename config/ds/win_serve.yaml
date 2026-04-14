@@ -1,5 +1,5 @@
 # 项目根目录
-root: /Users/songshgeo/Documents/VSCode/shifting_baseline
+root: /Users/songshgeo/Documents/CodeBase/Scholar/shifting_baseline
 # 项目数据目录
 processed: ${ds.root}/data
 

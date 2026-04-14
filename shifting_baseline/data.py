@@ -32,7 +32,6 @@ from shifting_baseline.constants import (
     STD_THRESHOLDS,
 )
 from shifting_baseline.filters import classify
-from shifting_baseline.mc import combine_reconstructions, standardize_both
 from shifting_baseline.utils.calc import calc_corr, rand_generate_from_std_levels
 
 if TYPE_CHECKING:
@@ -97,6 +96,8 @@ def load_nat_data(
         datasets (pd.DataFrame): 数据
         uncertainties (pd.DataFrame): 不确定性
     """
+    from shifting_baseline.mc import standardize_both
+
     includes_str = ", ".join(includes)
     log.info("从 %s 加载自然数据: %s", folder, includes_str)
     log.debug("年份范围: %s-%s", start_year, end_year)
@@ -1026,6 +1027,8 @@ def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRe
     log.debug("数据路径: %s", cfg.ds.noaa)
     log.debug("数据包括: %s", cfg.ds.includes)
     if cfg.recalculate_data:
+        from shifting_baseline.mc import combine_reconstructions
+
         log.info("重新计算自然数据 ...")
         datasets, uncertainties = load_nat_data(
             folder=cfg.ds.noaa,

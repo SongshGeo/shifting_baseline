@@ -74,11 +74,7 @@ report.analyze_error_patterns()
 ## Installation
 
 ```bash
-# Using Poetry (recommended)
-poetry install
-
-# Or using pip
-pip install -e .
+uv sync
 ```
 
 ## Documentation Structure

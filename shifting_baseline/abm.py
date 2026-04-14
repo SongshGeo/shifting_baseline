@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import logging
 import traceback
 from collections import deque
 from datetime import datetime
@@ -348,7 +347,7 @@ class ClimateObserver(Actor):
         if np.isnan(std):
             std = 1
         # Calculate the z-score of the current climate
-        return climate - baseline / std
+        return (climate - baseline) / std
 
     def step(self) -> None:
         """Update observer state at each step.

@@ -3,7 +3,7 @@ setname: "mac" # 数据集名称
 description: "所有重建数据都用到了" # 数据集描述
 
 # 项目根目录
-root: /Users/songshgeo/Documents/VSCode/shifting_baseline
+root: /Users/songshgeo/Documents/CodeBase/Scholar/shifting_baseline
 # 项目数据目录
 processed: ${ds.root}/data
 multirun: ${ds.root}/multirun
@@ -27,8 +27,8 @@ atlas:
   shp: ${ds.data}/中国历史千年旱涝数据/point.shp
   region: 华北地区
 
-# abm: ${ds.multirun}/2025-07-27/23-18-33  # 之前的
-abm: ${ds.multirun}/2025-09-11/15-46-18
+# abm: ${ds.multirun}/2025-09-11/15-46-18  # 之前的
+abm: ${ds.multirun}/2026-04-14/08-31-17
 
 # 整合校验数据，提取夏季降水，并保存为nc文件
 # 用于计算自然数据，调用 process.py 脚本

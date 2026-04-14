@@ -7,7 +7,7 @@ Thank you for your interest in contributing to Shifting Baseline! This guide wil
 ### Prerequisites
 
 - Python 3.11+
-- Poetry (recommended) or pip
+- uv
 - Git
 - A code editor (VS Code, PyCharm, etc.)
 
@@ -21,11 +21,7 @@ Thank you for your interest in contributing to Shifting Baseline! This guide wil
 
 2. **Install dependencies:**
    ```bash
-   # Using Poetry (recommended)
-   poetry install --with dev
-
-   # Or using pip
-   pip install -e ".[dev]"
+   uv sync
    ```
 
 3. **Install pre-commit hooks:**
@@ -37,7 +33,7 @@ Thank you for your interest in contributing to Shifting Baseline! This guide wil
 
 ```bash
 # Activate virtual environment
-poetry shell
+source .venv/bin/activate
 
 # Or create virtual environment manually
 python -m venv venv
