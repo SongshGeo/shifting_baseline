@@ -10,6 +10,12 @@ loss_rate: 0.4
 new_agents: 5
 min_age: 10
 memory_baseline: "personal"
+step_per_year: 1
+subannual_aggregation: "mean"  # mean, sum, last
+climate_process: "iid"  # iid, ar1, trend_plus_noise
+climate_sigma: 1.0
+climate_phi: 0.5
+climate_trend: 0.0
 
 # 相关性计算参数
 min_period: ${min_period}

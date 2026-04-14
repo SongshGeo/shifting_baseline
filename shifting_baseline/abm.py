@@ -11,7 +11,7 @@ import traceback
 from collections import deque
 from datetime import datetime
 from functools import cached_property
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 import numpy as np
 import pandas as pd
@@ -21,6 +21,9 @@ from omegaconf import DictConfig
 from scipy.stats import norm
 
 from shifting_baseline.calibration import MismatchReport
+from shifting_baseline.climate_forcing import SubannualAggregation
+from shifting_baseline.climate_forcing import generate as generate_climate_forcing
+from shifting_baseline.climate_forcing import sigma_tick_from_sigma_year
 from shifting_baseline.compare import compare_corr_2d
 from shifting_baseline.constants import MAX_AGE
 from shifting_baseline.filters import (
@@ -67,24 +70,93 @@ class ClimateObservingModel(MainModel):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self._step_per_year: int = int(self.p.get("step_per_year", 1))
+        if self._step_per_year < 1:
+            raise ValueError("step_per_year must be >= 1")
+        raw_agg = self.p.get("subannual_aggregation", "mean")
+        if raw_agg not in {"mean", "sum", "last"}:
+            raise ValueError(
+                "subannual_aggregation must be one of {'mean', 'sum', 'last'}"
+            )
+        self._subannual_aggregation: SubannualAggregation = cast(
+            SubannualAggregation, raw_agg
+        )
+        self._climate_process: str = self.p.get("climate_process", "iid")
+        # ``climate_sigma`` is interpreted as yearly-scale sigma. When
+        # ``step_per_year > 1`` we rescale to tick-scale internally so that
+        # annual and subannual runs remain comparable after yearly aggregation.
+        self._climate_sigma_year: float = float(self.p.get("climate_sigma", 1.0))
+        self._climate_sigma_tick: float = sigma_tick_from_sigma_year(
+            sigma_year=self._climate_sigma_year,
+            step_per_year=self._step_per_year,
+            subannual_aggregation=self._subannual_aggregation,
+        )
+        self._climate_phi: float = float(self.p.get("climate_phi", 0.5))
+        self._climate_trend: float = float(self.p.get("climate_trend", 0.0))
         # Years to simulate
         years: int = self.p.get("years", 100)
         # Maximum age for an observer
-        self._max_age: int = self.p.get("max_age", 40)
+        self._max_age_years: int = self.p.get("max_age", 40)
         self._new_agents: int = self.p.get("new_agents", 10)
         # Minimum age for recording events
-        self._min_age: int = self.p.get("min_age", 10)
+        self._min_age_years: int = self.p.get("min_age", 10)
+        self._max_age_ticks: int = self._max_age_years * self._step_per_year
+        self._min_age_ticks: int = self._min_age_years * self._step_per_year
         # Cache for collective memory
         self._collective_cache: Optional[pd.Series] = None
         self._collective_cache_tick: int = -1
-        self.spin_up_years: int = self._new_agents * (self._max_age - self._min_age + 1)
+        self.spin_up_years: int = self._new_agents * (
+            self._max_age_years - self._min_age_years + 1
+        )
+        self.spin_up_ticks: int = self.spin_up_years * self._step_per_year
         # Total simulation years
         self._years: int = years + self.spin_up_years
+        self._ticks: int = self._years * self._step_per_year
         # Climate time series
-        self._climate: np.ndarray = np.random.normal(0, 1, self._years)
+        self._climate: np.ndarray = self._generate_climate_series(self._ticks)
         # Archive of recorded events per year
-        self._archive: dict[int, list[int]] = {i: [] for i in range(self._years)}
+        self._archive: dict[int, list[int]] = {i: [] for i in range(self._ticks)}
         log.info(f"运行模式: {self.p.get('mode', 'exp')}")
+
+    def _generate_climate_series(self, n_ticks: int) -> np.ndarray:
+        """Generate discrete climate forcing for the current scenario.
+
+        Delegates to :mod:`shifting_baseline.climate_forcing`. Sigma is
+        passed in tick-scale after internal rescaling from the yearly-scale
+        ``climate_sigma`` config value.
+        """
+        return generate_climate_forcing(
+            self._climate_process,  # type: ignore[arg-type]
+            n_ticks,
+            sigma=self._climate_sigma_tick,
+            step_per_year=self._step_per_year,
+            phi=self._climate_phi,
+            trend_per_year=self._climate_trend,
+        )
+
+    def _aggregate_to_yearly(self, series: pd.Series) -> pd.Series:
+        """Aggregate a tick-indexed series to a year-indexed series.
+
+        When ``step_per_year == 1`` tick and year indices coincide and the
+        series is returned unchanged. Otherwise ticks are grouped by
+        ``tick // step_per_year`` and reduced by the configured aggregator.
+
+        Args:
+            series: Tick-level series indexed by tick id.
+
+        Returns:
+            Year-level aggregated series indexed by year id.
+        """
+        if self._step_per_year == 1:
+            return series
+        year_index = series.index // self._step_per_year
+        if self._subannual_aggregation == "mean":
+            return series.groupby(year_index).mean()
+        if self._subannual_aggregation == "sum":
+            return series.groupby(year_index).sum()
+        if self._subannual_aggregation == "last":
+            return series.groupby(year_index).last()
+        raise ValueError("subannual_aggregation must be one of {'mean', 'sum', 'last'}")
 
     @property
     def is_nan(self) -> bool:
@@ -93,8 +165,10 @@ class ClimateObservingModel(MainModel):
 
     @property
     def climate_now(self) -> float:
-        """Current climate value at the current tick.
-        (WDI, Z-score of the current climate)
+        """Current climate forcing at the current tick.
+
+        The model always reads climate as a discrete forcing sequence.
+        This value is not assumed to be a continuous physical process.
 
         Returns:
             float: Current climate value.
@@ -103,12 +177,12 @@ class ClimateObservingModel(MainModel):
 
     @cached_property
     def climate_series(self) -> pd.Series:
-        """Full climate time series.
+        """Full tick-level climate forcing series.
 
         Returns:
-            pd.Series: Climate values indexed by year.
+            pd.Series: Climate values indexed by model tick.
         """
-        return pd.Series(self._climate, index=range(self._years))
+        return pd.Series(self._climate, index=range(self._ticks))
 
     @property
     def collective_memory_climate(self) -> pd.Series:
@@ -170,8 +244,10 @@ class ClimateObservingModel(MainModel):
 
     @property
     def climate_df(self) -> pd.DataFrame:
-        """Climate DataFrame, sliced by spin-up years.
-        (Objective Climate, Collective Memory Climate)
+        """Model-vs-memory climate table after spin-up.
+
+        When ``step_per_year > 1`` this method aggregates tick-level series
+        to year-level by ``subannual_aggregation``.
 
         Returns:
             pd.DataFrame: DataFrame with columns 'climate' and 'collective_memory_climate'.
@@ -181,11 +257,19 @@ class ClimateObservingModel(MainModel):
         """
         if self.is_nan:
             raise ValueError("Collective memory is all NaN, did you run the model?")
-        slice_ = slice(self.spin_up_years, None)
+        # Aggregate the full series to yearly first, then drop spin-up years.
+        # Slicing before aggregation caused groupby to emit NaN year buckets
+        # for the spin-up range and shortened the effective analysis window.
+        climate = self._aggregate_to_yearly(self.climate_series)
+        collective = self._aggregate_to_yearly(self.collective_memory_climate).reindex(
+            climate.index
+        )
+        climate = climate.loc[self.spin_up_years :]
+        collective = collective.loc[self.spin_up_years :]
         return pd.DataFrame(
             {
-                "climate": self.climate_series.loc[slice_],
-                "collective_memory_climate": self.collective_memory_climate.loc[slice_],
+                "climate": climate,
+                "collective_memory_climate": collective,
             }
         )
 
@@ -228,9 +312,14 @@ class ClimateObservingModel(MainModel):
             - Update observer perception
             - Update observer writing down
         """
-        if self.time.tick == self._years - 1:
+        if self.time.tick == self._ticks - 1:
             self.running = False
-        self.agents.new(ClimateObserver, self._new_agents, max_age=self._max_age)
+        self.agents.new(
+            ClimateObserver,
+            self._new_agents,
+            max_age=self._max_age_ticks,
+            min_age=self._min_age_ticks,
+        )
         self.agents.do("step")
 
     def end(self) -> None:
@@ -275,11 +364,17 @@ class ClimateObserver(Actor):
         _min_age (int): Minimum age to start recording events.
     """
 
-    def __init__(self, *args, max_age: int = MAX_AGE, **kwargs):
+    def __init__(
+        self,
+        *args,
+        max_age: int = MAX_AGE,
+        min_age: int = 10,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._memory: deque = deque(maxlen=max_age)
         self._max_age: int = max_age
-        self._min_age: int = self.p.get("min_age", 10)
+        self._min_age: int = min_age
 
     @property
     def memory(self) -> np.ndarray:
