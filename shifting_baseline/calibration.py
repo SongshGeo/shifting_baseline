@@ -253,8 +253,8 @@ class MismatchReport:
         mc_std_matrix = combined_matrices.groupby(level=0).std()
 
         # 确保索引一致
-        for matrix in [mc_mean_matrix, mc_std_matrix]:
-            matrix = matrix.reindex(index=LEVELS, columns=LEVELS)
+        mc_mean_matrix = mc_mean_matrix.reindex(index=LEVELS, columns=LEVELS)
+        mc_std_matrix = mc_std_matrix.reindex(index=LEVELS, columns=LEVELS)
 
         # 计算p值
         z_scores = (self.diff_matrix - mc_mean_matrix) / mc_std_matrix

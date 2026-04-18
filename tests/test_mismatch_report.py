@@ -453,6 +453,57 @@ class TestMismatchReportMonteCarlo:
         assert hasattr(report, "diff_matrix")
         assert hasattr(report, "p_value_matrix")
 
+    def test_p_value_matrix_axes_recover_from_partial_mc_output(
+        self, realistic_data, monkeypatch
+    ):
+        """Regression guard for Bug 2a (calibration.py:255-257).
+
+        ``_run_significance_test`` must reindex ``mc_mean_matrix`` /
+        ``mc_std_matrix`` to the full LEVELS on both axes before
+        computing z-scores. The pre-fix code wrote
+        ``matrix = matrix.reindex(...)`` inside a for-loop, which only
+        rebound the loop variable and left the originals unchanged.
+
+        To surface the bug we force every MC iteration's diff-matrix to
+        carry labels outside LEVELS. Without an explicit reindex the
+        arithmetic alignment of ``self.diff_matrix - mc_mean_matrix``
+        produces an axis that is the union of LEVELS and the foreign
+        labels (shape != 5×5); the fix collapses it back to LEVELS.
+        """
+        from shifting_baseline import calibration
+
+        pred, true = realistic_data
+        natural_data = pd.Series(np.random.normal(0, 1, len(pred)), index=pred.index)
+        report = MismatchReport(pred, true, value_series=natural_data)
+
+        original = calibration.MismatchReport._create_misclassification_matrix
+        calls = {"n": 0}
+        foreign_idx = {-2: 100, -1: 101, 0: 102, 1: 103, 2: 104}
+        foreign_col = {-2: 200, -1: 201, 0: 202, 1: 203, 2: 204}
+
+        def _foreign_axes(self, df):
+            calls["n"] += 1
+            result = original(self, df)
+            # First call builds self.diff_matrix from real data; keep LEVELS.
+            # Later calls are MC iterations; relabel to foreign values so
+            # the aggregated mc_mean/mc_std carry non-LEVELS axes.
+            if calls["n"] == 1:
+                return result
+            return result.rename(index=foreign_idx, columns=foreign_col)
+
+        monkeypatch.setattr(
+            calibration.MismatchReport,
+            "_create_misclassification_matrix",
+            _foreign_axes,
+        )
+
+        report.analyze_error_patterns(mc_runs=5)
+
+        assert report.p_value_matrix is not None
+        assert report.p_value_matrix.shape == (5, 5)
+        assert report.p_value_matrix.index.tolist() == LEVELS
+        assert report.p_value_matrix.columns.tolist() == LEVELS
+
 
 class TestMismatchReportVisualization:
     """Tests for plotting and visualization functionality."""
