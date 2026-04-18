@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Literal
+from typing import TYPE_CHECKING, Callable, Literal, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -55,14 +55,18 @@ def compare_corr(
     default_kwargs = {
         "window": n // 10,  # 默认窗口为样本数的1/10
         "center": False,  # 默认不居中
-        "min_periods": min(np.log2(n), 2),  # 默认最小窗口为样本数的对数
+        "min_periods": max(int(np.log2(n)), 2),  # 默认最小窗口为样本数的对数（下限 2）
         "closed": "both",  # 默认闭合方式为both
     }
     default_kwargs.update(rolling_kwargs)
-    if default_kwargs["window"] <= default_kwargs["min_periods"] + n_diff_w:
+    # Cast narrow the numeric kwargs — ``default_kwargs`` is inferred as
+    # ``dict[str, object]`` by mypy because its literal has mixed value types.
+    window_val = cast(int, default_kwargs["window"])
+    min_periods_val = cast("int | float", default_kwargs["min_periods"])
+    if window_val <= min_periods_val + n_diff_w:
         if window_error == "raise":
             raise ValueError(
-                f"窗口{default_kwargs['window']}太小，n_periods={default_kwargs['min_periods']}，n_diff_w={n_diff_w}，请增大窗口范围"
+                f"窗口{window_val}太小，n_periods={min_periods_val}，n_diff_w={n_diff_w}，请增大窗口范围"
             )
         elif window_error == "nan":
             return np.nan, np.nan, n
@@ -223,7 +227,12 @@ def experiment_corr_2d(
     max_corr = np.nanmax(filtered)
     improvement = (max_corr - r_benchmark) / r_benchmark * 100
     log.info("最大相关性系数: %.5f，改进百分比: %.2f%%", max_corr, float(improvement))
-    log.info("最大相关性系数年份: %s", float(filtered_df.idxmax().max()))
+    # pandas >= 2.1 raises on idxmax across all-NaN columns; drop them first.
+    valid_cols = filtered_df.dropna(how="all", axis=1)
+    best_year = (
+        float(valid_cols.idxmax().max()) if not valid_cols.empty else float("nan")
+    )
+    log.info("最大相关性系数年份: %s", best_year)
     ax.set_title(f"{corr_method.capitalize()} Corr. Coef.")
     return filtered_df, r_benchmark, ax
 
