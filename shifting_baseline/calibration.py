@@ -88,14 +88,14 @@ class MismatchReport:
 
     @property
     def false_count_matrix(self) -> pd.DataFrame:
-        """返回false count矩阵"""
+        """返回 false count 矩阵（与 ``cm_df`` 同朝向：行=pred，列=true）"""
         # 计算错误计数矩阵（对角线为0，其他为实际错误数）
-        true = np.zeros((self.n_categories, self.n_categories), dtype=bool)
-        np.fill_diagonal(true, 1)
+        diag = np.zeros((self.n_categories, self.n_categories), dtype=bool)
+        np.fill_diagonal(diag, 1)
         return pd.DataFrame(
-            np.where(true, 0, self.cm_df.values),
-            index=pd.Series(LEVELS, name="true"),
-            columns=pd.Series(LEVELS, name="pred"),
+            np.where(diag, 0, self.cm_df.values),
+            index=pd.Series(LEVELS, name="pred"),
+            columns=pd.Series(LEVELS, name="true"),
         )
 
     @property
@@ -132,11 +132,19 @@ class MismatchReport:
         self.n_categories = len(self.labels)
 
     def _compute_confusion_matrix(self):
-        """计算混淆矩阵"""
+        """计算混淆矩阵
+
+        sklearn's ``confusion_matrix(y_true, y_pred)`` returns a matrix whose
+        rows index ``y_true`` and columns index ``y_pred``. The ``.T`` here
+        transposes that to rows=``pred`` / cols=``true`` so the matrix
+        lines up with ``plot_confusion_matrix``'s axes (y=Historical
+        Archives=pred, x=Natural Proxies=true) and with the downstream
+        ``plot_mismatch_matrix.loc[pred, true]`` access pattern.
+        """
         cm = confusion_matrix(self.true_clean, self.pred_clean, labels=LEVELS).T
         self.cm_df = pd.DataFrame(cm, index=self.labels, columns=self.labels)
-        self.cm_df.index.name = "true"
-        self.cm_df.columns.name = "pred"
+        self.cm_df.index.name = "pred"
+        self.cm_df.columns.name = "true"
 
     def analyze_error_patterns(
         self,

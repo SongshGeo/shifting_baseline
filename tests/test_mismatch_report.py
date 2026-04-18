@@ -330,6 +330,54 @@ class TestMismatchReportConfusionMatrix:
 
         assert report.cm_df.sum().sum() == len(report.pred_clean)
 
+    def test_confusion_matrix_orientation_rows_are_pred(self):
+        """Regression guard for Bug 2b (calibration.py:134-139).
+
+        The project transposes ``sklearn.confusion_matrix`` so that rows
+        index predicted classes and columns index true classes — this is
+        what ``plot_confusion_matrix`` (``y="Historical Archives"=pred``,
+        ``x="Natural Proxies"=true``) and ``plot_mismatch_matrix``
+        (``loc[l1=pred, l2=true]``) assume. Pre-fix the index/column
+        *names* were swapped ("true"/"pred" reversed); no numerical
+        consequence, but downstream `loc`-based access would have been
+        misleading.
+
+        We set up a 2-class-only dataset where pred and true class
+        distributions differ, so the row- and column-sum vectors are
+        distinct. Then we can verify both orientation (row sums match
+        pred class counts) and axis names.
+        """
+        from shifting_baseline.constants import LEVELS
+
+        index = pd.date_range("2000-01-01", periods=10, freq="D")
+        # True distribution: 3 × -2, 7 × 0
+        true_vals = pd.Series([-2, -2, -2, 0, 0, 0, 0, 0, 0, 0], index=index)
+        # Pred distribution: 1 × -2, 3 × 0, 6 × 1
+        pred_vals = pd.Series([-2, 0, 0, 0, 1, 1, 1, 1, 1, 1], index=index)
+
+        report = MismatchReport(pred_vals, true_vals)
+
+        cm = report.cm_df
+        # Row sums = pred class counts
+        pred_counts_expected = {-2: 1, -1: 0, 0: 3, 1: 6, 2: 0}
+        row_sums = dict(zip(LEVELS, cm.sum(axis=1).values))
+        assert (
+            row_sums == pred_counts_expected
+        ), f"rows of cm_df should index pred classes, got row_sums={row_sums}"
+        # Column sums = true class counts
+        true_counts_expected = {-2: 3, -1: 0, 0: 7, 1: 0, 2: 0}
+        col_sums = dict(zip(LEVELS, cm.sum(axis=0).values))
+        assert (
+            col_sums == true_counts_expected
+        ), f"columns of cm_df should index true classes, got col_sums={col_sums}"
+        # Axis name metadata must agree with the data orientation.
+        assert cm.index.name == "pred"
+        assert cm.columns.name == "true"
+        # false_count_matrix must inherit the same orientation + names.
+        fcm = report.false_count_matrix
+        assert fcm.index.name == "pred"
+        assert fcm.columns.name == "true"
+
 
 class TestMismatchReportErrorAnalysis:
     """Tests for error pattern analysis functionality."""
