@@ -47,6 +47,9 @@ def send_notification_email(
         error_msg: Error message if failed
         start_time: When the run started
     """
+    # 批量运行（如全局敏感性分析）需要静默通知，避免邮件风暴。
+    if os.getenv("EMAIL_DISABLE", "").strip().lower() in {"1", "true", "yes"}:
+        return
     # 从环境变量获取邮箱配置
     sender_email_final = sender_email or os.getenv("EMAIL_SENDER")
     sender_password_final = sender_password or os.getenv("EMAIL_PASSWORD")

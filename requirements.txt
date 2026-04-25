@@ -130,6 +130,8 @@ debugpy==1.8.20
     # via ipykernel
 decorator==5.2.1
     # via ipython
+dill==0.4.1
+    # via multiprocess
 et-xmlfile==2.0.0
     # via openpyxl
 etuples==0.3.10
@@ -292,6 +294,7 @@ matplotlib==3.10.8
     #   mesa
     #   mksci-font
     #   nc-time-axis
+    #   salib
     #   seaborn
     #   shifting-baseline
 matplotlib-inline==0.2.1
@@ -315,6 +318,8 @@ multipledispatch==1.0.0
     #   etuples
     #   logical-unification
     #   minikanren
+multiprocess==0.70.19
+    # via salib
 narwhals==2.19.0
     # via altair
 nbformat==5.10.4
@@ -362,6 +367,7 @@ numpy==2.4.4
     #   pythran
     #   rasterio
     #   rioxarray
+    #   salib
     #   scikit-learn
     #   scipy
     #   seaborn
@@ -405,6 +411,7 @@ pandas==3.0.2
     #   libpysal
     #   mesa
     #   pymc
+    #   salib
     #   seaborn
     #   shifting-baseline
     #   statsmodels
@@ -550,6 +557,8 @@ rpds-py==0.30.0
     #   referencing
 rtree==1.4.1
     # via mesa-geo
+salib==1.5.2
+    # via shifting-baseline
 scikit-learn==1.8.0
     # via
     #   libpysal
@@ -564,6 +573,7 @@ scipy==1.17.1
     #   mesa
     #   pymc
     #   pytensor
+    #   salib
     #   scikit-learn
     #   shifting-baseline
     #   statsmodels
