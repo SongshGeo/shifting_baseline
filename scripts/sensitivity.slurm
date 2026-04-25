@@ -24,15 +24,20 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=128G
-#SBATCH --time=48:00:00
-# Memory note: 32 concurrent ABM subprocesses each need ~2-4 GB at peak
-# (Python interp + abses + agent archive at corner cases). Empirically
-# `--mem=32G` OOM'd at ~40% of one Morris sample under memory pressure
-# (job 9503, 2026-04-25). 128 GB total = ~4 GB/worker, comfortable.
-# Smaller-mem nodes? Drop both --cpus-per-task and --mem proportionally:
-#   --cpus-per-task=16 --mem=64G   (still 4 GB/worker)
-#   --cpus-per-task=8  --mem=32G   (still 4 GB/worker)
+#SBATCH --mem=256G
+#SBATCH --time=120:00:00
+# Resource note: 32 concurrent ABM subprocesses; each peaks ~2-4 GB at
+# corner cases. Empirically `--mem=32G` OOM'd at ~40% of one Morris
+# sample (job 9503, 2026-04-25). 256 GB ≈ 8 GB/worker = generous margin.
+#
+# Time: Sobol N=1024 / k=5 / mean 926s estimated ~68 h per baseline;
+# 120 h (5 days) leaves ~75% headroom under the cluster's 7-day cap.
+# Morris runs in <2 h regardless — it just inherits the same allocation.
+#
+# Smaller-mem nodes? Drop --cpus-per-task and --mem proportionally
+# (keep ~8 GB/worker):
+#   --cpus-per-task=16 --mem=128G
+#   --cpus-per-task=8  --mem=64G
 # The ThreadPoolExecutor in run_sensitivity.py uses $SLURM_CPUS_PER_TASK
 # automatically.
 # #SBATCH --partition=cpu             # uncomment & set for your site
