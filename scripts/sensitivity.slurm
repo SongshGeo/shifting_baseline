@@ -24,8 +24,17 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=32G
+#SBATCH --mem=128G
 #SBATCH --time=48:00:00
+# Memory note: 32 concurrent ABM subprocesses each need ~2-4 GB at peak
+# (Python interp + abses + agent archive at corner cases). Empirically
+# `--mem=32G` OOM'd at ~40% of one Morris sample under memory pressure
+# (job 9503, 2026-04-25). 128 GB total = ~4 GB/worker, comfortable.
+# Smaller-mem nodes? Drop both --cpus-per-task and --mem proportionally:
+#   --cpus-per-task=16 --mem=64G   (still 4 GB/worker)
+#   --cpus-per-task=8  --mem=32G   (still 4 GB/worker)
+# The ThreadPoolExecutor in run_sensitivity.py uses $SLURM_CPUS_PER_TASK
+# automatically.
 # #SBATCH --partition=cpu             # uncomment & set for your site
 # #SBATCH --account=your_account      # uncomment & set for your site
 # #SBATCH --mail-type=END,FAIL
