@@ -78,16 +78,18 @@ case "$STAGE" in
             --repeats 30 --years 100 --n-samples 5
         ;;
     morris)
-        # --timeout 1800 protects the queue from rare corner-case samples
-        # (high max_age × new_agents → huge archive → ABM goes O(archive^2)).
-        # Timed-out samples are recorded as "error: ..." in raw_outputs.csv
-        # and SALib analysis falls back to nanmedian-fill for missing Y.
+        # --timeout 3600 protects the queue from rare corner-case samples.
+        # Empirical (cluster, 2026-04-25): mean 926s, max 2461s at
+        # max_age=55, new_agents=15, loss_rate=0.02 (huge archive, O(archive^2)
+        # in collective-baseline memory updates). 3600s = 1h covers the
+        # observed max with headroom; timed-out samples are recorded as
+        # "error: timeout ..." and SALib falls back to nanmedian fill.
         $PY reports/run_sensitivity.py morris \
             --memory-baseline "$BASELINE" \
             --r-trajectories 20 --num-levels 4 \
             --repeats 30 --years 100 \
             --n-workers "$N_WORKERS" \
-            --timeout 1800 \
+            --timeout 3600 \
             --climate-process ar1
         ;;
     sobol)
@@ -96,7 +98,7 @@ case "$STAGE" in
             --N "$N_SOBOL" \
             --repeats 30 --years 100 \
             --n-workers "$N_WORKERS" \
-            --timeout 1800 \
+            --timeout 3600 \
             --climate-process ar1
         ;;
     *)
