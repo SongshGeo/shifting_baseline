@@ -19,11 +19,12 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -59,6 +60,55 @@ PARAM_BOUNDS: dict[str, tuple[float, float]] = {
 PARAM_INTEGER: frozenset[str] = frozenset({"max_age", "new_agents"})
 
 RESPONSE_METRICS: tuple[str, ...] = ("peak_window_mean", "peak_strength_mean")
+
+# Fixed result-row schema. Stable across success / error rows so streaming
+# appends to ``raw_outputs.csv`` produce a well-formed table even if the job
+# is killed mid-run.
+_METRIC_COLUMNS: tuple[str, ...] = (
+    "peak_window_mean",
+    "peak_window_std",
+    "peak_strength_mean",
+    "peak_strength_std",
+    "n_replicates",
+    "elapsed_seconds",
+)
+
+
+def _result_columns(param_names: Sequence[str]) -> list[str]:
+    return ["sample_idx", *param_names, *_METRIC_COLUMNS, "status"]
+
+
+def _empty_row(idx: int, params_row: np.ndarray, param_names: Sequence[str]) -> dict:
+    """Pre-fill a result row with sample idx + params and NaN metrics.
+
+    Both success and error paths fill into this skeleton, so the CSV columns
+    stay aligned regardless of which branch a sample took.
+    """
+    row: dict = {"sample_idx": int(idx)}
+    for i, name in enumerate(param_names):
+        row[name] = float(params_row[i])
+    for col in _METRIC_COLUMNS:
+        row[col] = float("nan")
+    row["status"] = "pending"
+    return row
+
+
+def _read_done_idxs(progress_path: Path) -> set[int]:
+    """Return sample_idx values already persisted in ``raw_outputs.csv``.
+
+    Used to resume a partially-completed run after a SLURM time-limit kill:
+    the new invocation skips any sample already on disk. To force a re-run,
+    delete the row (or the whole file) before resubmitting.
+    """
+    if not progress_path.exists():
+        return set()
+    try:
+        existing = pd.read_csv(progress_path)
+    except (pd.errors.EmptyDataError, pd.errors.ParserError):
+        return set()
+    if "sample_idx" not in existing.columns:
+        return set()
+    return set(existing["sample_idx"].dropna().astype(int).tolist())
 
 
 def define_problem(names: Sequence[str] = PARAM_NAMES) -> dict:
@@ -214,13 +264,40 @@ def _evaluate_samples(
     n_workers: int,
     keep_run_dirs: bool,
     timeout: float | None = None,
+    runner: Callable[..., RunOneResult] = run_one,
+    progress_filename: str = "raw_outputs.csv",
 ) -> pd.DataFrame:
-    """Run ABM at each row of ``samples`` (concurrent threads). Returns long-form DataFrame."""
+    """Run ABM at each row of ``samples`` (concurrent threads).
+
+    Streams each completed sample's row to ``output_root/raw_outputs.csv`` as
+    soon as it finishes, under a thread lock. If that file already exists from
+    a previous (killed) invocation, indices already present are skipped — so
+    resubmitting the same SLURM script picks up where it left off instead of
+    redoing 70%+ of the samples.
+
+    Returns the full long-form DataFrame (including resumed rows).
+    """
+    output_root = Path(output_root)
+    output_root.mkdir(parents=True, exist_ok=True)
+    progress_path = output_root / progress_filename
+    cols = _result_columns(param_names)
+    write_lock = threading.Lock()
+    done_idxs = _read_done_idxs(progress_path)
+
+    todo = [i for i in range(len(samples)) if i not in done_idxs]
+
+    def _flush(row: dict) -> None:
+        normalized = {c: row.get(c, float("nan")) for c in cols}
+        df = pd.DataFrame([normalized], columns=cols)
+        with write_lock:
+            header = not progress_path.exists()
+            df.to_csv(progress_path, mode="a", header=header, index=False)
 
     def _one(idx: int) -> dict:
+        row = _empty_row(idx, samples[idx], param_names)
         run_dir = output_root / f"sample_{idx:06d}"
         try:
-            result = run_one(
+            result = runner(
                 samples[idx],
                 memory_baseline=memory_baseline,
                 run_dir=run_dir,
@@ -232,38 +309,35 @@ def _evaluate_samples(
                 cleanup=not keep_run_dirs,
                 timeout=timeout,
             )
-            row = {
-                "sample_idx": idx,
-                **result.params,
-                **result.metrics,
-                "elapsed_seconds": result.elapsed_seconds,
-                "status": "ok",
-            }
+            for name, value in result.params.items():
+                row[name] = value
+            for k, v in result.metrics.items():
+                if k in row:
+                    row[k] = v
+            row["elapsed_seconds"] = result.elapsed_seconds
+            row["status"] = "ok"
         except subprocess.TimeoutExpired:
-            row = {
-                "sample_idx": idx,
-                "status": f"error: timeout after {timeout}s",
-                **{name: float(samples[idx][i]) for i, name in enumerate(param_names)},
-            }
+            row["status"] = f"error: timeout after {timeout}s"
         except Exception as exc:  # pylint: disable=broad-except
-            row = {
-                "sample_idx": idx,
-                "status": f"error: {exc}",
-                **{name: float(samples[idx][i]) for i, name in enumerate(param_names)},
-            }
+            row["status"] = f"error: {exc}"
+        _flush(row)
         return row
 
-    rows: list[dict] = []
     if n_workers <= 1:
-        for idx in range(len(samples)):
-            rows.append(_one(idx))
+        for idx in todo:
+            _one(idx)
     else:
         with ThreadPoolExecutor(max_workers=n_workers) as pool:
-            futures = {pool.submit(_one, idx): idx for idx in range(len(samples))}
+            futures = {pool.submit(_one, idx): idx for idx in todo}
             for fut in as_completed(futures):
-                rows.append(fut.result())
-    rows.sort(key=lambda r: r["sample_idx"])
-    return pd.DataFrame(rows)
+                fut.result()
+
+    if not progress_path.exists():
+        return pd.DataFrame(columns=cols)
+    df = pd.read_csv(progress_path)
+    df = df.drop_duplicates(subset="sample_idx", keep="last")
+    df = df.sort_values("sample_idx").reset_index(drop=True)
+    return df
 
 
 def benchmark_runtime(
@@ -340,7 +414,7 @@ def run_morris(
 
     raw = _evaluate_samples(
         samples,
-        output_root=output_root / "runs",
+        output_root=output_root,
         memory_baseline=memory_baseline,
         param_names=problem["names"],
         repeats=repeats,
@@ -351,7 +425,6 @@ def run_morris(
         keep_run_dirs=keep_run_dirs,
         timeout=timeout,
     )
-    raw.to_csv(output_root / "raw_outputs.csv", index=False)
 
     indices: dict[str, pd.DataFrame] = {}
     successful = raw[raw["status"] == "ok"]
@@ -420,7 +493,7 @@ def run_sobol(
 
     raw = _evaluate_samples(
         samples,
-        output_root=output_root / "runs",
+        output_root=output_root,
         memory_baseline=memory_baseline,
         param_names=problem["names"],
         repeats=repeats,
@@ -431,7 +504,6 @@ def run_sobol(
         keep_run_dirs=keep_run_dirs,
         timeout=timeout,
     )
-    raw.to_csv(output_root / "raw_outputs.csv", index=False)
 
     indices: dict[str, pd.DataFrame] = {}
     successful = raw[raw["status"] == "ok"]

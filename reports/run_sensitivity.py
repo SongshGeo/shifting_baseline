@@ -55,9 +55,20 @@ def _make_run_dir(output_root: Path, stage: str, baseline: str) -> Path:
     return run_dir
 
 
+def _resolve_run_dir(args: argparse.Namespace, stage: str) -> Path:
+    """Use ``--output-dir`` verbatim if given (resume mode), else mint a new
+    timestamped directory under ``--output-root``.
+    """
+    if getattr(args, "output_dir", None):
+        run_dir = Path(args.output_dir).resolve()
+        run_dir.mkdir(parents=True, exist_ok=True)
+        return run_dir
+    return _make_run_dir(args.output_root, stage, args.memory_baseline)
+
+
 def cmd_smoke(args: argparse.Namespace) -> int:
     """One ABM call with tiny knobs; verifies subprocess + parsing path."""
-    run_dir = _make_run_dir(args.output_root, "smoke", args.memory_baseline)
+    run_dir = _resolve_run_dir(args, "smoke")
     print(f"[smoke] writing to {run_dir}")
     start = time.perf_counter()
     # Use defaults near the manuscript point; values are valid SA samples.
@@ -90,7 +101,7 @@ def cmd_smoke(args: argparse.Namespace) -> int:
 
 
 def cmd_benchmark(args: argparse.Namespace) -> int:
-    run_dir = _make_run_dir(args.output_root, "benchmark", args.memory_baseline)
+    run_dir = _resolve_run_dir(args, "benchmark")
     print(f"[benchmark] writing to {run_dir}")
     df = benchmark_runtime(
         run_dir,
@@ -112,7 +123,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
 
 
 def cmd_morris(args: argparse.Namespace) -> int:
-    run_dir = _make_run_dir(args.output_root, "morris", args.memory_baseline)
+    run_dir = _resolve_run_dir(args, "morris")
     print(
         f"[morris] r={args.r_trajectories} levels={args.num_levels} "
         f"workers={args.n_workers} timeout={args.timeout}s → {run_dir}"
@@ -136,7 +147,7 @@ def cmd_morris(args: argparse.Namespace) -> int:
 
 
 def cmd_sobol(args: argparse.Namespace) -> int:
-    run_dir = _make_run_dir(args.output_root, "sobol", args.memory_baseline)
+    run_dir = _resolve_run_dir(args, "sobol")
     print(
         f"[sobol] N={args.N} workers={args.n_workers} timeout={args.timeout}s → {run_dir}"
     )
@@ -194,6 +205,16 @@ def _add_common(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--timeout", type=float, default=None, help="Per-subprocess timeout in seconds."
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Resume into this exact existing directory (must already contain "
+            "the stage's samples.csv). Skips creating a new timestamped dir; "
+            "completed sample_idx values in raw_outputs.csv are reused."
+        ),
     )
 
 

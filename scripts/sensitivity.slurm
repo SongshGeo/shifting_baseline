@@ -9,6 +9,11 @@
 #   sbatch scripts/sensitivity.slurm sobol    collective 1024
 #   sbatch scripts/sensitivity.slurm benchmark personal
 #
+# Resume after a time-limit kill (reuses raw_outputs.csv, only re-runs the
+# missing sample_idx values):
+#   sbatch --export=ALL,RESUME_DIR=reports/results/sensitivity/<existing-dir> \
+#          scripts/sensitivity.slurm sobol collective 1024
+#
 # Args:
 #   $1  stage         : smoke | benchmark | morris | sobol  (default: morris)
 #   $2  baseline      : personal | collective | model       (default: personal)
@@ -51,6 +56,15 @@ STAGE="${1:-morris}"
 BASELINE="${2:-personal}"
 N_SOBOL="${3:-1024}"
 
+# Resume mode: if RESUME_DIR is set (e.g., via `sbatch --export=ALL,RESUME_DIR=…`),
+# the orchestrator reuses that directory's raw_outputs.csv and only runs the
+# missing sample_idx values. Use this after a SLURM time-limit kill.
+RESUME_FLAG=()
+if [[ -n "${RESUME_DIR:-}" ]]; then
+    RESUME_FLAG=(--output-dir "$RESUME_DIR")
+    echo "[resume] continuing into $RESUME_DIR"
+fi
+
 mkdir -p logs/slurm
 
 # --- Environment ------------------------------------------------------------
@@ -84,12 +98,14 @@ case "$STAGE" in
     smoke)
         $PY reports/run_sensitivity.py smoke \
             --memory-baseline "$BASELINE" \
-            --repeats 2 --years 20
+            --repeats 2 --years 20 \
+            ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"}
         ;;
     benchmark)
         $PY reports/run_sensitivity.py benchmark \
             --memory-baseline "$BASELINE" \
-            --repeats 30 --years 100 --n-samples 5
+            --repeats 30 --years 100 --n-samples 5 \
+            ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"}
         ;;
     morris)
         # --timeout 3600 protects the queue from rare corner-case samples.
@@ -104,7 +120,8 @@ case "$STAGE" in
             --repeats 30 --years 100 \
             --n-workers "$N_WORKERS" \
             --timeout 3600 \
-            --climate-process ar1
+            --climate-process ar1 \
+            ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"}
         ;;
     sobol)
         $PY reports/run_sensitivity.py sobol \
@@ -113,7 +130,8 @@ case "$STAGE" in
             --repeats 30 --years 100 \
             --n-workers "$N_WORKERS" \
             --timeout 3600 \
-            --climate-process ar1
+            --climate-process ar1 \
+            ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"}
         ;;
     *)
         echo "Unknown stage: $STAGE" >&2
