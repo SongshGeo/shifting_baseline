@@ -30,13 +30,17 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=256G
-#SBATCH --time=120:00:00
+#SBATCH --time=150:00:00
 # Resource note: 32 concurrent ABM subprocesses; each peaks ~2-4 GB at
 # corner cases. Empirically `--mem=32G` OOM'd at ~40% of one Morris
 # sample (job 9503, 2026-04-25). 256 GB ≈ 8 GB/worker = generous margin.
 #
-# Time: Sobol N=1024 / k=5 / mean 926s estimated ~68 h per baseline;
-# 120 h (5 days) leaves ~75% headroom under the cluster's 7-day cap.
+# Time: After the 2026-05-04 collective_memory_climate fix (frozen
+# per-year random samples), local A/B benchmark shows ~2.3× speedup;
+# expected HPC mean drops from ~926s to ~400s per sample. Sobol N=1024
+# / k=5 (12288 samples) at 32 workers ≈ 43h per baseline. 150h (~6.25
+# days) leaves >70% headroom under the cluster's 7-day cap and absorbs
+# variability from corner-case samples.
 # Morris runs in <2 h regardless — it just inherits the same allocation.
 #
 # Smaller-mem nodes? Drop --cpus-per-task and --mem proportionally
