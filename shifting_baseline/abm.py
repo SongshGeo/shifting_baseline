@@ -105,6 +105,12 @@ class ClimateObservingModel(MainModel):
         # Cache for collective memory
         self._collective_cache: Optional[pd.Series] = None
         self._collective_cache_tick: int = -1
+        # Per-tick cache of the cohort-level (mean, std) used by every observer
+        # under the "collective" baseline. The values are the same for all
+        # observers in the same tick — recomputing them per agent burns ~ms
+        # per call × ~10³ agents × ~10² ticks under the SA upper corner.
+        self._collective_baseline_cache: Optional[tuple[float, float]] = None
+        self._collective_baseline_cache_tick: int = -1
         self.spin_up_years: int = self._new_agents * (
             self._max_age_years - self._min_age_years + 1
         )
@@ -209,6 +215,35 @@ class ClimateObservingModel(MainModel):
         self._collective_cache = series
         self._collective_cache_tick = self.time.tick
         return series
+
+    @property
+    def collective_baseline_stats(self) -> tuple[float, float]:
+        """Cohort-level (mean, std) of the collective memory at this tick.
+
+        Cached per tick. Every observer under the "collective" baseline reads
+        this same scalar pair — computing it once instead of N_agents times
+        is a pure performance fix (no numerical change).
+        """
+        tick = self.time.tick
+        if (
+            self._collective_baseline_cache is not None
+            and self._collective_baseline_cache_tick == tick
+        ):
+            return self._collective_baseline_cache
+        series = self.collective_memory_climate
+        mean_val = float(series.mean()) if len(series) else float("nan")
+        std_val = float(series.std()) if len(series) else float("nan")
+        self._collective_baseline_cache = (mean_val, std_val)
+        self._collective_baseline_cache_tick = tick
+        return self._collective_baseline_cache
+
+    @cached_property
+    def model_baseline_stats(self) -> tuple[float, float]:
+        """(mean, std) of the full climate forcing series; constant for the run.
+
+        Cached once because the climate series doesn't change after init.
+        """
+        return float(self.climate_series.mean()), float(self.climate_series.std())
 
     @property
     def mismatch_report(self) -> MismatchReport:
@@ -422,18 +457,16 @@ class ClimateObserver(Actor):
         Returns:
             float: Z-score of the current climate.
         """
-        # Personal baseline
+        # Personal baseline (per-agent state, can't be hoisted)
         if self.model.p.memory_baseline == "personal":
             baseline = self.memory.mean()
             std = self.memory.std()
-        # Model baseline
+        # Model baseline (constant across the run; cached once on the model)
         elif self.model.p.memory_baseline == "model":
-            baseline = self.model.climate_series.mean()
-            std = self.model.climate_series.std()
-        # Collective baseline
+            baseline, std = self.model.model_baseline_stats
+        # Collective baseline (same scalar for every observer in this tick)
         elif self.model.p.memory_baseline == "collective":
-            baseline = self.model.collective_memory_climate.mean()
-            std = self.model.collective_memory_climate.std()
+            baseline, std = self.model.collective_baseline_stats
         else:
             raise ValueError("Invalid memory baseline")
         # Handle NaN values
