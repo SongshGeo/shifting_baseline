@@ -5,85 +5,105 @@
 #   bash scripts/check_sa_results.sh
 #
 # Prints:
-#   1. SLURM job status (last 10 sbs-sa jobs)
-#   2. File inventory of the two newest sobol dirs
-#   3. mtime of raw_outputs.csv (sanity-check that the two dirs are independent)
-#   4. Per-sample failure rate (status column + NaN counts)
-#   5. Sobol indices (S1, ST + 95% CI) for peak_window and peak_strength
+#   1. SLURM job status
+#   2. File inventory + raw_outputs.csv mtime
+#   3. Per-sample failure rate (status + NaN)
+#   4. Failure-mode analysis (which params drive timeouts)
+#   5. Sobol indices (S1, ST + 95% CI)
+#   6. NaN-fill bias check (was nanmedian-fill triggered?)
 
 set -uo pipefail
 
+DIRS=($(ls -dt reports/results/sensitivity/2026*-sobol-* 2>/dev/null | head -2))
+
 echo "================================================================"
-echo "[1/5] SLURM job history (last 10 sbs-sa jobs)"
+echo "[1/6] SLURM job history (last 12 sbs-sa jobs)"
 echo "================================================================"
 sacct -u "$USER" --name=sbs-sa --starttime=2026-04-25 \
       --format=JobID,JobName,State,Elapsed,ExitCode,Submit -X 2>/dev/null \
-    | tail -n 11
+    | tail -n 13
 
 echo
 echo "================================================================"
-echo "[2/5] Two newest sobol output directories"
+echo "[2/6] File inventory + raw_outputs.csv mtime"
 echo "================================================================"
-DIRS=($(ls -dt reports/results/sensitivity/2026*-sobol-* 2>/dev/null | head -2))
-if [[ ${#DIRS[@]} -lt 2 ]]; then
-    echo "WARNING: found only ${#DIRS[@]} sobol dir(s); expected 2." >&2
-fi
 for d in "${DIRS[@]}"; do
     echo
     echo "--- $d ---"
-    ls -la "$d/"
-done
-
-echo
-echo "================================================================"
-echo "[3/5] raw_outputs.csv mtime (confirm dirs are independent runs)"
-echo "================================================================"
-for d in "${DIRS[@]}"; do
+    ls "$d"/*.csv "$d"/*.json "$d"/*.txt 2>/dev/null
+    n_sample_dirs=$(ls -d "$d"/sample_* 2>/dev/null | wc -l)
+    echo "  sample_NNNNNN sub-dirs: $n_sample_dirs (left-over from failed runs)"
     f="$d/raw_outputs.csv"
-    [[ -f "$f" ]] && stat -c '%y  %n' "$f" 2>/dev/null \
-                  || stat -f '%Sm  %N' "$f" 2>/dev/null
+    [[ -f "$f" ]] && stat -c '  raw_outputs.csv mtime: %y' "$f" 2>/dev/null \
+                  || stat -f '  raw_outputs.csv mtime: %Sm' "$f" 2>/dev/null
 done
 
 echo
 echo "================================================================"
-echo "[4/5] Per-sample failure rate (status + NaN check)"
+echo "[3/6] Per-sample failure rate"
 echo "================================================================"
 for d in "${DIRS[@]}"; do
     echo
     echo "--- $d ---"
     python3 - <<EOF
-import pandas as pd, sys
-try:
-    df = pd.read_csv("$d/raw_outputs.csv")
-except Exception as e:
-    print(f"  ERROR reading raw_outputs.csv: {e}")
-    sys.exit(0)
+import pandas as pd
+df = pd.read_csv("$d/raw_outputs.csv")
 total = len(df)
-ok = (df["status"] == "ok").sum() if "status" in df else float("nan")
-nan_w = df["peak_window_mean"].isna().sum() if "peak_window_mean" in df else float("nan")
-nan_s = df["peak_strength_mean"].isna().sum() if "peak_strength_mean" in df else float("nan")
+ok = (df["status"] == "ok").sum()
 print(f"  total rows         : {total}")
 print(f"  status == ok       : {ok} ({100*ok/total:.2f}%)")
-print(f"  NaN peak_window    : {nan_w}")
-print(f"  NaN peak_strength  : {nan_s}")
-if "status" in df:
-    bad = df[df["status"] != "ok"]
-    if len(bad):
-        print(f"  non-ok status counts:")
-        print(bad["status"].value_counts().to_string())
-        print(f"  median elapsed (failed)  : {bad['elapsed_seconds'].median():.0f}s")
-        print(f"  max    elapsed (failed)  : {bad['elapsed_seconds'].max():.0f}s")
-print(f"  median elapsed (all): {df['elapsed_seconds'].median():.0f}s")
-print(f"  max    elapsed (all): {df['elapsed_seconds'].max():.0f}s")
+print(f"  failed             : {total - ok} ({100*(total-ok)/total:.2f}%)")
+bad = df[df["status"] != "ok"]
+if len(bad):
+    print(f"  failure modes:")
+    print(bad["status"].value_counts().to_string().replace("\n", "\n    "))
+    print(f"  median elapsed (all completed): {df[df['status']=='ok']['elapsed_seconds'].median():.0f}s")
+    print(f"  max    elapsed (all completed): {df[df['status']=='ok']['elapsed_seconds'].max():.0f}s")
+else:
+    print(f"  median elapsed: {df['elapsed_seconds'].median():.0f}s")
+    print(f"  max    elapsed: {df['elapsed_seconds'].max():.0f}s")
 EOF
 done
 
 echo
 echo "================================================================"
-echo "[5/5] Sobol indices (S1 / ST with 95% CI)"
+echo "[4/6] Failure-mode analysis: which params drive timeouts?"
 echo "================================================================"
 for d in "${DIRS[@]}"; do
-    for metric in peak_window peak_strength; do
+    echo
+    echo "--- $d ---"
+    python3 - <<EOF
+import pandas as pd
+df = pd.read_csv("$d/raw_outputs.csv")
+bad = df[df["status"] != "ok"]
+ok  = df[df["status"] == "ok"]
+if len(bad) == 0:
+    print("  (no failures)")
+else:
+    print(f"  Comparing parameter distributions: failed (n={len(bad)}) vs ok (n={len(ok)})")
+    print(f"  {'param':<15} {'ok mean':>12} {'fail mean':>12} {'ratio':>8}")
+    for p in ["max_age", "new_agents", "loss_rate", "climate_sigma", "climate_phi"]:
+        if p in df.columns:
+            ok_m, bad_m = ok[p].mean(), bad[p].mean()
+            ratio = bad_m / ok_m if ok_m else float("nan")
+            print(f"  {p:<15} {ok_m:>12.3f} {bad_m:>12.3f} {ratio:>8.2f}x")
+    print()
+    print(f"  Failed sample param ranges:")
+    print(f"    max_age      : {bad['max_age'].min():.0f} .. {bad['max_age'].max():.0f}")
+    print(f"    new_agents   : {bad['new_agents'].min():.0f} .. {bad['new_agents'].max():.0f}")
+    print(f"    loss_rate    : {bad['loss_rate'].min():.3f} .. {bad['loss_rate'].max():.3f}")
+    print()
+    print(f"  Indices of failed samples (first 30):")
+    print(f"    {bad['sample_idx'].head(30).tolist()}")
+EOF
+done
+
+echo
+echo "================================================================"
+echo "[5/6] Sobol indices (S1, ST + 95% CI)"
+echo "================================================================"
+for d in "${DIRS[@]}"; do
+    for metric in peak_window_mean peak_strength_mean; do
         f="$d/sobol_${metric}.csv"
         echo
         echo "--- $f ---"
@@ -97,6 +117,39 @@ done
 
 echo
 echo "================================================================"
-echo "Done. If failure rate is < 5% and all four sobol_*.csv are present,"
-echo "results are usable for the SI."
+echo "[6/6] NaN-fill bias check"
+echo "================================================================"
+echo "If failure rate > 0, run_sobol() replaces NaN with np.nanmedian(Y) before"
+echo "analysis. This is a soft fallback — indices are still usable but variance"
+echo "contributions from the failed corner are biased toward the median."
+echo
+for d in "${DIRS[@]}"; do
+    if [[ -f "$d/ERRORS.txt" ]]; then
+        echo "--- $d/ERRORS.txt ---"
+        cat "$d/ERRORS.txt"
+    fi
+done
+
+echo
+echo "================================================================"
+echo "[bonus] Generating PNG visualizations"
+echo "================================================================"
+if command -v uv >/dev/null 2>&1; then
+    uv run python reports/plot_sobol.py 2>&1 | sed 's/^/  /'
+elif [[ -f ".venv/bin/activate" ]]; then
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+    python reports/plot_sobol.py 2>&1 | sed 's/^/  /'
+else
+    echo "  (skipped — neither uv nor .venv available)"
+fi
+
+echo
+echo "================================================================"
+echo "Interpretation guide:"
+echo "  - failure rate < 1% : indices fully reliable"
+echo "  - 1-5%              : usable, disclose nanmedian-fill in SI"
+echo "  - 5-10%             : borderline — consider resume with longer timeout"
+echo "                        on the failed sample_idx values only"
+echo "  - > 10%             : do not use; resume required"
 echo "================================================================"

@@ -141,6 +141,7 @@ def cmd_morris(args: argparse.Namespace) -> int:
         keep_run_dirs=args.keep_run_dirs,
         seed=args.seed,
         timeout=args.timeout,
+        retry_failed=args.retry_failed,
     )
     print(f"[morris] done — see {run_dir}")
     return 0
@@ -164,6 +165,7 @@ def cmd_sobol(args: argparse.Namespace) -> int:
         seed=args.seed,
         calc_second_order=args.second_order,
         timeout=args.timeout,
+        retry_failed=args.retry_failed,
     )
     print(f"[sobol] done — see {run_dir}")
     return 0
@@ -214,6 +216,14 @@ def _add_common(parser: argparse.ArgumentParser) -> None:
             "Resume into this exact existing directory (must already contain "
             "the stage's samples.csv). Skips creating a new timestamped dir; "
             "completed sample_idx values in raw_outputs.csv are reused."
+        ),
+    )
+    parser.add_argument(
+        "--retry-failed",
+        action="store_true",
+        help=(
+            "When resuming, only treat status=='ok' rows as done. Failed rows "
+            "(e.g. timeouts) are re-evaluated. Pair with a longer --timeout."
         ),
     )
 

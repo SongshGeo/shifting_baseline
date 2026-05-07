@@ -14,6 +14,13 @@
 #   sbatch --export=ALL,RESUME_DIR=reports/results/sensitivity/<existing-dir> \
 #          scripts/sensitivity.slurm sobol collective 1024
 #
+# Resume + re-run failed samples with a longer timeout (e.g. timeout-corner
+# samples that hit the default 7200s wall):
+#   sbatch --export=ALL,\
+# RESUME_DIR=reports/results/sensitivity/<existing-dir>,\
+# SBS_RETRY_FAILED=1,SBS_SOBOL_TIMEOUT=14400 \
+#          scripts/sensitivity.slurm sobol collective 512
+#
 # Args:
 #   $1  stage         : smoke | benchmark | morris | sobol  (default: morris)
 #   $2  baseline      : personal | collective | model       (default: personal)
@@ -69,6 +76,19 @@ if [[ -n "${RESUME_DIR:-}" ]]; then
     echo "[resume] continuing into $RESUME_DIR"
 fi
 
+# SBS_RETRY_FAILED=1 (with RESUME_DIR) re-runs status!='ok' rows. Pair with a
+# longer SBS_SOBOL_TIMEOUT / SBS_MORRIS_TIMEOUT to push corner-case samples
+# past their previous wall-clock limit.
+RETRY_FLAG=()
+if [[ "${SBS_RETRY_FAILED:-0}" == "1" ]]; then
+    RETRY_FLAG=(--retry-failed)
+    echo "[retry-failed] only status==ok rows are treated as done"
+fi
+
+# Per-stage timeout overrides (defaults match the original tuning).
+SBS_MORRIS_TIMEOUT="${SBS_MORRIS_TIMEOUT:-7200}"
+SBS_SOBOL_TIMEOUT="${SBS_SOBOL_TIMEOUT:-7200}"
+
 mkdir -p logs/slurm
 
 # --- Environment ------------------------------------------------------------
@@ -112,33 +132,37 @@ case "$STAGE" in
             ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"}
         ;;
     morris)
-        # --timeout 7200 (2h) — empirical: 1h timeout caused 22.5% failure
-        # rate on collective Morris (job 9683, 2026-05-04) even after the
-        # frozen-year-mean fix. Corner samples (max_age=80, new_agents=15,
-        # loss_rate≈0) at 30 repeats × 100 years can still reach 1.5-2h.
-        # 7200s drops the expected failure rate to <5% so SALib's
-        # nanmedian-fill doesn't materially bias the indices.
+        # Default --timeout 7200 (2h). Override via SBS_MORRIS_TIMEOUT for a
+        # resume that re-runs corner samples that hit the previous wall.
+        # Empirical: 1h timeout caused 22.5% failure rate on collective Morris
+        # (job 9683, 2026-05-04) even after the frozen-year-mean fix; 2h drops
+        # it to <5%.
         $PY reports/run_sensitivity.py morris \
             --memory-baseline "$BASELINE" \
             --r-trajectories 20 --num-levels 4 \
             --repeats 30 --years 100 \
             --n-workers "$N_WORKERS" \
-            --timeout 7200 \
+            --timeout "$SBS_MORRIS_TIMEOUT" \
             --climate-process ar1 \
-            ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"}
+            ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"} \
+            ${RETRY_FLAG[@]+"${RETRY_FLAG[@]}"}
         ;;
     sobol)
-        # --timeout 7200 — same rationale as morris above. Saltelli sampling
-        # explores corner cases more aggressively than Morris trajectories,
-        # so a tight timeout would worsen the failure-induced bias.
+        # Default --timeout 7200. Override via SBS_SOBOL_TIMEOUT (e.g. 14400
+        # for a resume targeting collective corner samples).
+        # Empirical: collective Sobol N=512 at 7200s timeout had 5.33%
+        # failure rate (job 9687, 2026-05-04 .. 2026-05-07), all timeouts
+        # in the high-max_age × high-new_agents corner. Doubling to 14400s
+        # for the retry pass should clear them.
         $PY reports/run_sensitivity.py sobol \
             --memory-baseline "$BASELINE" \
             --N "$N_SOBOL" \
             --repeats 30 --years 100 \
             --n-workers "$N_WORKERS" \
-            --timeout 7200 \
+            --timeout "$SBS_SOBOL_TIMEOUT" \
             --climate-process ar1 \
-            ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"}
+            ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"} \
+            ${RETRY_FLAG[@]+"${RETRY_FLAG[@]}"}
         ;;
     *)
         echo "Unknown stage: $STAGE" >&2

@@ -93,12 +93,17 @@ def _empty_row(idx: int, params_row: np.ndarray, param_names: Sequence[str]) -> 
     return row
 
 
-def _read_done_idxs(progress_path: Path) -> set[int]:
+def _read_done_idxs(progress_path: Path, *, only_ok: bool = False) -> set[int]:
     """Return sample_idx values already persisted in ``raw_outputs.csv``.
 
     Used to resume a partially-completed run after a SLURM time-limit kill:
     the new invocation skips any sample already on disk. To force a re-run,
     delete the row (or the whole file) before resubmitting.
+
+    With ``only_ok=True``, rows whose ``status`` is not exactly ``"ok"`` are
+    treated as not-done — so a resume re-runs failed samples (e.g. timeouts).
+    The new ``status`` row is appended; the de-dup pass in ``_evaluate_samples``
+    keeps the most recent entry per ``sample_idx``.
     """
     if not progress_path.exists():
         return set()
@@ -108,6 +113,8 @@ def _read_done_idxs(progress_path: Path) -> set[int]:
         return set()
     if "sample_idx" not in existing.columns:
         return set()
+    if only_ok and "status" in existing.columns:
+        existing = existing[existing["status"] == "ok"]
     return set(existing["sample_idx"].dropna().astype(int).tolist())
 
 
@@ -266,6 +273,7 @@ def _evaluate_samples(
     timeout: float | None = None,
     runner: Callable[..., RunOneResult] = run_one,
     progress_filename: str = "raw_outputs.csv",
+    retry_failed: bool = False,
 ) -> pd.DataFrame:
     """Run ABM at each row of ``samples`` (concurrent threads).
 
@@ -275,6 +283,10 @@ def _evaluate_samples(
     resubmitting the same SLURM script picks up where it left off instead of
     redoing 70%+ of the samples.
 
+    With ``retry_failed=True``, only rows whose status is exactly ``"ok"`` are
+    treated as done; previously-failed samples (e.g. timeouts) get re-run.
+    Useful for resuming with a longer ``--timeout``.
+
     Returns the full long-form DataFrame (including resumed rows).
     """
     output_root = Path(output_root)
@@ -282,7 +294,7 @@ def _evaluate_samples(
     progress_path = output_root / progress_filename
     cols = _result_columns(param_names)
     write_lock = threading.Lock()
-    done_idxs = _read_done_idxs(progress_path)
+    done_idxs = _read_done_idxs(progress_path, only_ok=retry_failed)
 
     todo = [i for i in range(len(samples)) if i not in done_idxs]
 
@@ -392,6 +404,7 @@ def run_morris(
     seed: int = 20260425,
     param_names: Sequence[str] = PARAM_NAMES,
     timeout: float | None = None,
+    retry_failed: bool = False,
 ) -> dict:
     """Generate Morris trajectories, evaluate, and analyze.
 
@@ -424,6 +437,7 @@ def run_morris(
         n_workers=n_workers,
         keep_run_dirs=keep_run_dirs,
         timeout=timeout,
+        retry_failed=retry_failed,
     )
 
     indices: dict[str, pd.DataFrame] = {}
@@ -469,6 +483,7 @@ def run_sobol(
     calc_second_order: bool = False,
     param_names: Sequence[str] = PARAM_NAMES,
     timeout: float | None = None,
+    retry_failed: bool = False,
 ) -> dict:
     """Generate Saltelli samples, evaluate ABM, and analyze with Sobol."""
     output_root = Path(output_root)
@@ -503,6 +518,7 @@ def run_sobol(
         n_workers=n_workers,
         keep_run_dirs=keep_run_dirs,
         timeout=timeout,
+        retry_failed=retry_failed,
     )
 
     indices: dict[str, pd.DataFrame] = {}

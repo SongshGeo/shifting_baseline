@@ -286,6 +286,60 @@ def test_evaluate_samples_resumes_skipping_done(tmp_path: Path) -> None:
     assert set(df["sample_idx"]) == {0, 1, 2, 3, 4, 5}
 
 
+def test_evaluate_samples_retry_failed_reruns_only_failures(tmp_path: Path) -> None:
+    """retry_failed=True must re-run rows whose status != 'ok' and skip 'ok' rows."""
+    samples = _make_samples(5)
+    # Pass 1: idx 0,1,3,4 succeed; idx 2 times out → status starts with "error: ".
+    _evaluate_samples(
+        samples,
+        output_root=tmp_path,
+        memory_baseline="personal",
+        param_names=PARAM_NAMES,
+        repeats=2,
+        years=20,
+        num_process=1,
+        climate_process="ar1",
+        n_workers=1,
+        keep_run_dirs=False,
+        timeout=5.0,
+        runner=_fake_runner_factory(timeout_indices={2}),
+    )
+    first = pd.read_csv(tmp_path / "raw_outputs.csv")
+    assert len(first) == 5
+    assert (first["status"] == "ok").sum() == 4
+    assert first[first["sample_idx"] == 2]["status"].iloc[0].startswith("error:")
+
+    # Pass 2: retry_failed=True, with a runner that succeeds for idx 2 and would
+    # raise if re-called for any of {0,1,3,4}.
+    call_log: list[int] = []
+
+    def watching_runner(*args, **kwargs):
+        idx = int(Path(kwargs["run_dir"]).name.split("_")[-1])
+        call_log.append(idx)
+        if idx in {0, 1, 3, 4}:
+            raise AssertionError(f"retry regression: re-ran ok idx {idx}")
+        return _fake_runner_factory()(*args, **kwargs)
+
+    df = _evaluate_samples(
+        samples,
+        output_root=tmp_path,
+        memory_baseline="personal",
+        param_names=PARAM_NAMES,
+        repeats=2,
+        years=20,
+        num_process=1,
+        climate_process="ar1",
+        n_workers=1,
+        keep_run_dirs=False,
+        runner=watching_runner,
+        retry_failed=True,
+    )
+    assert call_log == [2]
+    # After dedup keep="last", idx 2 should now be ok.
+    assert len(df) == 5
+    assert (df["status"] == "ok").sum() == 5
+
+
 def test_evaluate_samples_concurrent_streaming(tmp_path: Path) -> None:
     """Threaded execution must not corrupt the CSV (lock holds)."""
     samples = _make_samples(16)

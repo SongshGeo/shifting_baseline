@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from omegaconf import DictConfig, OmegaConf
 
+from shifting_baseline import abm as abm_mod
 from shifting_baseline.abm import ClimateObservingModel
 
 
@@ -121,6 +122,67 @@ def test_model_baseline_stats_matches_climate_series() -> None:
     cached_mean, cached_std = model.model_baseline_stats
     assert cached_mean == float(series.mean())
     assert cached_std == float(series.std())
+
+
+def test_past_year_means_are_frozen_after_run() -> None:
+    """Once a year has passed, its random-sampled mean must not be re-drawn.
+
+    Before this fix every cache miss re-sampled the entire archive (O(N²)
+    random draws cumulative). After the fix, past years live in
+    `_frozen_year_means` and are reused; only the current-tick year is
+    re-sampled on cache misses.
+    """
+    model = ClimateObservingModel(parameters=_make_cfg())
+    model.run_model()
+
+    # Snapshot one past year's value.
+    series_first = model.collective_memory_climate
+    past_years = [k for k in series_first.index if k < model.time.tick]
+    assert past_years, "test setup expected at least one past year in archive"
+    snapshot = {k: series_first.loc[k] for k in past_years}
+
+    # All snapshotted years should now be in the frozen dict.
+    for k in past_years:
+        assert k in model._frozen_year_means
+        assert model._frozen_year_means[k] == snapshot[k]
+
+    # Force outer-cache miss and rebuild. Past-year values must be byte-identical.
+    model._collective_cache_tick = -1
+    series_second = model.collective_memory_climate
+    for k in past_years:
+        assert (
+            series_second.loc[k] == snapshot[k]
+        ), f"year {k} re-sampled on rebuild (frozen cache regressed)"
+
+
+def test_rebuild_after_run_does_not_resample_past(monkeypatch) -> None:
+    """Rebuilding the series after a completed run draws ≤1 new random sample.
+
+    Hard perf invariant: with N past years frozen, at most one random draw
+    is needed (for the current-tick year, if it has any records). This guards
+    against any future change that bypasses the frozen-year cache.
+    """
+    model = ClimateObservingModel(parameters=_make_cfg())
+    model.run_model()
+    # Warm: populate _frozen_year_means.
+    _ = model.collective_memory_climate
+
+    call_count = {"n": 0}
+    real = abm_mod.rand_generate_from_std_levels
+
+    def spy(*args, **kwargs):
+        call_count["n"] += 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(abm_mod, "rand_generate_from_std_levels", spy)
+    # Force outer-cache miss and rebuild.
+    model._collective_cache_tick = -1
+    _ = model.collective_memory_climate
+
+    assert call_count["n"] <= 1, (
+        f"hotspot-1 cache regressed: rebuild drew {call_count['n']} samples; "
+        f"expected ≤ 1 (current-tick year only)"
+    )
 
 
 def test_collective_baseline_stats_handles_empty_archive() -> None:

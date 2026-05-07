@@ -111,6 +111,13 @@ class ClimateObservingModel(MainModel):
         # per call × ~10³ agents × ~10² ticks under the SA upper corner.
         self._collective_baseline_cache: Optional[tuple[float, float]] = None
         self._collective_baseline_cache_tick: int = -1
+        # Per-year frozen mean of `rand_generate_from_std_levels(archive[k])`.
+        # Once tick advances past year k, archive[k] is permanently fixed
+        # (`archive_it` only writes to the current tick), so its random-sample
+        # mean should also be fixed. Without freezing, every tick re-samples
+        # the whole archive, which is the dominant O(N²) cost in collective
+        # baseline runs.
+        self._frozen_year_means: dict[int, float] = {}
         self.spin_up_years: int = self._new_agents * (
             self._max_age_years - self._min_age_years + 1
         )
@@ -192,28 +199,43 @@ class ClimateObservingModel(MainModel):
 
     @property
     def collective_memory_climate(self) -> pd.Series:
-        """Mean of recorded events per year, cached per tick.
+        """Mean of recorded events per year.
 
-        Returns:
-            pd.Series: Rounded mean of recorded events for each year.
+        Two-level caching:
+        - **Outer (tick-scoped):** the assembled Series is reused for all
+          accesses within the same tick.
+        - **Inner (year-scoped, permanent):** for any year ``k`` that is
+          strictly past (``k < current_tick``), ``archive[k]`` is immutable
+          (``archive_it`` only appends to ``self.time.tick``), so its
+          random-sample mean is drawn once and frozen in
+          ``self._frozen_year_means``. This collapses the per-tick rebuild
+          from O(years_elapsed × records) to O(1 + new records this tick).
+          The current-tick year is *not* frozen — it is still being written
+          to, so its sample is drawn fresh on each cache miss.
         """
-        # Return cache if tick has not advanced
+        current_tick = self.time.tick
         if (
             self._collective_cache is not None
-            and self._collective_cache_tick == self.time.tick
+            and self._collective_cache_tick == current_tick
         ):
             return self._collective_cache
 
-        current_archive = {k: v for k, v in self._archive.items() if v}
-        series = pd.Series(
-            {
-                k: rand_generate_from_std_levels(np.array(v)).mean()
-                for k, v in current_archive.items()
-            }
-        )
-        # Update cache for current tick
+        out: dict[int, float] = {}
+        frozen = self._frozen_year_means
+        for k, v in self._archive.items():
+            if not v:
+                continue
+            if k < current_tick:
+                cached = frozen.get(k)
+                if cached is None:
+                    cached = float(rand_generate_from_std_levels(np.array(v)).mean())
+                    frozen[k] = cached
+                out[k] = cached
+            else:
+                out[k] = float(rand_generate_from_std_levels(np.array(v)).mean())
+        series = pd.Series(out)
         self._collective_cache = series
-        self._collective_cache_tick = self.time.tick
+        self._collective_cache_tick = current_tick
         return series
 
     @property
