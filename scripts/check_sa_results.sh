@@ -14,6 +14,17 @@
 
 set -uo pipefail
 
+# Pick a python that actually has pandas. The bare `python3` on the cluster
+# does not — must go through uv or the project venv.
+if command -v uv >/dev/null 2>&1; then
+    PY=(uv run python)
+elif [[ -x ".venv/bin/python" ]]; then
+    PY=(.venv/bin/python)
+else
+    echo "Error: need uv or .venv/bin/python (system python3 has no pandas)" >&2
+    exit 1
+fi
+
 DIRS=($(ls -dt reports/results/sensitivity/2026*-sobol-* 2>/dev/null | head -2))
 
 echo "================================================================"
@@ -45,7 +56,7 @@ echo "================================================================"
 for d in "${DIRS[@]}"; do
     echo
     echo "--- $d ---"
-    python3 - <<EOF
+    "${PY[@]}" - <<EOF
 import pandas as pd
 df = pd.read_csv("$d/raw_outputs.csv")
 total = len(df)
@@ -72,7 +83,7 @@ echo "================================================================"
 for d in "${DIRS[@]}"; do
     echo
     echo "--- $d ---"
-    python3 - <<EOF
+    "${PY[@]}" - <<EOF
 import pandas as pd
 df = pd.read_csv("$d/raw_outputs.csv")
 bad = df[df["status"] != "ok"]
