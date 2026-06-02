@@ -1,11 +1,18 @@
-"""Quick visualization of Sobol SA results.
+"""Visualization of Sobol SA results.
 
 Auto-finds the two most-recent ``reports/results/sensitivity/*-sobol-*``
 directories and writes:
+
+Exploratory (diagnostics; 150 DPI PNG):
   - ``<dir>/sobol_indices.png``       — S1/ST bar chart per metric
   - ``sobol_compare.png``             — both baselines side-by-side
   - ``sobol_distribution.png``        — peak_window / peak_strength histogram
                                          per baseline (uses ok rows only)
+  - ``sobol_failure_corner.png``      — failed samples in param space
+
+Publication quality (for SI; 300 DPI PNG + vector PDF, panel labels a-d):
+  - ``sobol_compare_si.pdf``
+  - ``sobol_compare_si.png``
 
 Usage:
     uv run python reports/plot_sobol.py
@@ -236,6 +243,122 @@ def plot_failure_corner(dirs: list[Path]) -> Path | None:
     return out
 
 
+PARAM_LABELS = {
+    "max_age": r"$\mathit{max\_age}$",
+    "new_agents": r"$\mathit{new\_agents}$",
+    "loss_rate": r"$\mathit{loss\_rate}$",
+    "climate_sigma": r"$\mathit{climate\_\sigma}$",
+    "climate_phi": r"$\mathit{climate\_\phi}$",
+}
+METRIC_LABELS = {
+    "peak_window_mean": "Peak-window location (years)",
+    "peak_strength_mean": "Peak-correlation strength",
+}
+
+
+def _ordered_dirs(dirs: list[Path]) -> list[Path]:
+    """Return [personal_dir, collective_dir] when both are present."""
+    order = {"personal": 0, "collective": 1}
+    return sorted(dirs, key=lambda d: order.get(baseline_of(d), 99))
+
+
+def plot_compare_si(dirs: list[Path]) -> tuple[Path, Path] | None:
+    """Publication-quality 4-panel Sobol comparison for SI use.
+
+    Layout: rows = response metric, cols = memory baseline (personal | collective).
+    Saves both PDF (vector) and 300-DPI PNG.
+    """
+    if len(dirs) < 2:
+        return None
+    ordered = _ordered_dirs(dirs)
+    with plt.rc_context(
+        {
+            "font.size": 9,
+            "axes.titlesize": 10,
+            "axes.labelsize": 9,
+            "xtick.labelsize": 8.5,
+            "ytick.labelsize": 8.5,
+            "legend.fontsize": 8.5,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.linewidth": 0.7,
+            "xtick.major.width": 0.7,
+            "ytick.major.width": 0.7,
+            "savefig.bbox": "tight",
+        }
+    ):
+        fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.6), sharey=False)
+        panel_idx = 0
+        for row, m in enumerate(METRICS):
+            for col, d in enumerate(ordered[:2]):
+                ax = axes[row, col]
+                b = baseline_of(d)
+                f = d / f"sobol_{m}.csv"
+                if not f.exists():
+                    ax.text(0.5, 0.5, f"missing\n{f.name}", ha="center", va="center")
+                    ax.set_axis_off()
+                    continue
+                df = pd.read_csv(f)
+                x = np.arange(len(df))
+                w = 0.38
+                ax.bar(
+                    x - w / 2,
+                    df["S1"],
+                    w,
+                    yerr=df.get("S1_conf"),
+                    label="$S_1$",
+                    color="#4C72B0",
+                    edgecolor="black",
+                    linewidth=0.5,
+                    capsize=2.2,
+                    error_kw={"elinewidth": 0.7},
+                )
+                ax.bar(
+                    x + w / 2,
+                    df["ST"],
+                    w,
+                    yerr=df.get("ST_conf"),
+                    label="$S_T$",
+                    color="#DD8452",
+                    edgecolor="black",
+                    linewidth=0.5,
+                    capsize=2.2,
+                    error_kw={"elinewidth": 0.7},
+                )
+                ax.set_xticks(x)
+                ax.set_xticklabels(
+                    [PARAM_LABELS.get(n, n) for n in df["name"]],
+                    rotation=30,
+                    ha="right",
+                )
+                ax.axhline(0, color="black", lw=0.5)
+                ax.set_ylim(-0.15, 1.1)
+                if col == 0:
+                    ax.set_ylabel("Sobol index")
+                ax.set_title(f"{b} — {METRIC_LABELS.get(m, m)}", pad=5)
+                if row == 0 and col == 1:
+                    ax.legend(loc="upper right", frameon=False, handlelength=1.4)
+                ax.text(
+                    -0.12,
+                    1.04,
+                    f"({chr(ord('a') + panel_idx)})",
+                    transform=ax.transAxes,
+                    fontsize=11,
+                    fontweight="bold",
+                    va="bottom",
+                )
+                panel_idx += 1
+        fig.tight_layout(h_pad=1.2, w_pad=1.6)
+        out_pdf = SENSITIVITY_ROOT / "sobol_compare_si.pdf"
+        out_png = SENSITIVITY_ROOT / "sobol_compare_si.png"
+        fig.savefig(out_pdf)
+        fig.savefig(out_png, dpi=300)
+        plt.close(fig)
+    print(f"  saved {out_pdf}")
+    print(f"  saved {out_png}")
+    return out_pdf, out_png
+
+
 def main(argv: list[str]) -> int:
     if argv:
         dirs = [Path(p) for p in argv]
@@ -252,6 +375,7 @@ def main(argv: list[str]) -> int:
     plot_compare(dirs)
     plot_distribution(dirs)
     plot_failure_corner(dirs)
+    plot_compare_si(dirs)
     return 0
 
 

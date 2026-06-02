@@ -73,7 +73,7 @@ def _main(cfg: DictConfig | None = None):
         csv_save_to=ds.csv,
     )
     # log.info("Step 2: 整合树轮数据")
-    log.info("Step 3: 比较每个树轮数据")
+    log.info("Step 3: 比较每个树轮数据 skipped for now")
     # TODO 需要添加一个函数，用于比较每个树轮数据
     log.info("Step 4: 比较树轮数据和测试数据 z-score")
     tree_ring = combined["mean"]

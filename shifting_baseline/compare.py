@@ -72,7 +72,6 @@ def compare_corr(
             return np.nan, np.nan, n
         else:
             raise ValueError(f"无效的窗口错误处理方式: {window_error}")
-        default_kwargs["min_periods"] = default_kwargs["window"]
     if filter_side == "both":
         filtered_data1 = data1.rolling(**default_kwargs).apply(filter_func)
         filtered_data2 = data2.rolling(**default_kwargs).apply(filter_func)

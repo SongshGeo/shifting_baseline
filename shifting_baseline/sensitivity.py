@@ -412,6 +412,9 @@ def run_morris(
     """
     output_root = Path(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
+    # Drop any stale ERRORS.txt from a prior failed pass so its presence/content
+    # always reflects the latest run (not a leftover from before a successful resume).
+    (output_root / "ERRORS.txt").unlink(missing_ok=True)
     problem = define_problem(param_names)
     samples = morris_sample.sample(
         problem, N=r_trajectories, num_levels=num_levels, seed=seed
@@ -488,6 +491,8 @@ def run_sobol(
     """Generate Saltelli samples, evaluate ABM, and analyze with Sobol."""
     output_root = Path(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
+    # See run_morris for the rationale.
+    (output_root / "ERRORS.txt").unlink(missing_ok=True)
     problem = define_problem(param_names)
     samples = sobol_sample.sample(
         problem, N, calc_second_order=calc_second_order, seed=seed
