@@ -5,184 +5,145 @@
 # GitHub   : https://github.com/SongshGeo
 # Website: https://cv.songshgeo.com/
 
+"""shifting_baseline 的日志工具。
+
+遵循 Python 标准 logging 的库约定，与 Hydra / Mesa / ABSESpy 保持一致：
+
+- 库代码只用命名 logger（``"shifting_baseline.*"``），自身**不挂真实 handler**，
+  只挂一个 ``NullHandler``；日志记录靠 ``propagate`` 上抛到 root。
+- 运行期由 Hydra 的 ``hydra/job_logging``（见 ``config/hydra/job_logging/log.yaml``）
+  统一配置 root 的 console + file handler——本模块不插手，因此不会重复输出，
+  也不会和 Hydra 的 file handler 抢同一个日志文件。
+- 笔记本等非 Hydra 环境，显式调用 :func:`setup_notebook_logging` 让 INFO 可见。
+"""
+
 from __future__ import annotations
 
 import logging
 import sys
-from datetime import datetime
-from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
-if TYPE_CHECKING:
-    from omegaconf import DictConfig
+PACKAGE_LOGGER_NAME = "shifting_baseline"
+_CONSOLE_FORMAT = "%(levelname)s | %(message)s"
+_FILE_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 
-
-def setup_logger(
-    console_level: str = "WARNING",
-    file_level: str = "DEBUG",
-    file_path: Optional[str] = None,
-    logger_name: str = "shifting_baseline",
-) -> logging.Logger:
-    """
-    Set up logging configuration for the application.
-
-    Args:
-        console_level: Console output level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        file_level: File output level
-        file_path: Log file path, defaults to logs directory with timestamp
-        logger_name: Name of the logger to configure
-
-    Returns:
-        Configured logger instance
-    """
-    if file_path is None:
-        # Create logs directory in project root and default filename
-        # Find project root by looking for pyproject.toml or similar
-        current_path = Path.cwd()
-        project_root = current_path
-
-        # Walk up the directory tree to find project root
-        for parent in current_path.parents:
-            if (
-                (parent / "pyproject.toml").exists()
-                or (parent / "setup.py").exists()
-                or (parent / "README.md").exists()
-            ):
-                project_root = parent
-                break
-
-        logs_dir = project_root / "logs"
-        logs_dir.mkdir(exist_ok=True)
-        timestamp = datetime.now().strftime("%Y-%m-%d")
-        file_path = str(logs_dir / f"{logger_name}_{timestamp}.log")
-    # Create formatters
-    detailed_formatter = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    simple_formatter = logging.Formatter(fmt="%(levelname)s | %(message)s")
-
-    # Get or create logger
-    logger = logging.getLogger(logger_name)
-    logger.setLevel(logging.DEBUG)  # Set root level to DEBUG
-
-    # Clear existing handlers to avoid duplicates
-    logger.handlers.clear()
-
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(getattr(logging, console_level.upper()))
-    console_handler.setFormatter(simple_formatter)
-    logger.addHandler(console_handler)
-
-    # File handler
-    file_handler = logging.FileHandler(file_path, encoding="utf-8")
-    file_handler.setLevel(getattr(logging, file_level.upper()))
-    file_handler.setFormatter(detailed_formatter)
-    logger.addHandler(file_handler)
-    return logger
-
-
-def setup_logger_from_hydra(cfg: "DictConfig") -> logging.Logger:
-    """
-    Set up logging to work with Hydra's job_logging system.
-
-    This function doesn't override Hydra's logging configuration,
-    but ensures our custom loggers use the same configuration.
-
-    Args:
-        cfg: Hydra configuration object
-
-    Returns:
-        Configured logger instance
-    """
-    # Get the root logger to ensure it's configured by Hydra
-    root_logger = logging.getLogger()
-
-    # If Hydra hasn't configured logging yet, use our default setup
-    if not root_logger.handlers:
-        return setup_logger()
-
-    # Hydra has already configured logging, just return our logger
-    return get_logger("shifting_baseline")
+# 库最佳实践：给包根 logger 挂 NullHandler，避免"无 handler"告警，
+# 也不抢占 root 的输出（NullHandler 不影响 propagate）。
+logging.getLogger(PACKAGE_LOGGER_NAME).addHandler(logging.NullHandler())
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:
-    """
-    Get a logger instance. If no name provided, returns the main logger.
+    """取包内命名 logger（缺省取包根 ``"shifting_baseline"``）。
+
+    无任何副作用——不配置 handler、不设级别。运行期 root 由 Hydra 配置，
+    记录经 ``propagate`` 输出。
 
     Args:
-        name: Logger name (usually __name__)
+        name: logger 名，通常传 ``__name__``；缺省用包根 logger。
 
     Returns:
-        Logger instance
+        对应的 :class:`logging.Logger`。
     """
-    if name is None:
-        name = "shifting_baseline"
+    return logging.getLogger(name or PACKAGE_LOGGER_NAME)
 
-    logger = logging.getLogger(name)
 
-    # Check if our main logger has handlers
-    main_logger = logging.getLogger("shifting_baseline")
-    if not main_logger.handlers:
-        # Check if root logger has handlers (Hydra configuration)
-        root_logger = logging.getLogger()
-        if not root_logger.handlers:
-            # No Hydra configuration, use our default setup for notebook environment
-            setup_logger()
+def setup_logger_from_hydra(cfg: Optional[object] = None) -> logging.Logger:
+    """Hydra 运行下 root logger 已由 ``hydra/job_logging`` 配好，本函数无需动作。
 
+    包内记录会 ``propagate`` 到 root 的 console(WARNING) 与 file(DEBUG) handler。
+    保留此函数仅为兼容 ``__main__`` 的现有调用、并使"日志已就绪"的语义显式。
+
+    Args:
+        cfg: Hydra 配置对象（未使用，仅保留以兼容调用签名）。
+
+    Returns:
+        包根 logger。
+    """
+    return get_logger()
+
+
+def setup_notebook_logging(
+    console_level: str = "INFO",
+    file_path: Optional[str] = None,
+    file_level: str = "DEBUG",
+) -> logging.Logger:
+    """为非 Hydra（笔记本/脚本）环境配置包 logger，使 ``log.info(...)`` 可见。
+
+    幂等：重复调用只调整级别，不会重复叠加 handler。默认只配控制台；仅当传入
+    ``file_path`` 时才额外写文件——**运行期的文件日志应交给 Hydra，不要在这里配**。
+    控制台 handler 加上后会把包 logger 的 ``propagate`` 关掉，避免与（如 IPython
+    可能配置的）root handler 重复输出。
+
+    Args:
+        console_level: 控制台级别（DEBUG/INFO/WARNING/ERROR/CRITICAL）。
+        file_path: 可选，日志文件路径；不传则不写文件。
+        file_level: 文件级别（仅 ``file_path`` 给定时生效）。
+
+    Returns:
+        配置好的包 logger。
+    """
+    logger = logging.getLogger(PACKAGE_LOGGER_NAME)
+
+    console = next(
+        (
+            h
+            for h in logger.handlers
+            if isinstance(h, logging.StreamHandler)
+            and not isinstance(h, logging.FileHandler)
+        ),
+        None,
+    )
+    if console is None:
+        console = logging.StreamHandler(sys.stdout)
+        console.setFormatter(logging.Formatter(_CONSOLE_FORMAT))
+        logger.addHandler(console)
+        logger.propagate = False  # 笔记本里我们自己就是 handler，避免重复输出
+    console.setLevel(getattr(logging, console_level.upper()))
+
+    levels = [getattr(logging, console_level.upper())]
+    if file_path is not None:
+        exists = any(
+            isinstance(h, logging.FileHandler)
+            and getattr(h, "baseFilename", None) == str(file_path)
+            for h in logger.handlers
+        )
+        if not exists:
+            file_handler = logging.FileHandler(file_path, encoding="utf-8")
+            file_handler.setLevel(getattr(logging, file_level.upper()))
+            file_handler.setFormatter(
+                logging.Formatter(_FILE_FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
+            )
+            logger.addHandler(file_handler)
+        levels.append(getattr(logging, file_level.upper()))
+
+    logger.setLevel(min(levels))
     return logger
 
 
 def adjust_log_level(
     console_level: Optional[str] = None, file_level: Optional[str] = None
 ) -> None:
-    """
-    Dynamically adjust log levels for existing handlers.
-    Useful for notebook environments where you want to change logging without restarting.
+    """笔记本里动态调整包 logger 的级别（兼容旧签名）。
+
+    若尚未配置控制台 handler，会先经 :func:`setup_notebook_logging` 建立，再调整级别。
+    ``file_level`` 用于把 logger 整体级别放低，以便（如已配置）文件 handler 记录更详细。
+
+    注意：运行期（Hydra）下**不应**调用本函数——root 已由 Hydra 负责。
 
     Args:
-        console_level: New console log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        file_level: New file log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        console_level: 新的控制台级别；缺省 ``"INFO"``。
+        file_level: 新的文件级别（用于下调 logger 整体级别）。
     """
-    # Get our main logger
-    main_logger = logging.getLogger("shifting_baseline")
-
-    # Ensure we have a logger setup first
-    if not main_logger.handlers:
-        setup_logger()
-        main_logger = logging.getLogger("shifting_baseline")
-
-    # Adjust handlers on our main logger
-    for handler in main_logger.handlers:
-        if isinstance(handler, logging.StreamHandler) and not isinstance(
-            handler, logging.FileHandler
-        ):
-            # Console handler
-            if console_level:
-                handler.setLevel(getattr(logging, console_level.upper()))
-        elif isinstance(handler, logging.FileHandler):
-            # File handler
-            if file_level:
-                handler.setLevel(getattr(logging, file_level.upper()))
-
-    # Also update the logger level to the minimum of all handlers
-    levels = []
-    if console_level:
-        levels.append(getattr(logging, console_level.upper()))
+    logger = setup_notebook_logging(console_level or "INFO")
     if file_level:
-        levels.append(getattr(logging, file_level.upper()))
-
-    if levels:
-        min_level = min(levels)
-        main_logger.setLevel(min_level)
+        logger.setLevel(min(logger.level, getattr(logging, file_level.upper())))
 
 
 if __name__ == "__main__":
-    # Test the logging setup
-    logger = setup_logger(console_level="DEBUG", file_level="DEBUG")
-    logger.debug("Debug message")
-    logger.info("Info message")
-    logger.warning("Warning message")
-    logger.error("Error message")
-    logger.critical("Critical message")
+    # 自测：模拟笔记本环境
+    _logger = setup_notebook_logging(console_level="DEBUG")
+    _logger.debug("Debug message")
+    _logger.info("Info message")
+    _logger.warning("Warning message")
+    _logger.error("Error message")
+    _logger.critical("Critical message")

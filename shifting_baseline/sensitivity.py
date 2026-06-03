@@ -238,7 +238,9 @@ def run_one(
     ]
 
     env = os.environ.copy()
-    env.setdefault("EMAIL_DISABLE", "1")
+    # SA worker 子进程不发通知（每个样本一个 abm.py 子进程，否则扫参会刷屏）。
+    # twist_academic 认 NO_NOTIFY（见 abm.py __main__ 的 notify 调用）。
+    env.setdefault("NO_NOTIFY", "1")
     start = time.perf_counter()
     subprocess.run(command, cwd=REPO_ROOT, check=True, timeout=timeout, env=env)
     elapsed = time.perf_counter() - start

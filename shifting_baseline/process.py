@@ -27,10 +27,9 @@ from xarray import DataArray, open_dataarray
 if TYPE_CHECKING:
     from geo_dskit.core.types import PathLike
 
-from shifting_baseline.utils.log import adjust_log_level, get_logger
+from shifting_baseline.utils.log import get_logger
 
 log = get_logger()
-adjust_log_level(console_level="INFO", file_level="DEBUG")
 
 __all__ = [
     "open_dataarray",

@@ -9,9 +9,12 @@
 shifting_baseline 是一个用于对比历史集体记忆和气候重建资料的 Python 库。
 """
 
+from pathlib import Path
+
 import numpy as np
 from hydra import main
-from omegaconf import DictConfig
+from hydra.core.hydra_config import HydraConfig
+from omegaconf import DictConfig, OmegaConf
 
 from shifting_baseline.calibration import MismatchReport
 from shifting_baseline.compare import (
@@ -23,7 +26,6 @@ from shifting_baseline.constants import END, STAGE1
 from shifting_baseline.data import load_data, load_validation_data
 from shifting_baseline.filters import calc_std_deviation, classify
 from shifting_baseline.process import batch_process_recon_data
-from shifting_baseline.utils.config import format_by_config, get_output_dir
 from shifting_baseline.utils.log import get_logger, setup_logger_from_hydra
 from shifting_baseline.utils.plot import plot_correlation_windows
 
@@ -50,7 +52,7 @@ def _main(cfg: DictConfig | None = None):
     """根据配置文件自动化运行。"""
     if cfg is None:
         raise ValueError("cfg 不能为空")
-    cfg = format_by_config(cfg)
+    OmegaConf.resolve(cfg)  # 就地解析 ${...} 插值
 
     # Check if in test mode
     if cfg.get("test_mode", False):
@@ -60,7 +62,7 @@ def _main(cfg: DictConfig | None = None):
     setup_logger_from_hydra(cfg)
 
     log = get_logger(__name__)
-    out_dir = get_output_dir()
+    out_dir = Path(HydraConfig.get().runtime.output_dir)
     log.info("实验开始，配置文件请参看 %s", out_dir / ".hydra/config.yaml")
     log.info("Step 1: 加载数据 ...")
     combined, uncertainties, history = load_data(cfg)

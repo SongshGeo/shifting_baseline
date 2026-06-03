@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import traceback
 from collections import deque
 from datetime import datetime
 from functools import cached_property
@@ -19,9 +18,9 @@ from abses import Actor, Experiment, MainModel
 from hydra import main
 from omegaconf import DictConfig
 from scipy.stats import norm
+from twist_academic import notify
 
 from shifting_baseline.calibration import MismatchReport
-from shifting_baseline.climate_forcing import SubannualAggregation
 from shifting_baseline.climate_forcing import generate as generate_climate_forcing
 from shifting_baseline.climate_forcing import sigma_tick_from_sigma_year
 from shifting_baseline.compare import compare_corr_2d
@@ -31,10 +30,10 @@ from shifting_baseline.filters import (
     classify_single_value,
 )
 from shifting_baseline.utils.calc import rand_generate_from_std_levels
-from shifting_baseline.utils.email import send_notification_email
 
 if TYPE_CHECKING:
     from shifting_baseline.utils.types import CorrFunc
+    from shifting_baseline.utils.types import SubannualAggregation
 
 from shifting_baseline.utils.log import get_logger
 
@@ -79,9 +78,7 @@ class ClimateObservingModel(MainModel):
             raise ValueError(
                 "subannual_aggregation must be one of {'mean', 'sum', 'last'}"
             )
-        self._subannual_aggregation: SubannualAggregation = cast(
-            SubannualAggregation, raw_agg
-        )
+        self._subannual_aggregation: SubannualAggregation = raw_agg
         self._climate_process: str = self.p.get("climate_process", "iid")
         # ``climate_sigma`` is interpreted as yearly-scale sigma. When
         # ``step_per_year > 1`` we rescale to tick-scale internally so that
@@ -542,14 +539,13 @@ def repeat_run(cfg: Optional[DictConfig] = None) -> None:
 
 if __name__ == "__main__":
     start_time = datetime.now()
-    print(f"ABM 模型开始运行: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    log.info(f"ABM 模型开始运行: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     try:
         repeat_run()
-        send_notification_email(success=True, start_time=start_time)
-        print("✅ ABM 模型运行成功完成")
-    except Exception as e:  # pylint: disable=broad-except # 需要捕获所有异常以发送邮件通知
-        error_msg = f"{str(e)}\n\n详细错误信息:\n{traceback.format_exc()}"
-        send_notification_email(
-            success=False, error_msg=error_msg, start_time=start_time
+        notify("✅ Shifting Baseline ABM 模型运行成功完成")
+        log.info(
+            f"✅ Shifting Baseline ABM 模型运行成功完成, 结束时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
-        print(f"❌ ABM 模型运行失败: {e}")
+    except Exception as e:  # pylint: disable=broad-except # 需要捕获所有异常以发送邮件通知
+        log.error(f"❌ Shifting Baseline ABM 模型运行失败: {e}")
+        notify("❌ Shifting Baseline ABM 模型运行失败")
