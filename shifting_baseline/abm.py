@@ -25,7 +25,6 @@ from shifting_baseline.climate_forcing import SubannualAggregation
 from shifting_baseline.climate_forcing import generate as generate_climate_forcing
 from shifting_baseline.climate_forcing import sigma_tick_from_sigma_year
 from shifting_baseline.compare import compare_corr_2d
-from shifting_baseline.constants import MAX_AGE
 from shifting_baseline.filters import (
     calc_std_deviation,
     classify,
@@ -38,6 +37,8 @@ if TYPE_CHECKING:
     from shifting_baseline.utils.types import CorrFunc
 
 from shifting_baseline.utils.log import get_logger
+
+MAX_AGE: int = 40  # 主体气候观察者的最大年龄
 
 # 使用主logger，避免重复设置
 log = get_logger()
