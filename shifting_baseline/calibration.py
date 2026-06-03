@@ -151,6 +151,7 @@ class MismatchReport:
         value_series: pd.Series | None = None,
         shift: int = 1,
         mc_runs: int = 1000,
+        random_seed: int | None = None,
     ) -> pd.DataFrame:
         """分析分类错误的模式（公开方法）
 
@@ -189,7 +190,9 @@ class MismatchReport:
         # 创建错误分析矩阵
         self.diff_matrix = self._create_misclassification_matrix(df)
         self._analyzed = True
-        self._run_significance_test(mc_runs=mc_runs, shift=shift)
+        self._run_significance_test(
+            mc_runs=mc_runs, shift=shift, random_seed=random_seed
+        )
         return self.diff_matrix
 
     def _generate_last_column(self, df: pd.DataFrame, shift: int = 1) -> pd.Series:
@@ -222,17 +225,30 @@ class MismatchReport:
         # 确保所有等级都存在
         return pivot_matrix.reindex(index=LEVELS, columns=LEVELS, fill_value=np.nan)
 
-    def _run_significance_test(self, mc_runs: int = 1000, shift: int = 1):
-        """运行蒙特卡洛显著性检验"""
+    def _run_significance_test(
+        self,
+        mc_runs: int = 1000,
+        shift: int = 1,
+        random_seed: int | None = None,
+    ):
+        """运行蒙特卡洛显著性检验
+
+        Args:
+            mc_runs: 蒙特卡洛迭代次数
+            shift: 同类别内回看的步长
+            random_seed: 随机种子。给定则结果可复现（用 ``numpy`` 现代 Generator，
+                不污染全局随机状态）。
+        """
         logger.info("开始蒙特卡洛模拟 (n=%d)", mc_runs)
 
+        rng = np.random.default_rng(random_seed)
         all_diff_matrices = []
         n_samples = self.n_raw_samples
 
         for _ in tqdm(range(mc_runs), desc="MC模拟"):
             # 生成随机数据
-            random_data = np.random.normal(0, 1, n_samples)
-            random_pred = np.random.choice(LEVELS, size=n_samples, p=LEVELS_PROB)
+            random_data = rng.normal(0, 1, n_samples)
+            random_pred = rng.choice(LEVELS, size=n_samples, p=LEVELS_PROB)
 
             random_df = pd.DataFrame(
                 {
@@ -412,16 +428,18 @@ class MismatchReport:
     def get_mean_diff(
         self, direction: Literal["positive", "negative", "all"] = "all"
     ) -> float:
-        """计算平均差异"""
+        """计算平均差异（所有非 NaN 单元的整体均值，每个单元等权）。"""
         assert self.diff_matrix is not None, "需要先调用 analyze_error_patterns() 进行错误分析"
+        vals = self.diff_matrix.to_numpy(dtype=float)
         if direction == "positive":
-            return self.diff_matrix[self.diff_matrix > 0].abs().mean().mean()
+            selected = vals[vals > 0]
         elif direction == "negative":
-            return self.diff_matrix[self.diff_matrix < 0].abs().mean().mean()
+            selected = vals[vals < 0]
         elif direction == "all":
-            return self.diff_matrix.abs().mean().mean()
+            selected = vals[~np.isnan(vals)]
         else:
             raise ValueError(f"Invalid direction: {direction}")
+        return float(np.abs(selected).mean()) if selected.size else float("nan")
 
     def plot_mismatch_bar(
         self,

@@ -9,7 +9,7 @@ processed: ${ds.root}/data
 multirun: ${ds.root}/multirun
 
 # 最终作图输出目录
-longform: /Users/songshgeo/Documents/SongshGeo/Outputs/ColMemo_MS
+longform: /Users/songshgeo/Documents/Obsidian/SongshGeo/Outputs/ColMemo_MS
 figs: ${ds.longform}/figs
 
 # 其它数据文件夹

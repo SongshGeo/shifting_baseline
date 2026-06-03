@@ -20,25 +20,16 @@ from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
 from geo_dskit.utils.path import filter_files, get_files
 from omegaconf import DictConfig
 
-from shifting_baseline.constants import (
-    END,
-    FINAL,
-    GRADE_VALUES,
-    LEVELS,
-    LEVELS_PROB,
-    MAP,
-    STAGES_BINS,
-    START,
-    STD_THRESHOLDS,
-)
+from shifting_baseline.constants import END, FINAL, LEVELS, MAP, STAGES_BINS, START
 from shifting_baseline.filters import classify
 from shifting_baseline.utils.calc import calc_corr, rand_generate_from_std_levels
 
 if TYPE_CHECKING:
-    from geo_dskit.core.types import PathLike, Region
+    from geo_dskit.core.types import PathLike
 
     from shifting_baseline.utils.types import (
         HistoricalAggregateType,
+        Region,
         Stages,
         ToStdMethod,
     )
@@ -296,10 +287,10 @@ class HistoricalRecords:
 
         Examples:
             >>> history.get_time_slice(1)  # slice(1000, 1469)
-            >>> history.get_time_slice(slice(1, 2))  # slice(1000, 1669)
-            >>> history.get_time_slice("1:4")  # slice(1000, 2010)
-            >>> history.get_time_slice("stage3")  # slice(1669, 1889)
-            >>> history.get_time_slice("1000:2010")  # slice(1000, 2010)
+            >>> history.get_time_slice(slice(1, 2))  # slice(1000, 1659)
+            >>> history.get_time_slice("1:4")  # slice(1000, 2000)
+            >>> history.get_time_slice("stage3")  # slice(1659, 1900)
+            >>> history.get_time_slice("1000:2000")  # slice(1000, 2000)
         """
         bins = STAGES_BINS
 
@@ -427,319 +418,6 @@ class HistoricalRecords:
         df.index.name = "year"
         return df.reindex(full_index)
 
-    def rescale_to_std(self, target_std=None):
-        """
-        将原始等级值重新映射到标准差倍数
-
-        Args:
-            target_std: 目标标准差倍数，默认使用预定义的 STD_THRESHOLDS
-
-        Returns:
-            DataFrame/Series: 映射到标准差尺度的数据
-        """
-        if target_std is None:
-            target_std = STD_THRESHOLDS
-        return self.data.replace(dict(zip(GRADE_VALUES, target_std)))
-
-    def _probability_weighted_aggregation(
-        self, weights: Optional[dict] = None
-    ) -> pd.Series:
-        """
-        基于概率分布的加权平均聚合
-
-        将每个站点的等级数据转换为连续值时，考虑等级的概率分布，
-        使用概率密度函数来估计连续值
-        """
-
-        # 获取所有非NA数据
-        data_clean = self.data.dropna(how="all")
-
-        if data_clean.empty:
-            return pd.Series(index=self.data.index, dtype=float)
-
-        # 设置站点权重
-        if weights is None:
-            weights = {col: 1.0 for col in data_clean.columns}
-
-        # 标准化权重
-        total_weight = sum(weights.get(col, 1.0) for col in data_clean.columns)
-        normalized_weights = {
-            col: weights.get(col, 1.0) / total_weight for col in data_clean.columns
-        }
-
-        result = pd.Series(index=self.data.index, dtype=float)
-
-        for year in data_clean.index:
-            year_data = data_clean.loc[year]
-            valid_data = year_data.dropna()
-
-            if valid_data.empty:
-                result.loc[year] = np.nan
-                continue
-
-            # 对每个有效站点，计算概率加权的连续值
-            weighted_values = []
-            total_weight_sum = 0
-
-            for station in valid_data.index:
-                level = valid_data[station]
-                if level in MAP:
-                    # 使用等级对应的标准差值作为中心
-                    center_value = MAP[level]
-
-                    # 使用该等级的概率作为权重
-                    level_prob = LEVELS_PROB[LEVELS.index(level)]
-                    station_weight = normalized_weights.get(station, 1.0)
-
-                    # 概率加权
-                    weighted_value = center_value * level_prob * station_weight
-                    weighted_values.append(weighted_value)
-                    total_weight_sum += level_prob * station_weight
-
-            if weighted_values:
-                result.loc[year] = sum(weighted_values) / total_weight_sum
-            else:
-                result.loc[year] = np.nan
-
-        return result
-
-    def _simple_mean_aggregation(self, weights: Optional[dict] = None) -> pd.Series:
-        """简单平均聚合"""
-        from .constants import MAP
-
-        data_std = self.data.replace(MAP)
-
-        if weights is None:
-            return data_std.mean(axis=1)
-        else:
-            # 应用权重
-            weighted_data = data_std * pd.Series(weights)
-            return weighted_data.sum(axis=1) / sum(weights.values())
-
-    def _median_aggregation(self, weights: Optional[dict] = None) -> pd.Series:
-        """中位数聚合"""
-        from .constants import MAP
-
-        data_std = self.data.replace(MAP)
-        return data_std.median(axis=1)
-
-    def _mode_aggregation(self, weights: Optional[dict] = None) -> pd.Series:
-        """众数聚合"""
-        from .constants import MAP
-
-        data_std = self.data.replace(MAP)
-        return (
-            data_std.mode(axis=1).iloc[:, 0]
-            if not data_std.empty
-            else pd.Series(index=self.data.index)
-        )
-
-    def bayesian_aggregation(
-        self,
-        spatial_correlation: float | np.ndarray | pd.DataFrame = 0.5,
-        uncertainty_factor: float = 1.0,
-        distance_matrix: np.ndarray | pd.DataFrame | None = None,
-        correlation_decay: float = 0.1,
-    ) -> pd.Series:
-        """
-        基于贝叶斯方法的站点数据聚合
-
-        考虑站点间的空间相关性和不确定性，使用贝叶斯组合方法
-        来整合多个站点的离散等级数据
-
-        Args:
-            spatial_correlation: 站点间空间相关性，可以是：
-                - float: 常数相关性系数 (0-1)
-                - np.ndarray: 相关性矩阵 (n_stations x n_stations)
-                - pd.DataFrame: 相关性矩阵，索引为站点名
-            uncertainty_factor: 不确定性因子，用于调整置信区间
-            distance_matrix: 站点间距离矩阵，用于计算空间相关性
-            correlation_decay: 距离衰减参数，用于基于距离计算相关性
-
-        Returns:
-            pd.Series: 贝叶斯聚合的区域连续时间序列
-        """
-        import numpy as np
-
-        from .constants import LEVELS, LEVELS_PROB, MAP
-
-        data_clean = self.data.dropna(how="all")
-
-        if data_clean.empty:
-            return pd.Series(index=self.data.index, dtype=float)
-
-        # 处理空间相关性参数
-        correlation_matrix = self._process_spatial_correlation(
-            spatial_correlation,
-            distance_matrix,
-            correlation_decay,
-            data_clean.columns,
-        )
-
-        result = pd.Series(index=self.data.index, dtype=float)
-        uncertainty = pd.Series(index=self.data.index, dtype=float)
-
-        for year in data_clean.index:
-            year_data = data_clean.loc[year]
-            valid_data = year_data.dropna()
-
-            if valid_data.empty:
-                result.loc[year] = np.nan
-                uncertainty.loc[year] = np.nan
-                continue
-
-            n_stations = len(valid_data)
-            station_names = valid_data.index.tolist()
-
-            # 计算每个站点的似然函数
-            station_values = []
-            station_uncertainties = []
-
-            for station in station_names:
-                level = valid_data[station]
-                if level in MAP:
-                    center_value = MAP[level]
-                    level_prob = LEVELS_PROB[LEVELS.index(level)]
-
-                    # 基于等级概率计算不确定性
-                    base_uncertainty = 0.5  # 基础标准差
-                    level_uncertainty = base_uncertainty * (
-                        1 - level_prob
-                    )  # 概率越高，不确定性越低
-
-                    station_values.append(center_value)
-                    station_uncertainties.append(level_uncertainty)
-
-            if not station_values:
-                result.loc[year] = np.nan
-                uncertainty.loc[year] = np.nan
-                continue
-
-            # 贝叶斯组合
-            if n_stations == 1:
-                # 单站点情况
-                result.loc[year] = station_values[0]
-                uncertainty.loc[year] = station_uncertainties[0]
-            else:
-                # 多站点贝叶斯组合
-                # 获取当前有效站点的相关性子矩阵
-                station_indices = [
-                    list(data_clean.columns).index(name) for name in station_names
-                ]
-                corr_submatrix = correlation_matrix[
-                    np.ix_(station_indices, station_indices)
-                ]
-
-                # 计算贝叶斯权重
-                weights = self._calculate_bayesian_weights(
-                    station_values, station_uncertainties, corr_submatrix
-                )
-
-                # 计算后验均值和方差
-                posterior_mean = np.average(station_values, weights=weights)
-
-                # 计算后验不确定性（考虑空间相关性）
-                posterior_uncertainty = self._calculate_posterior_uncertainty(
-                    station_uncertainties, corr_submatrix, weights
-                )
-
-                result.loc[year] = posterior_mean
-                uncertainty.loc[year] = posterior_uncertainty * uncertainty_factor
-
-        # 存储不确定性信息
-        self._aggregation_uncertainty = uncertainty
-
-        return result
-
-    def _process_spatial_correlation(
-        self,
-        spatial_correlation,
-        distance_matrix,
-        correlation_decay,
-        station_names,
-    ):
-        """处理空间相关性参数，生成相关性矩阵"""
-
-        n_stations = len(station_names)
-
-        if isinstance(spatial_correlation, (int, float)):
-            # 常数相关性
-            if spatial_correlation == 0:
-                return np.eye(n_stations)  # 完全独立
-            else:
-                # 创建常数相关性矩阵
-                corr_matrix = np.full((n_stations, n_stations), spatial_correlation)
-                np.fill_diagonal(corr_matrix, 1.0)  # 对角线为1
-                return corr_matrix
-
-        elif isinstance(spatial_correlation, (np.ndarray, pd.DataFrame)):
-            # 提供相关性矩阵
-            if isinstance(spatial_correlation, pd.DataFrame):
-                # 确保索引和列名匹配
-                corr_matrix = spatial_correlation.reindex(
-                    index=station_names, columns=station_names
-                ).values
-            else:
-                corr_matrix = spatial_correlation
-
-            # 确保矩阵是对称的且对角线为1
-            corr_matrix = (corr_matrix + corr_matrix.T) / 2
-            np.fill_diagonal(corr_matrix, 1.0)
-            return corr_matrix
-
-        elif distance_matrix is not None:
-            # 基于距离矩阵计算相关性
-            if isinstance(distance_matrix, pd.DataFrame):
-                dist_matrix = distance_matrix.reindex(
-                    index=station_names, columns=station_names
-                ).values
-            else:
-                dist_matrix = distance_matrix
-
-            # 使用指数衰减函数计算相关性
-            corr_matrix = np.exp(-correlation_decay * dist_matrix)
-            np.fill_diagonal(corr_matrix, 1.0)
-            return corr_matrix
-
-        else:
-            # 默认：基于距离的简单相关性
-            # 这里可以添加基于地理距离的默认计算
-            return np.eye(n_stations)  # 默认独立
-
-    def _calculate_bayesian_weights(
-        self,
-        station_values: np.ndarray,
-        station_uncertainties: np.ndarray,
-        corr_matrix: np.ndarray,
-    ) -> np.ndarray:
-        """计算贝叶斯权重"""
-        n_stations = len(station_values)
-
-        # 构建协方差矩阵
-        # 对角线元素是各站点的方差
-        variances = np.array(station_uncertainties) ** 2
-
-        # 非对角线元素考虑空间相关性
-        cov_matrix = np.outer(np.sqrt(variances), np.sqrt(variances)) * corr_matrix
-        np.fill_diagonal(cov_matrix, variances)
-
-        # 计算贝叶斯权重
-        try:
-            # 使用协方差矩阵的逆来计算权重
-            inv_cov = np.linalg.inv(cov_matrix)
-            ones = np.ones(n_stations)
-            weights = inv_cov @ ones / (ones.T @ inv_cov @ ones)
-
-            # 确保权重为正且和为1
-            weights = np.maximum(weights, 0)
-            weights = weights / np.sum(weights)
-
-        except np.linalg.LinAlgError:
-            # 如果矩阵奇异，使用简单平均
-            weights = np.ones(n_stations) / n_stations
-
-        return weights
-
     def __repr__(self) -> str:
         return f"<Historical Records: {self.data.shape}>"
 
@@ -813,7 +491,6 @@ class HistoricalRecords:
             pd.Series: 聚合后的结果
             HistoricalRecords: 如果 inplace 为 True，则返回自身
         """
-        # data = self.rescale_to_std()
         data = self.data
         if isinstance(data, pd.Series):
             result = data.copy()
@@ -827,10 +504,6 @@ class HistoricalRecords:
             elif how == "weighted_mean":
                 assert weights is not None, "带权重的平均值需要提供权重"
                 result = self.weighted_mean(weights)
-            elif how == "probability_weighted":
-                result = self._probability_weighted_aggregation(weights, **kwargs)
-            elif how == "bayesian":
-                result = self.bayesian_aggregation(weights, **kwargs)
             else:
                 raise ValueError(f"无效的聚合方法: {how}")
         if name is None:
@@ -956,7 +629,7 @@ def load_validation_data(
     crs: str = "EPSG:4326",
     recalculate_zscore: bool = False,
     sel_bound_by: Optional[dict | HistoricalRecords] = None,
-) -> xr.DataArray:
+) -> tuple[xr.DataArray, pd.Series]:
     """加载验证数据
 
     Args:

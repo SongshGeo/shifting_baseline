@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from shifting_baseline.constants import GRADE_VALUES, STAGES_BINS, STD_THRESHOLDS
+from shifting_baseline.constants import STAGES_BINS
 from shifting_baseline.data import HistoricalRecords
 
 
@@ -136,18 +136,6 @@ class TestHistoricalRecordsSeriesOps:
         assert isinstance(out, HistoricalRecords)
         sel = out.period("1000:1010")
         assert isinstance(sel, pd.Series)
-
-    def test_rescale_to_std_mapping(self, rec: HistoricalRecords):
-        mapped = rec.rescale_to_std()
-        # mapping from grade values to STD thresholds
-        mapping = dict(zip(GRADE_VALUES, STD_THRESHOLDS))
-        # If any grade value appears in data, it should be replaced by thresholds
-        # Note: data may contain NA from zeros; we only check present values
-        unique_vals = rec.data.stack().dropna().unique()
-        possible_targets = set(mapping.values()) | {-2, -1, 0, 1, 2}
-        # Ensure mapping returns same index/shape and values are within expected set
-        assert mapped.shape == rec.data.shape
-        assert set(unique_vals).issubset(possible_targets)
 
 
 class TestHistoricalRecordsMergeAndCorr:

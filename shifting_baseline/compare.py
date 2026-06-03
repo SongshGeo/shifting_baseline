@@ -177,7 +177,6 @@ def experiment_corr_2d(
         sample_threshold: 样本数阈值
         std_offset: 标准差偏移
         p_threshold: p值阈值
-        penalty: 是否使用惩罚
         n_diff_w: 窗口差值
         ax: 绘图轴
 
@@ -305,7 +304,8 @@ def sweep_max_corr_year(
         )
         assert isinstance(rs, np.ndarray), "rs must be a numpy array"
         top_max_indices = find_top_max_indices(rs, ratio)
-        max_corr_year.append(top_max_indices)
+        # 存的是实际窗口大小 windows[索引]，而非索引本身（否则 y 轴会 off-by-windows[0]）
+        max_corr_year.append(windows[top_max_indices])
         max_corr.append(rs[top_max_indices])
 
     return max_corr_year, max_corr, r_benchmark_list, p_value_list
