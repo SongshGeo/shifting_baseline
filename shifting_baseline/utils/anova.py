@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
@@ -17,6 +16,7 @@ from scipy import stats
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 
+from shifting_baseline.utils.calc import get_significance_stars
 from shifting_baseline.utils.log import get_logger
 
 # 使用主logger，避免重复设置
@@ -162,15 +162,7 @@ def _single_factor_analysis(
                 }
 
                 if verbose:
-                    significance = (
-                        "***"
-                        if p_val < 0.001
-                        else "**"
-                        if p_val < 0.01
-                        else "*"
-                        if p_val < 0.05
-                        else ""
-                    )
+                    significance = get_significance_stars(p_val)
                     log.info(f"{col}: F={f_stat:.4f}, p={p_val:.4f} {significance}")
                     log.info(
                         f"  R²={r_squared:.4f}, 显著: {'是' if p_val < significance_level else '否'}"
@@ -374,15 +366,7 @@ def _generate_summary_table(
                     "p值": f"{result['p_value']:.4f}",
                     "R²": f"{result['r_squared']:.4f}",
                     "显著性": "是" if result["significant"] else "否",
-                    "显著性标记": (
-                        "***"
-                        if result["p_value"] < 0.001
-                        else "**"
-                        if result["p_value"] < 0.01
-                        else "*"
-                        if result["p_value"] < 0.05
-                        else ""
-                    ),
+                    "显著性标记": get_significance_stars(result["p_value"]),
                 }
             )
 
@@ -399,15 +383,7 @@ def _generate_summary_table(
                         "p值": f"{corr_p:.4f}",
                         "R²": f"{corr_coef**2:.4f}",
                         "显著性": "是" if corr_p < significance_level else "否",
-                        "显著性标记": (
-                            "***"
-                            if corr_p < 0.001
-                            else "**"
-                            if corr_p < 0.01
-                            else "*"
-                            if corr_p < 0.05
-                            else ""
-                        ),
+                        "显著性标记": get_significance_stars(corr_p),
                     }
                 )
             except Exception as e:
@@ -630,42 +606,3 @@ def comprehensive_anova_analysis(
                 results["best_model_name"] = "none"
 
     return results
-
-
-def quick_anova_summary(
-    df: pd.DataFrame,
-    target_col: str,
-    categorical_cols: Optional[List[str]] = None,
-    plot: bool = True,
-) -> pd.DataFrame:
-    """
-    快速方差分析函数 - 简化版本
-
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        输入数据框
-    target_col : str
-        因变量列名
-    categorical_cols : List[str], optional
-        分类变量列名列表，如果为None则自动识别
-    plot : bool, default True
-        是否生成图表
-
-    Returns:
-    --------
-    pd.DataFrame
-        统计摘要表
-    """
-    results = comprehensive_anova_analysis(
-        df=df,
-        target_col=target_col,
-        categorical_cols=categorical_cols,
-        continuous_cols=[],
-        include_interactions=True,
-        significance_level=0.05,
-        verbose=True,
-        plot=plot,
-    )
-
-    return results["summary_table"]

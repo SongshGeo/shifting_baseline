@@ -62,6 +62,30 @@ class TestStdDeviation:
         assert not np.isnan(result)
         assert not np.isinf(result)
 
+    def test_series_and_array_agree(self):
+        """Series and ndarray inputs must give identical results.
+
+        Regression for the ddof landmine: pandas .std() is ddof=1 but numpy
+        .std() is ddof=0 (~12% apart). Both input types must now agree.
+        """
+        data = [1.0, 2.0, 3.0, 4.0, 6.0]
+        from_series = calc_std_deviation(pd.Series(data))
+        from_array = calc_std_deviation(np.array(data))
+        assert from_series == pytest.approx(from_array)
+
+    def test_known_value_uses_ddof1(self):
+        """Pin the numeric value to ddof=1 (the published behaviour)."""
+        data = [1.0, 2.0, 3.0, 4.0, 6.0]
+        # mean=3.2, std(ddof=1)=1.92354, (6-3.2)/1.92354 = 1.455651
+        assert calc_std_deviation(pd.Series(data)) == pytest.approx(1.455651, abs=1e-5)
+        assert calc_std_deviation(np.array(data)) == pytest.approx(1.455651, abs=1e-5)
+
+    def test_constant_returns_float_zero(self):
+        """Constant window returns float 0.0 regardless of input type."""
+        result = calc_std_deviation(np.array([5.0, 5.0, 5.0]))
+        assert result == 0.0
+        assert isinstance(result, float)
+
 
 class TestClassification:
     """Test cases for classification based on standard deviation thresholds."""
@@ -258,6 +282,14 @@ class TestClassifySeries:
     def test_invalid_handle_na_parameter(self):
         """Test validation of handle_na parameter"""
         data = pd.Series([-1.0, np.nan, 1.0])
+        with pytest.raises(
+            ValueError, match="handle_na must be 'raise', 'skip', or 'fill'"
+        ):
+            classify_series(data, handle_na="invalid")
+
+    def test_invalid_handle_na_without_nan(self):
+        """Invalid handle_na must raise even when there are no NaN values."""
+        data = pd.Series([-1.0, 0.0, 1.0])  # no NaN
         with pytest.raises(
             ValueError, match="handle_na must be 'raise', 'skip', or 'fill'"
         ):

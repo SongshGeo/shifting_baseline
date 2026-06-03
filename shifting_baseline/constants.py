@@ -51,3 +51,6 @@ END = 1900
 FINAL = 2000
 
 STAGES_BINS: list[int] = [START, STAGE1, STAGE2, END, FINAL]
+
+# 极端等级（±2）反推数值时截断在 ±2σ：重建值不应超出物理合理范围（有意为之）。
+EXTREME_STD_CAP: float = 2.0

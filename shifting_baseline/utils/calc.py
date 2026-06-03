@@ -14,34 +14,19 @@ import pandas as pd
 from scipy import stats
 from scipy.stats import truncnorm
 
+from shifting_baseline.constants import EXTREME_STD_CAP, LEVELS, THRESHOLDS
+
 if TYPE_CHECKING:
     from shifting_baseline.utils.types import CorrFunc
 
 
-def get_coords(mask: np.ndarray) -> list[tuple[int, ...]]:
-    """
-    获取数组中符合条件的坐标列表。
-
-    Args:
-        mask: 布尔数组
-
-    Examples:
-        >>> mask = np.array([[True, False, True], [False, True, False]])
-        >>> get_coords(mask)
-        [(0, 0), (0, 2), (1, 1)]
-
-    Returns:
-        list[tuple[int, ...]]: 符合条件的坐标列表
-    """
-    coords = np.where(mask)
-    if coords[0].size == 0:
-        return []
-    return list(zip(*coords))
-
-
 def get_significance_stars(p_value: float) -> str:
-    """
-    根据 p 值决定添加什么星号
+    """根据 p 值返回显著性星号（全仓库统一约定）。
+
+    - ``***``  p < 0.01
+    - ``**``   p < 0.05
+    - ``*``    p < 0.1
+    - ``""``   p >= 0.1 或 NaN
 
     Args:
         p_value: p 值，0-1 之间
@@ -53,10 +38,12 @@ def get_significance_stars(p_value: float) -> str:
         return ""
     if not 0 <= p_value <= 1:
         raise ValueError(f"p must be between 0 and 1, but got {p_value}")
+    if p_value < 0.01:
+        return "***"  # p < 0.01
     if p_value < 0.05:
-        return "**"  # p < 0.05, 两个星号
+        return "**"  # 0.01 <= p < 0.05
     if p_value < 0.1:
-        return "*"  # 0.05 <= p < 0.1, 一个星号
+        return "*"  # 0.05 <= p < 0.1
     return ""
 
 
@@ -91,7 +78,6 @@ def calc_corr(
         arr1: 第一个序列，支持pandas Series或numpy数组
         arr2: 第二个序列，支持pandas Series或numpy数组
         how: 相关系数计算方法，可选'pearson', 'kendall', 'spearman'
-        penalty: 是否应用有效样本量惩罚
 
     Returns:
         tuple[float, float, int]: (相关系数, p值, 有效样本数)
@@ -325,17 +311,17 @@ def low_pass_filter(
 
 
 def get_interval(level: int) -> tuple[float, float]:
-    """根据等级返回标准化下限和上限（标准差倍数）。"""
-    boundaries = {
-        -2: (-2, -1.17),
-        -1: (-1.17, -0.33),
-        0: (-0.33, 0.33),
-        1: (0.33, 1.17),
-        2: (1.17, 2),
-    }
-    if level not in boundaries:
+    """根据等级返回标准化下限和上限（标准差倍数）。
+
+    内部切点取自 ``constants.THRESHOLDS``（与分类阈值同源，避免失同步）；最外侧
+    （等级 ±2）截断在 ``±EXTREME_STD_CAP`` —— 有意的物理范围约束，使从极端等级
+    反推的数值不超过 ±2σ。
+    """
+    edges = [-EXTREME_STD_CAP, *THRESHOLDS, EXTREME_STD_CAP]
+    intervals = {lvl: (edges[i], edges[i + 1]) for i, lvl in enumerate(LEVELS)}
+    if level not in intervals:
         raise ValueError("无效等级，必须为 {-2, -1, 0, 1, 2}")
-    return boundaries[level]
+    return intervals[level]
 
 
 def rand_generate_from_std_levels(
@@ -366,9 +352,8 @@ def rand_generate_from_std_levels(
     if not isinstance(n_samples, int) or n_samples < 1:
         raise ValueError("n_samples 必须大于等于 1 的整数")
 
-    # 设置随机种子
-    if random_seed is not None:
-        np.random.seed(random_seed)
+    # 现代随机数生成器（不污染全局 np.random 状态）
+    rng = np.random.default_rng(random_seed)
 
     # 统一取 numpy array 视图与原始形状
     if isinstance(grade_matrix, pd.DataFrame):
@@ -432,11 +417,11 @@ def rand_generate_from_std_levels(
 
             if n_samples == 1:
                 # 单次采样
-                samples = truncnorm.rvs(a, b, size=cnt)
+                samples = truncnorm.rvs(a, b, size=cnt, random_state=rng)
                 out[idx] = mu + samples * sigma
             else:
                 # 多次采样：为每个有效位置生成 n_samples 个值
-                samples = truncnorm.rvs(a, b, size=(n_samples, cnt))
+                samples = truncnorm.rvs(a, b, size=(n_samples, cnt), random_state=rng)
                 # 将采样值转换回原始尺度
                 transformed_samples = mu + samples * sigma
                 # 填充到对应位置

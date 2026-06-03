@@ -12,33 +12,38 @@ from shifting_baseline.constants import LEVELS, THRESHOLDS
 
 
 def calc_std_deviation(series: pd.Series | np.ndarray) -> float:
-    """Calculate the standard deviation of the last value relative to the past window years.
+    """How many standard deviations the last value sits from the window mean.
+
+    This is the core sliding-window re-standardization of the SBS analysis. The
+    "window" is the whole ``series`` passed in — callers do the windowing (e.g.
+    ``rolling(window).apply(calc_std_deviation)``).
 
     Args:
-        series: A pandas Series with time index
+        series: Window of values (pandas Series or numpy array).
 
     Returns:
-        float: The number of standard deviations the last value is from the mean
+        float: Number of (sample) standard deviations the last value is from the
+            window mean; ``0.0`` when the window is constant.
 
     Raises:
-        ValueError: If series is empty, has only one value, or window is larger than series length
+        ValueError: If the series has one or zero values.
     """
+    # Numpy arrays are routed through ``pandas`` so both input
+    # types share the same NaN-skipping, ddof=1 behaviour used in the manuscript.
+    if not isinstance(series, pd.Series):
+        series = pd.Series(series)
+
     if len(series) <= 1:
         raise ValueError("Series must have more than one value")
 
-    # Get the last value
-    last_value = series.iloc[-1] if isinstance(series, pd.Series) else series[-1]
+    last_value = series.iloc[-1]
+    window_std = series.std(ddof=1)  # explicit; matches pandas default, skips NaN
 
-    # Calculate mean and std of the window
-    window_mean = series.mean()
-    window_std = series.std()
-
-    # Handle case where std is 0 (constant values)
+    # Constant window → no deviation
     if window_std == 0:
-        return 0
+        return 0.0
 
-    # Calculate number of standard deviations
-    return (last_value - window_mean) / window_std
+    return float((last_value - series.mean()) / window_std)
 
 
 def classify_single_value(
@@ -203,6 +208,10 @@ def classify_series(
     if not all(thresholds[i] < thresholds[i + 1] for i in range(len(thresholds) - 1)):
         raise ValueError("Thresholds must be in strictly ascending order")
 
+    # Validate handle_na up-front, regardless of whether NaNs are present
+    if handle_na not in ("raise", "skip", "fill"):
+        raise ValueError("handle_na must be 'raise', 'skip', or 'fill'")
+
     # Convert to pandas Series if numpy array
     if isinstance(series, np.ndarray):
         series = pd.Series(series)
@@ -211,20 +220,16 @@ def classify_series(
     if not pd.api.types.is_numeric_dtype(series):
         raise TypeError("Series must contain numeric data")
 
-    # Handle NaN values
+    # Handle NaN values (handle_na already validated above)
     nan_mask = series.isna()
     if nan_mask.any():
         if handle_na == "raise":
             raise ValueError(
                 "Cannot classify NaN values. Use handle_na='skip' or 'fill'"
             )
-        elif handle_na == "skip":
-            # Continue with NaN values, they will be preserved
-            pass
         elif handle_na == "fill":
             series = series.fillna(levels[0])  # Fill with lowest level
-        else:
-            raise ValueError("handle_na must be 'raise', 'skip', or 'fill'")
+        # "skip": NaN preserved, set to <NA> after classification
 
     # Handle infinite values
     inf_mask = np.isinf(series)
@@ -251,26 +256,4 @@ def classify_series(
 
 
 # Backward compatibility alias
-def classify(
-    series: pd.Series | np.ndarray,
-    thresholds: list[float] | None = None,
-    levels: list[int] | None = None,
-    handle_na: str = "raise",
-) -> pd.Series:
-    """Classify values in the series based on standard deviation thresholds.
-
-    This function is maintained for backward compatibility. For new code, consider
-    using classify_series() for better parameter control and error handling options.
-
-    Args:
-        series: Input series or array to classify
-        thresholds: List of thresholds for classification. Default is [-1.17, -0.33, 0.33, 1.17]
-        levels: List of level values to assign. Default is [-2, -1, 0, 1, 2]
-
-    Returns:
-        pd.Series: Series with classification labels.
-
-    Raises:
-        ValueError: If levels length is not thresholds length + 1
-    """
-    return classify_series(series, thresholds, levels, handle_na)
+classify = classify_series
