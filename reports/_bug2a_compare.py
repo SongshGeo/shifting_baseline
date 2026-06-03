@@ -47,14 +47,24 @@ AFTER_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _buggy_significance_test(
-    self: MismatchReport, mc_runs: int = 1000, shift: int = 1
+    self: MismatchReport,
+    mc_runs: int = 1000,
+    shift: int = 1,
+    random_seed: int | None = None,
 ) -> None:
     """Replica of the pre-fix ``_run_significance_test``.
 
-    Identical to the current implementation except the reindex step is
+    Identical to the pre-fix implementation except the reindex step is
     written in the broken for-loop form — the loop variable is rebound but
     the original matrices are never mutated.
+
+    ``random_seed`` is accepted for signature compatibility with the current
+    ``analyze_error_patterns`` call site (which now forwards it) but is
+    intentionally ignored: the pre-fix code drew from the global ``np.random``
+    stream seeded once by ``_run_one``, and reproducing that is the whole
+    point of the "before" branch.
     """
+    del random_seed  # faithfully keep pre-fix global-RNG behavior
     all_diff_matrices = []
     n_samples = self.n_raw_samples
 

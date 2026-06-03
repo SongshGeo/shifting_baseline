@@ -25,14 +25,12 @@ from shifting_baseline.compare import (
 from shifting_baseline.constants import END, STAGE1
 from shifting_baseline.data import load_data, load_validation_data
 from shifting_baseline.filters import calc_std_deviation, classify
-from shifting_baseline.process import batch_process_recon_data
 from shifting_baseline.utils.log import get_logger, setup_logger_from_hydra
 from shifting_baseline.utils.plot import plot_correlation_windows
 
 __version__ = "0.1.0"
 __all__ = [
     "_main",
-    "batch_process_recon_data",
 ]
 
 
