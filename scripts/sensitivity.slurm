@@ -5,9 +5,14 @@
 # Usage (from repo root, on a SLURM cluster):
 #   sbatch scripts/sensitivity.slurm morris   personal
 #   sbatch scripts/sensitivity.slurm morris   collective
-#   sbatch scripts/sensitivity.slurm sobol    personal   1024
-#   sbatch scripts/sensitivity.slurm sobol    collective 1024
+#   sbatch scripts/sensitivity.slurm morris   collective_lifetime
+#   sbatch scripts/sensitivity.slurm sobol    personal            1024
+#   sbatch scripts/sensitivity.slurm sobol    collective          1024
+#   sbatch scripts/sensitivity.slurm sobol    collective_lifetime 1024
 #   sbatch scripts/sensitivity.slurm benchmark personal
+#
+# To submit every baseline at once, use the batch wrapper:
+#   bash scripts/submit_sensitivity.sh sobol 1024
 #
 # Resume after a time-limit kill (reuses raw_outputs.csv, only re-runs the
 # missing sample_idx values):
@@ -23,7 +28,8 @@
 #
 # Args:
 #   $1  stage         : smoke | benchmark | morris | sobol  (default: morris)
-#   $2  baseline      : personal | collective | model       (default: personal)
+#   $2  baseline      : personal | collective | collective_lifetime | model
+#                       (default: personal)
 #   $3  N (sobol only): Saltelli base size                  (default: 1024)
 #
 # Tweak --cpus-per-task / --time / --partition for your cluster. The Python

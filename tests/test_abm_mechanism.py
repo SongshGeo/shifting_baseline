@@ -73,6 +73,46 @@ class TestPerceiveZScore:
         mean, std = model.model_baseline_stats
         assert obs.perceive(2.0) == pytest.approx((2.0 - mean) / std)
 
+    def test_collective_lifetime_windowed_by_age(self):
+        """Collective archive, but baseline stats only over the agent's lifetime."""
+        model = ClimateObservingModel(parameters=_cfg("collective_lifetime"))
+        model.run_model()
+        obs = next(a for a in model.agents if a.age() >= model._min_age_ticks)
+
+        tick = model.time.tick
+        start = tick - obs.age()
+        series = model.collective_memory_climate
+        window = series[(series.index >= start) & (series.index <= tick)]
+        expected = (float(window.mean()), float(window.std()))
+
+        assert model.collective_baseline_stats_window(start, tick) == (
+            pytest.approx(expected[0]),
+            pytest.approx(expected[1]),
+        )
+        assert obs.perceive(2.0) == pytest.approx((2.0 - expected[0]) / expected[1])
+
+    def test_collective_lifetime_differs_by_age(self):
+        """Agents of different ages read different slices of the same archive."""
+        model = ClimateObservingModel(parameters=_cfg("collective_lifetime"))
+        model.run_model()
+        agents = [a for a in model.agents if a.age() >= model._min_age_ticks]
+        young = min(agents, key=lambda a: a.age())
+        old = max(agents, key=lambda a: a.age())
+        if young.age() == old.age():
+            pytest.skip("need agents with distinct ages")
+
+        tick = model.time.tick
+        young_window = model.collective_memory_climate[
+            (model.collective_memory_climate.index >= tick - young.age())
+            & (model.collective_memory_climate.index <= tick)
+        ]
+        old_window = model.collective_memory_climate[
+            (model.collective_memory_climate.index >= tick - old.age())
+            & (model.collective_memory_climate.index <= tick)
+        ]
+        assert len(old_window) >= len(young_window)
+        assert young.perceive(1.0) != pytest.approx(old.perceive(1.0))
+
     def test_invalid_baseline_raises(self, personal_obs):
         model, obs = personal_obs
         model.p.memory_baseline = "nonsense"

@@ -257,6 +257,23 @@ class ClimateObservingModel(MainModel):
         self._collective_baseline_cache_tick = tick
         return self._collective_baseline_cache
 
+    def collective_baseline_stats_window(
+        self, start_tick: int, end_tick: int
+    ) -> tuple[float, float]:
+        """(mean, std) of collective memory over an inclusive tick window.
+
+        Used by the ``collective_lifetime`` baseline: every observer reads
+        from the same societal archive, but only the portion written during
+        their own lifetime (``start_tick`` = current tick − age).
+        """
+        if end_tick < start_tick:
+            return float("nan"), float("nan")
+        series = self.collective_memory_climate
+        window = series[(series.index >= start_tick) & (series.index <= end_tick)]
+        if len(window) == 0:
+            return float("nan"), float("nan")
+        return float(window.mean()), float(window.std())
+
     @cached_property
     def model_baseline_stats(self) -> tuple[float, float]:
         """(mean, std) of the full climate forcing series; constant for the run.
@@ -465,10 +482,12 @@ class ClimateObserver(Actor):
     def perceive(self, climate: float) -> float:
         """Perceive the z-score of the current climate.
         We assume that the observer always perceive the climate with a baseline.
-        Here, we have three types of baseline:
+        Here, we have four types of baseline:
         - personal: the observer's personal memory
         - model: the model's climate time series (objective climate)
         - collective: the collective memory of the model (collective memory climate)
+        - collective_lifetime: same societal archive as collective, but each
+          observer only uses records from their own lifetime window
         We use the baseline to re-calculate the z-score of the current climate.
         The hypothesis is that the observer will compare the current climatic extreme with the baseline.
 
@@ -487,6 +506,13 @@ class ClimateObserver(Actor):
         # Collective baseline (same scalar for every observer in this tick)
         elif self.model.p.memory_baseline == "collective":
             baseline, std = self.model.collective_baseline_stats
+        # Collective archive, windowed to the observer's lifetime
+        elif self.model.p.memory_baseline == "collective_lifetime":
+            tick = self.model.time.tick
+            start_tick = tick - self.age()
+            baseline, std = self.model.collective_baseline_stats_window(
+                start_tick, tick
+            )
         else:
             raise ValueError("Invalid memory baseline")
         # Handle NaN values

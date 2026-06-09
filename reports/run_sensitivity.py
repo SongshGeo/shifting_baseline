@@ -179,7 +179,7 @@ def _add_common(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--memory-baseline",
-        choices=["personal", "collective", "model"],
+        choices=["personal", "collective", "collective_lifetime", "model"],
         default="personal",
     )
     parser.add_argument("--repeats", type=int, default=30)

@@ -11,6 +11,7 @@ cached scalar equals the value the old "naive" code path would have produced.
 
 from __future__ import annotations
 
+import numpy as np
 from omegaconf import DictConfig, OmegaConf
 
 from shifting_baseline import abm as abm_mod
@@ -183,6 +184,30 @@ def test_rebuild_after_run_does_not_resample_past(monkeypatch) -> None:
         f"hotspot-1 cache regressed: rebuild drew {call_count['n']} samples; "
         f"expected ≤ 1 (current-tick year only)"
     )
+
+
+def test_collective_baseline_stats_window_matches_slice() -> None:
+    """Windowed stats equal a manual slice of collective_memory_climate."""
+    model = ClimateObservingModel(parameters=_make_cfg())
+    model.run_model()
+
+    series = model.collective_memory_climate
+    end = model.time.tick
+    start = max(0, end - 3)
+    window = series[(series.index >= start) & (series.index <= end)]
+    expected_mean = float(window.mean()) if len(window) else float("nan")
+    expected_std = float(window.std()) if len(window) else float("nan")
+
+    mean_val, std_val = model.collective_baseline_stats_window(start, end)
+    assert mean_val == expected_mean
+    assert std_val == expected_std
+
+
+def test_collective_baseline_stats_window_empty_returns_nan() -> None:
+    model = ClimateObservingModel(parameters=_make_cfg())
+    mean_val, std_val = model.collective_baseline_stats_window(5, 3)
+    assert np.isnan(mean_val)
+    assert np.isnan(std_val)
 
 
 def test_collective_baseline_stats_handles_empty_archive() -> None:
