@@ -21,6 +21,7 @@ from shifting_baseline.utils.calc import (
     get_interval,
     get_significance_stars,
     low_pass_filter,
+    shapiro_wilk_test,
 )
 
 
@@ -59,15 +60,16 @@ class TestSignificanceStars:
     @pytest.mark.parametrize(
         "p,expected",
         [
-            (0.0, "***"),
-            (0.005, "***"),
-            (0.009, "***"),
-            (0.01, "**"),  # 边界：0.01 不 < 0.01 → ** 档
-            (0.03, "**"),
-            (0.049, "**"),
-            (0.05, "*"),  # 边界：0.05 不 < 0.05 → * 档
-            (0.08, "*"),
-            (0.099, "*"),
+            # 新约定（去掉 p<0.1 档，应 Reviewer #3）：** p<0.01, * p<0.05
+            (0.0, "**"),
+            (0.005, "**"),
+            (0.009, "**"),
+            (0.01, "*"),  # 边界：0.01 不 < 0.01 → * 档
+            (0.03, "*"),
+            (0.049, "*"),
+            (0.05, ""),  # 边界：0.05 不 < 0.05 → 无星
+            (0.08, ""),
+            (0.099, ""),
             (0.1, ""),
             (0.5, ""),
             (1.0, ""),
@@ -126,3 +128,20 @@ class TestGetInterval:
     def test_invalid_level_raises(self):
         with pytest.raises(ValueError, match="无效等级"):
             get_interval(3)
+
+
+class TestShapiroWilkTest:
+    def test_normal_like_data_not_rejected(self):
+        rng = np.random.default_rng(0)
+        result = shapiro_wilk_test(rng.normal(0, 1, 200))
+        assert result["n"] == 200
+        assert not result["reject_normal_0_05"]
+
+    def test_uniform_data_often_rejected(self):
+        rng = np.random.default_rng(0)
+        result = shapiro_wilk_test(rng.uniform(-1, 1, 500))
+        assert result["reject_normal_0_05"]
+
+    def test_too_few_observations_raises(self):
+        with pytest.raises(ValueError, match="at least 3"):
+            shapiro_wilk_test([1.0, 2.0])

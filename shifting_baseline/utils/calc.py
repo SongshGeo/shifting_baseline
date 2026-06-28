@@ -23,10 +23,11 @@ if TYPE_CHECKING:
 def get_significance_stars(p_value: float) -> str:
     """根据 p 值返回显著性星号（全仓库统一约定）。
 
-    - ``***``  p < 0.01
-    - ``**``   p < 0.05
-    - ``*``    p < 0.1
-    - ``""``   p >= 0.1 或 NaN
+    仅报告常规显著性水平（不再使用 p < 0.1，应 Reviewer #3 意见）：
+
+    - ``**``   p < 0.01
+    - ``*``    p < 0.05
+    - ``""``   p >= 0.05 或 NaN
 
     Args:
         p_value: p 值，0-1 之间
@@ -39,11 +40,9 @@ def get_significance_stars(p_value: float) -> str:
     if not 0 <= p_value <= 1:
         raise ValueError(f"p must be between 0 and 1, but got {p_value}")
     if p_value < 0.01:
-        return "***"  # p < 0.01
+        return "**"  # p < 0.01
     if p_value < 0.05:
-        return "**"  # 0.01 <= p < 0.05
-    if p_value < 0.1:
-        return "*"  # 0.05 <= p < 0.1
+        return "*"  # 0.01 <= p < 0.05
     return ""
 
 
@@ -429,3 +428,33 @@ def rand_generate_from_std_levels(
 
     # 还原为最终形状
     return out.reshape(output_shape)
+
+
+def shapiro_wilk_test(data: pd.Series | np.ndarray) -> pd.Series:
+    """Shapiro-Wilk test for normality.
+
+    Args:
+        data: Input values (NaNs are dropped).
+
+    Returns:
+        Series with keys ``statistic``, ``pvalue``, ``n``, and
+        ``reject_normal_0_05`` (True if p < 0.05).
+    """
+    if isinstance(data, pd.Series):
+        values = data.dropna().to_numpy(dtype=float)
+    else:
+        values = np.asarray(data, dtype=float)
+        values = values[~np.isnan(values)]
+
+    if values.size < 3:
+        raise ValueError("Shapiro-Wilk test requires at least 3 observations.")
+
+    result = stats.shapiro(values)
+    return pd.Series(
+        {
+            "statistic": result.statistic,
+            "pvalue": result.pvalue,
+            "n": values.size,
+            "reject_normal_0_05": result.pvalue < 0.05,
+        }
+    )

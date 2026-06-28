@@ -148,6 +148,7 @@ class HistoricalRecords:
         region: Region | None = "华北地区",
         symmetrical_level: bool = True,
         to_std: Optional[ToStdMethod] = None,
+        random_seed: int | None = 42,
     ):
         """
         历史千年旱涝记录数据，参考：
@@ -173,6 +174,7 @@ class HistoricalRecords:
         self.data_path = Path(data_path)
         self.region = region
         self.to_std = to_std
+        self.random_seed = random_seed
         # 读取地理空间数据
         self.shp = gpd.read_file(shp_path).dropna(how="any")
         self._symmetrical_level = symmetrical_level
@@ -205,6 +207,7 @@ class HistoricalRecords:
                 mu=0.0,
                 sigma=1.0,
                 n_samples=100,
+                random_seed=self.random_seed,
             )
             self._data = pd.DataFrame(
                 np.nanmean(data, axis=0),
@@ -709,7 +712,12 @@ def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRe
             index_name="year",
             start_year=start_year,
         )
-        datasets, _ = combine_reconstructions(datasets, uncertainties, standardize=True)
+        datasets, _ = combine_reconstructions(
+            datasets,
+            uncertainties,
+            standardize=True,
+            random_seed=cfg.get("random_seed", 42),
+        )
     else:
         log.info("从文件加载处理后的自然数据 ...")
         datasets = pd.read_csv(cfg.ds.out.tree_ring, index_col=0)
@@ -720,5 +728,6 @@ def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRe
         data_path=cfg.ds.atlas.file,
         symmetrical_level=True,
         to_std=cfg.to_std,
+        random_seed=cfg.get("random_seed", 42),
     )
     return datasets, uncertainties, history

@@ -117,6 +117,7 @@ def combine_reconstructions(
     n_samples: int = 2000,
     n_tune: int = 1000,
     standardize: bool = True,
+    random_seed: int | None = 42,
 ) -> tuple[pd.DataFrame, az.InferenceData]:
     """使用贝叶斯方法整合多个重建序列"""
     # 标准化数据
@@ -162,6 +163,7 @@ def combine_reconstructions(
             init="jitter+adapt_diag",  # 改回更简单的初始化方法
             target_accept=0.95,
             cores=4,
+            random_seed=random_seed,
         )
 
     # 提取结果

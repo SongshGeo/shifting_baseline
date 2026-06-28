@@ -24,6 +24,9 @@ agg_method: mean
 to_int: true
 resolution: 0.5
 to_std: sampling
+# 全局随机种子：固定以保证 to_std=sampling 的历史聚合与贝叶斯整合(MCMC)可复现；
+# 设为 null 则每次随机（恢复旧的不可复现行为）。
+random_seed: 42
 # 在相关性计算时，控制默认的最小样本数，至少为 3，但 5+ 计算 std 更合理
 min_period: 10
 # 前百分之 % 的最大值区间

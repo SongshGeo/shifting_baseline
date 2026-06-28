@@ -287,11 +287,10 @@ def sweep_max_corr_year(
     r_benchmark_list = []
     p_value_list = []
     for slice_now in slices:
-        r_benchmark, p_value, _ = compare_corr(
+        r_benchmark, p_value, _ = calc_corr(
             data1.loc[slice_now],
             data2.loc[slice_now],
-            window_error="nan",
-            **compare_kwargs,
+            how=compare_kwargs.get("corr_method", "pearson"),
         )
         p_value_list.append(p_value)
         r_benchmark_list.append(r_benchmark)

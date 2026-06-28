@@ -40,7 +40,13 @@ METRICS = ("peak_window_mean", "peak_strength_mean")
 SENSITIVITY_ROOT = Path("reports/results/sensitivity")
 
 
-def find_latest_sobol_dirs(n: int = 2) -> list[Path]:
+def find_latest_sobol_dirs(n: int = 3) -> list[Path]:
+    """Most-recent sobol dir *per baseline*, newest first.
+
+    Re-runs of one baseline collapse to its latest dir, so a fresh
+    collective_lifetime run sits alongside the older personal/collective
+    runs instead of evicting one of them on raw mtime.
+    """
     if not SENSITIVITY_ROOT.exists():
         return []
     dirs = sorted(
@@ -48,11 +54,17 @@ def find_latest_sobol_dirs(n: int = 2) -> list[Path]:
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
-    return dirs[:n]
+    latest: dict[str, Path] = {}
+    for d in dirs:
+        latest.setdefault(baseline_of(d), d)
+    return list(latest.values())[:n]
 
 
 def baseline_of(d: Path) -> str:
     name = d.name
+    # Order matters: "collective_lifetime" also contains "collective".
+    if "collective_lifetime" in name:
+        return "collective_lifetime"
     if "collective" in name:
         return "collective"
     if "personal" in name:
@@ -134,8 +146,10 @@ def plot_one_dir(d: Path) -> Path | None:
 def plot_compare(dirs: list[Path]) -> Path | None:
     if len(dirs) < 2:
         return None
-    fig, axes = plt.subplots(2, 2, figsize=(13, 9))
-    for col, d in enumerate(dirs[:2]):
+    ordered = _ordered_dirs(dirs)
+    ncol = len(ordered)
+    fig, axes = plt.subplots(2, ncol, figsize=(6.5 * ncol, 9), squeeze=False)
+    for col, d in enumerate(ordered):
         b = baseline_of(d)
         for row, m in enumerate(METRICS):
             f = d / f"sobol_{m}.csv"
@@ -146,7 +160,10 @@ def plot_compare(dirs: list[Path]) -> Path | None:
                 continue
             df = pd.read_csv(f)
             plot_indices_panel(ax, df, f"{b} — {m}")
-    fig.suptitle("Sobol sensitivity indices: personal vs collective", fontsize=12)
+    fig.suptitle(
+        "Sobol sensitivity indices: " + " vs ".join(baseline_of(d) for d in ordered),
+        fontsize=12,
+    )
     fig.tight_layout()
     out = SENSITIVITY_ROOT / "sobol_compare.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
@@ -159,7 +176,12 @@ def plot_distribution(dirs: list[Path]) -> Path | None:
     if len(dirs) < 1:
         return None
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.2))
-    palette = {"personal": "#4C72B0", "collective": "#DD8452", "model": "#55A868"}
+    palette = {
+        "personal": "#4C72B0",
+        "collective": "#DD8452",
+        "collective_lifetime": "#55A868",
+        "model": "#8172B3",
+    }
     for ax, m in zip(axes, METRICS):
         for d in dirs:
             b = baseline_of(d)
@@ -257,20 +279,22 @@ METRIC_LABELS = {
 
 
 def _ordered_dirs(dirs: list[Path]) -> list[Path]:
-    """Return [personal_dir, collective_dir] when both are present."""
-    order = {"personal": 0, "collective": 1}
+    """Canonical baseline order: personal, collective_lifetime, collective, model."""
+    order = {"personal": 0, "collective_lifetime": 1, "collective": 2, "model": 3}
     return sorted(dirs, key=lambda d: order.get(baseline_of(d), 99))
 
 
 def plot_compare_si(dirs: list[Path]) -> tuple[Path, Path] | None:
-    """Publication-quality 4-panel Sobol comparison for SI use.
+    """Publication-quality Sobol comparison for SI use.
 
-    Layout: rows = response metric, cols = memory baseline (personal | collective).
-    Saves both PDF (vector) and 300-DPI PNG.
+    Layout: rows = response metric, cols = memory baseline
+    (personal | collective_lifetime | collective). Saves both PDF (vector)
+    and 300-DPI PNG.
     """
     if len(dirs) < 2:
         return None
     ordered = _ordered_dirs(dirs)
+    ncol = len(ordered)
     with plt.rc_context(
         {
             "font.size": 9,
@@ -287,10 +311,12 @@ def plot_compare_si(dirs: list[Path]) -> tuple[Path, Path] | None:
             "savefig.bbox": "tight",
         }
     ):
-        fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.6), sharey=False)
+        fig, axes = plt.subplots(
+            2, ncol, figsize=(3.6 * ncol, 5.6), sharey=False, squeeze=False
+        )
         panel_idx = 0
         for row, m in enumerate(METRICS):
-            for col, d in enumerate(ordered[:2]):
+            for col, d in enumerate(ordered):
                 ax = axes[row, col]
                 b = baseline_of(d)
                 f = d / f"sobol_{m}.csv"
@@ -336,7 +362,7 @@ def plot_compare_si(dirs: list[Path]) -> tuple[Path, Path] | None:
                 if col == 0:
                     ax.set_ylabel("Sobol index")
                 ax.set_title(f"{b} — {METRIC_LABELS.get(m, m)}", pad=5)
-                if row == 0 and col == 1:
+                if row == 0 and col == ncol - 1:
                     ax.legend(loc="upper right", frameon=False, handlelength=1.4)
                 ax.text(
                     -0.12,
@@ -363,7 +389,7 @@ def main(argv: list[str]) -> int:
     if argv:
         dirs = [Path(p) for p in argv]
     else:
-        dirs = find_latest_sobol_dirs(2)
+        dirs = find_latest_sobol_dirs()
     if not dirs:
         print("No sobol output directories found.", file=sys.stderr)
         return 1

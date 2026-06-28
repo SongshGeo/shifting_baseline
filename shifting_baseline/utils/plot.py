@@ -25,7 +25,7 @@ from mksci_font import config_font
 from pyproj import CRS
 from sklearn.metrics import root_mean_squared_error
 
-from shifting_baseline.constants import LEVELS, TICK_LABELS
+from shifting_baseline.constants import COLORS, LEVELS, THRESHOLDS, TICK_LABELS
 from shifting_baseline.utils.calc import (
     fill_star_matrix,
     get_significance_stars,
@@ -316,63 +316,77 @@ def plot_std_times(
     data: pd.Series,
     ax: Optional[Axes] = None,
     color_options: Optional[dict[str, str]] = None,
+    n_levels: int = 5,
+    legend_kwargs: Optional[dict] = None,
     **kwargs,
-) -> None:
-    """分段绘制正负值出现次数图
+) -> Axes:
+    """分段绘制历史档案标准差时间序列。
 
     Args:
-        data: pd.Series
-            输入数据。
-        ax: matplotlib.axes.Axes
-            绘图的Axes对象。
-        color_options: dict[str, str]
-            颜色映射。
-        add_legend: bool
-            是否添加图例。
+        data: 输入数据（连续 z-score 或档案代表性标准差）。
+        ax: 绘图的 Axes 对象。
+        color_options: 3 级模式下的颜色映射（``n_levels=3`` 时使用）。
+        n_levels: 分级数量，5 为旱涝 5 档（默认），3 为旱/正常/涝。
+        legend_kwargs: 若提供，则按 SW→SD 顺序绘制 5 级图例。
     """
     assert isinstance(data, pd.Series), "data must be a pandas Series"
     assert data.index.is_monotonic_increasing, "index must be monotonic increasing"
     assert data.index.is_unique, "index must be unique"
     assert ax is not None, "ax must be provided"
+    assert n_levels in (3, 5), "n_levels must be 3 or 5"
 
-    # 使用numpy条件设置颜色：正数蓝色，负数红色，零值灰色
-    if color_options is None:
-        color_options = {
-            "positive": "#689B8A",
-            "negative": "#E43636",
-            "zero": "lightgray",
-        }
-    colors = np.where(
-        data.values > 0.33,
-        color_options["positive"],  # 正数用蓝色
-        np.where(
-            data.values < -0.33, color_options["negative"], color_options["zero"]
-        ),  # 负数用红色，零值用灰色
-    )
+    added_labels: set[int | str] = set()
 
-    # 跟踪已添加的标签类型
-    added_labels = set()
-
-    # 绘制垂直线和散点
-    for x, y, color in zip(data.index, data.values, colors):
-        ax.vlines(x, 0, y, colors=color, linewidth=1, **kwargs)
-
-        # 根据数值类型确定标签
-        if y > 0.33:
-            label = "Wet Year" if "positive" not in added_labels else None
+    if n_levels == 5:
+        level_colors = [COLORS[0], COLORS[1], COLORS[2], "#5CB8E8", COLORS[3]]
+        level_labels = TICK_LABELS
+        bin_idx = np.digitize(data.values, THRESHOLDS)
+        for x, y, idx in zip(data.index, data.values, bin_idx):
+            color = level_colors[idx]
+            ax.vlines(x, 0, y, colors=color, linewidth=1, **kwargs)
+            label = level_labels[idx] if idx not in added_labels else None
             if label:
-                added_labels.add("positive")
-        elif y < -0.33:
-            label = "Dry Year" if "negative" not in added_labels else None
-            if label:
-                added_labels.add("negative")
-        else:
-            label = "Normal Year" if "zero" not in added_labels else None
-            if label:
-                added_labels.add("zero")
+                added_labels.add(idx)
+            ax.scatter(x, y, c=color, s=30, zorder=3, edgecolors="white", label=label)
+        if legend_kwargs is not None:
+            handles, labels = ax.get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            legend_order = list(reversed(TICK_LABELS))  # SW, MW, N, MD, SD
+            ordered_handles = [by_label[lab] for lab in legend_order if lab in by_label]
+            ordered_labels = [lab for lab in legend_order if lab in by_label]
+            if ordered_labels:
+                ax.legend(ordered_handles, ordered_labels, **legend_kwargs)
+    else:
+        if color_options is None:
+            color_options = {
+                "positive": "#689B8A",
+                "negative": "#E43636",
+                "zero": "lightgray",
+            }
+        colors = np.where(
+            data.values > 0.33,
+            color_options["positive"],
+            np.where(
+                data.values < -0.33, color_options["negative"], color_options["zero"]
+            ),
+        )
+        for x, y, color in zip(data.index, data.values, colors):
+            ax.vlines(x, 0, y, colors=color, linewidth=1, **kwargs)
+            if y > 0.33:
+                label = "Wet Year" if "positive" not in added_labels else None
+                if label:
+                    added_labels.add("positive")
+            elif y < -0.33:
+                label = "Dry Year" if "negative" not in added_labels else None
+                if label:
+                    added_labels.add("negative")
             else:
-                label = None
-        ax.scatter(x, y, c=color, s=30, zorder=3, edgecolors="white", label=label)
+                label = "Normal Year" if "zero" not in added_labels else None
+                if label:
+                    added_labels.add("zero")
+                else:
+                    label = None
+            ax.scatter(x, y, c=color, s=30, zorder=3, edgecolors="white", label=label)
 
     # 添加基线
     ax.axhline(y=0, color="black", linewidth=0.5, alpha=0.7)
@@ -548,6 +562,8 @@ def plot_time_series_with_lowpass(
     filter_method: str = "rolling_mean",
     baseline: float | None = None,
     rmse_data: pd.Series | None = None,
+    band_label: str = "±1 RMSE",
+    band_center: pd.Series | None = None,
     ax: Optional[Axes] = None,
     show_annual: bool = True,
     show_filtered: bool = True,
@@ -644,17 +660,19 @@ def plot_time_series_with_lowpass(
             label="Annual data",
         )
 
-    # 绘制RMSE误差范围
+    # 绘制误差/置信带：默认围绕低通线，可用 band_center 指定围绕的中心序列
+    # （例如传入后验均值序列以画出指数本身的可信区间）
     if show_rmse and rmse_data is not None:
-        valid_mask = ~filtered_data.isna()
+        center = filtered_data if band_center is None else band_center
+        valid_mask = ~center.isna()
         if valid_mask.any():
             ax.fill_between(
-                filtered_data.index[valid_mask],
-                filtered_data[valid_mask] - rmse_data[valid_mask],
-                filtered_data[valid_mask] + rmse_data[valid_mask],
+                center.index[valid_mask],
+                center[valid_mask] - rmse_data[valid_mask],
+                center[valid_mask] + rmse_data[valid_mask],
                 color=colors["rmse"],
                 alpha=0.3,
-                label="±1 RMSE",
+                label=band_label,
             )
 
     # 绘制基准线着色区域
@@ -730,6 +748,7 @@ def plot_corr_map(
     base_maps: dict[str, str] | None = None,
     crs: str | None | CRS = None,
     add_colorbar: bool = True,
+    cbar_label: str | None = "Pearson r",
 ) -> plt.Axes:
     """绘制相关性地图
 
@@ -738,6 +757,11 @@ def plot_corr_map(
         p_value (xr.DataArray): p值
         threshold (float, optional): 显著性阈值. Defaults to 0.05.
         ax (plt.Axes | None, optional): 坐标轴. Defaults to None.
+        mask (bool, optional): 是否仅显示显著相关格点. Defaults to True.
+        base_maps (dict[str, str] | None, optional): 底图 shapefile 路径.
+        crs (str | None | CRS, optional): 坐标参考系.
+        add_colorbar (bool, optional): 是否添加颜色条. Defaults to True.
+        cbar_label (str | None, optional): 颜色条标题；覆盖数据变量自带名称.
 
     Returns:
         plt.Axes: 坐标轴
@@ -767,11 +791,15 @@ def plot_corr_map(
     if mask:
         significant_mask = p_value < threshold
         corr_map = corr_map.where(significant_mask)
+    corr_map = corr_map.copy()
+    corr_map.name = "pearson_r"
+    corr_map.attrs.pop("long_name", None)
+    corr_map.attrs.pop("units", None)
     if add_colorbar:
-        cbar_kwargs = {"shrink": 0.8, "aspect": 20}
+        cbar_kwargs = {"shrink": 0.8, "aspect": 20, "pad": 0.12}
     else:
         cbar_kwargs = None
-    corr_map.plot(
+    mesh = corr_map.plot(
         ax=ax,
         cmap="RdBu_r",
         vmin=-0.5,
@@ -779,6 +807,11 @@ def plot_corr_map(
         add_colorbar=add_colorbar,
         cbar_kwargs=cbar_kwargs,
     )
+    if add_colorbar and cbar_label:
+        cbar = mesh.colorbar
+        cbar.set_label(cbar_label)
+        cbar.ax.yaxis.set_label_position("left")
+        cbar.ax.yaxis.tick_right()
     # 绘制底图
     if base_maps is None:
         base_maps = {}
