@@ -131,7 +131,7 @@ def _run_one(
             "_run_significance_test",
             types.MethodType(sig_test_override, report),
         )
-    report.analyze_error_patterns(mc_runs=mc_runs)
+    report.analyze_error_patterns(mc_runs=mc_runs, random_seed=seed)
 
     report.cm_df.to_csv(out_dir / "cm_df.csv")
     if report.diff_matrix is not None:

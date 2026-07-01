@@ -173,7 +173,7 @@ This repository contains research code under peer review. For questions or colla
 
 ## License
 
-[Specify your license here - e.g., MIT, GPL-3.0, etc.]
+This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgments
 

@@ -1,164 +1,54 @@
 # Installation
 
-This guide will help you install Shifting Baseline and its dependencies.
+The project targets **Python 3.11 only** and manages dependencies with
+[**uv**](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`).
 
-## Prerequisites
+## Requirements
 
-- Python 3.11+ (required)
-- uv
-- Git (for development)
+- Python 3.11 (exactly)
+- `uv` — `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Git
 
-## Installation Methods
-
-### Method 1: Using uv (Recommended)
-
-uv is the recommended package manager for this project and is the default workflow for dependency syncing and command execution.
+## Install
 
 ```bash
-# Clone the repository
-git clone https://github.com/SongshGeo/shifting_baseline.git
+git clone https://github.com/SongshGeo/shifting_baseline
 cd shifting_baseline
 
-# Install dependencies
-uv sync
+uv sync                 # runtime + dev dependencies
+uv sync --group docs    # add the docs toolchain (mkdocs, mkdocstrings, i18n …)
+```
 
-# Activate the virtual environment
+`uv sync` creates a `.venv/`. Run commands with `uv run …`, or activate the env:
+
+```bash
 source .venv/bin/activate
 ```
 
-### Method 2: Using pip
+The scientific stack (xarray, pandas, numpy, scipy, arviz, pymc, geopandas,
+cartopy, netcdf4, hydra-core, and the ABM framework
+[`abses`](https://pypi.org/project/abses/)) is installed automatically from
+`pyproject.toml` / `uv.lock`.
 
-If you prefer using pip, you can install the package in development mode:
+## Verify
 
 ```bash
-# Clone the repository
-git clone https://github.com/SongshGeo/shifting_baseline.git
-cd shifting_baseline
-
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install in development mode
-pip install -e .
+uv run python -c "import shifting_baseline; print('ok')"
+uv run pytest -m "not slow"     # quick smoke test (skips slow-marked tests)
 ```
 
-## Dependencies
+## Build the docs locally
 
-Shifting Baseline relies on several scientific Python packages:
-
-### Core Dependencies
-- **xarray** (>=2023): Multi-dimensional labeled arrays
-- **pandas** (>=1.5): Data manipulation and analysis
-- **numpy** (>=1.20): Numerical computing
-- **matplotlib** (>=3.9.2): Plotting library
-- **scipy** (>=1.9): Scientific computing
-
-### Climate Data Processing
-- **netcdf4** (>=1.7): NetCDF file format support
-- **rioxarray** (>=0.17.0): Geospatial raster data
-- **xclim** (^0.53.2): Climate data analysis
-- **cf-xarray** (*): CF conventions for xarray
-
-### Geospatial Analysis
-- **geopandas** (*): Geospatial data processing
-- **cartopy** (>=0.24.1): Cartographic projections
-
-### Statistical Analysis
-- **scikit-learn** (>=1.0): Machine learning tools
-- **arviz** (^0.20.0): Bayesian analysis
-- **pymc** (^5.20.1): Probabilistic programming
-
-### Agent-Based Modeling
-- **abses** (>=0.7.5): Agent-based simulation framework
-
-### Additional Utilities
-- **tqdm** (*): Progress bars
-- **hydra-core** (~1.3): Configuration management
-- **openpyxl** (*): Excel file support
-- **fitter** (^1.7.1): Distribution fitting
-
-## Verification
-
-After installation, verify that Shifting Baseline is working correctly:
-
-```python
-# Test basic import
-import shifting_baseline
-print(f"Shifting Baseline version: {shifting_baseline.__version__}")
-
-# Test core modules
-from shifting_baseline.data import HistoricalRecords
-from shifting_baseline.compare import experiment_corr_2d
-from shifting_baseline.calibration import MismatchReport
-
-print("✅ All imports successful!")
+```bash
+uv run mkdocs serve             # live preview at http://127.0.0.1:8000
+uv run mkdocs build             # static site into ./site
 ```
+
+The site is bilingual (English + 中文) — use the language selector in the top bar.
 
 ## Troubleshooting
 
-### Common Issues
-
-**1. uv Installation Issues**
-```bash
-# Install or update uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# Refresh the environment
-uv sync --refresh
-```
-
-**2. NetCDF4 Installation Problems**
-```bash
-# Install system dependencies (Ubuntu/Debian)
-sudo apt-get install libhdf5-dev libnetcdf-dev
-
-# Or using conda
-conda install -c conda-forge netcdf4
-```
-
-**3. Cartopy Installation Issues**
-```bash
-# Install system dependencies
-sudo apt-get install libproj-dev proj-data proj-bin
-sudo apt-get install libgeos-dev
-
-# Or using conda
-conda install -c conda-forge cartopy
-```
-
-**4. Memory Issues with Large Datasets**
-```bash
-# Increase virtual memory
-export MALLOC_ARENA_MAX=2
-```
-
-### Getting Help
-
-If you encounter issues during installation:
-
-1. Check the [GitHub Issues](https://github.com/SongshGeo/shifting_baseline/issues)
-2. Create a new issue with:
-   - Operating system and version
-   - Python version
-   - Installation method used
-   - Complete error message
-3. Contact: [songshgeo@gmail.com](mailto:songshgeo@gmail.com)
-
-## Development Installation
-
-For development work, install with additional development dependencies:
-
-```bash
-# Install the default development environment
-uv sync
-
-# Or install all groups explicitly
-uv sync --all-groups
-```
-
-This includes:
-- **pytest**: Testing framework
-- **pytest-cov**: Coverage reporting
-- **black**: Code formatting
-- **flake8**: Linting
-- **mypy**: Type checking
+- **`uv` out of date** — `uv self update`, then `uv sync --refresh`.
+- **NetCDF / Cartopy build errors** — the wheels usually just work; if not, install
+  system libs (`libhdf5-dev libnetcdf-dev libproj-dev libgeos-dev`) or use a
+  conda-forge base, then re-run `uv sync`.

@@ -1,10 +1,17 @@
-site_name: Shifting Baseline API Documentation
-site_description: Comprehensive API documentation for the Shifting Baseline climate reconstruction analysis library
+site_name: Shifting Baseline
+site_description: >-
+  Documentation for the Shifting Baseline research codebase — comparing historical
+  Chinese climate archives against tree-ring reconstructions to study Shifting
+  Baseline Syndrome (SBS), validated with an agent-based model.
 site_author: SongshGeo
 site_url: https://songshgeo.github.io/shifting_baseline
 
+repo_name: SongshGeo/shifting_baseline
+repo_url: https://github.com/SongshGeo/shifting_baseline
+
 theme:
   name: material
+  language: en
   palette:
     - scheme: default
       primary: blue
@@ -21,90 +28,151 @@ theme:
   features:
     - navigation.tabs
     - navigation.sections
-    - navigation.expand
-    - navigation.path
     - navigation.top
+    - navigation.path
+    - navigation.indexes
+    - toc.follow
     - search.highlight
     - search.share
     - content.code.copy
     - content.code.annotate
+    - content.tabs.link
   icon:
     repo: fontawesome/brands/github
 
-repo_name: SongshGeo/shifting_baseline
-repo_url: https://github.com/SongshGeo/shifting_baseline
-
 plugins:
   - search
-  - mkdocstrings
+  - i18n:
+      docs_structure: suffix
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: zh
+          name: 中文
+          build: true
+          site_name: Shifting Baseline 文档
+          nav_translations:
+            Home: 首页
+            Getting Started: 快速开始
+            Installation: 安装
+            Quick Start: 快速上手
+            Configuration: 配置 (Hydra)
+            User Guide: 用户指南
+            Overview & Science: 概览与科学背景
+            Data & Reproduction: 数据与复现
+            Analysis Pipeline: 分析流水线
+            Agent-Based Model: 智能体模型 (ABM)
+            Examples: 示例
+            Basic Usage: 基础用法
+            Advanced Analysis: 进阶分析
+            ABM Simulation: ABM 模拟
+            API Reference: API 参考
+            Filters: 滤波与分级 (filters)
+            Analysis: 分析模块
+            Comparison: 相关性对比 (compare)
+            Calibration: 误配分析 (calibration)
+            Model: 模型
+            ABM: 智能体模型 (abm)
+            Climate Forcing: 气候强迫 (climate_forcing)
+            Sensitivity Analysis: 敏感性分析 (sensitivity)
+            Utilities: 工具
+            Constants: 常量 (constants)
+            Utils: 通用工具 (utils)
+            Architecture: 架构
+            UML Diagrams: UML 图
+  - autorefs:
+      resolve_closest: true   # with i18n each API object exists in en+zh; link to the same-language page instead of warning
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            docstring_section_style: table
+            merge_init_into_class: true
+            filters: ["!^_"]
+            heading_level: 2
+  - git-revision-date-localized:
+      enable_creation_date: true
+      enable_git_follow: false
+      fallback_to_build_date: true
+  - glightbox
 
 markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
-  - pymdownx.superfences
-  - pymdownx.tabbed:
-      alternate_style: true
   - pymdownx.snippets
+  - pymdownx.details
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
-  - admonition
-  - pymdownx.details
-  - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
-  - tables
-  - attr_list
-  - md_in_html
   - toc:
       permalink: true
+  - plantuml_markdown:
+      server: https://www.plantuml.com/plantuml   # render ```plantuml blocks via the public PlantUML server
+      format: svg
+      cachedir: /tmp/plantuml-cache
 
 nav:
   - Home: index.md
-  - Architecture:
-    - UML Diagrams: architecture/uml.md
   - Getting Started:
-    - Installation: getting-started/installation.md
-    - Quick Start: getting-started/quickstart.md
-    - Configuration: getting-started/configuration.md
-  - API Reference:
-    - Core Modules:
-      - Data Processing: api/data.md
-      - Historical Records: api/historical-records.md
-      - Filters: api/filters.md
-      - Process: api/process.md
-    - Analysis Modules:
-      - Comparison: api/compare.md
-      - Calibration: api/calibration.md
-      - Monte Carlo: api/mc.md
-    - Agent-Based Model:
-      - ABM Overview: api/abm.md
-      - Climate Observer: api/climate-observer.md
-    - Utilities:
-      - Constants: api/constants.md
-      - Utils: api/utils.md
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
+  - User Guide:
+      - Overview & Science: guide/overview.md
+      - Data & Reproduction: guide/data.md
+      - Analysis Pipeline: guide/pipeline.md
+      - Agent-Based Model: guide/abm.md
   - Examples:
-    - Basic Usage: examples/basic-usage.md
-    - Advanced Analysis: examples/advanced-analysis.md
-    - ABM Simulation: examples/abm-simulation.md
-  - Development:
-    - Contributing: development/contributing.md
-    - Testing: development/testing.md
-    - Changelog: development/changelog.md
+      - Basic Usage: examples/basic-usage.md
+      - Advanced Analysis: examples/advanced-analysis.md
+      - ABM Simulation: examples/abm-simulation.md
+  - API Reference:
+      - Analysis:
+          - Filters: api/filters.md
+          - Comparison: api/compare.md
+          - Calibration: api/calibration.md
+      - Model:
+          - ABM: api/abm.md
+          - Climate Forcing: api/climate_forcing.md
+          - Sensitivity Analysis: api/sensitivity.md
+      - Utilities:
+          - Constants: api/constants.md
+          - Utils: api/utils.md
+  - Architecture:
+      - UML Diagrams: architecture/uml.md
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/SongshGeo
-    - icon: fontawesome/brands/twitter
-      link: https://twitter.com/songshgeo
-  version:
-    provider: mike
+      link: https://github.com/SongshGeo/shifting_baseline

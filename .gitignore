@@ -151,8 +151,6 @@ data
 tmp
 .virtual_documents
 
-# poetry
-poetry.lock
 
 # Hydra
 outputs
@@ -165,6 +163,5 @@ multirun
 playground.ipynb
 manuscript
 reports/results
-CLAUDE.md
 docs/reviews
 webapp/

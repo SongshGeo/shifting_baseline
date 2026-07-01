@@ -1804,6 +1804,18 @@ wheels = [
 ]
 
 [[package]]
+name = "mkdocs-static-i18n"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mkdocs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ce/f9/51e2ffda9c7210bc35a24f3717b08c052cd4b728dfa87f901c00d8005259/mkdocs_static_i18n-1.3.1.tar.gz", hash = "sha256:a6125ea7db6cc1a900d76a967f262535af09831160a93c56d7f0d522a79b5faf", size = 1371325, upload-time = "2026-02-20T10:42:41.835Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/0b/43ff4afb6b438d47718b1959a22075ed95d8460d8c47381878b37a40de63/mkdocs_static_i18n-1.3.1-py3-none-any.whl", hash = "sha256:4036e24795a150c9c4d4b001ed24a43aec01335f76188dbe5a5d8fb4a27eba65", size = 21853, upload-time = "2026-02-20T10:42:40.551Z" },
+]
+
+[[package]]
 name = "mkdocstrings"
 version = "0.30.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2273,6 +2285,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a1/92/b402b6e58a4f9ea2718ada67171586dc2ebd494ffcaf0c08f2b634714ad5/pint_xarray-0.6.1.tar.gz", hash = "sha256:a0febf909b69342fde39b8e053875c52bb75a65e4fc56d95bd146f74449aed84", size = 57668, upload-time = "2026-03-23T20:58:41.476Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/0d/e20fbbf036a88fc7be7438f6fc1c7606e8806064f933f7eb6d4f110bc622/pint_xarray-0.6.1-py3-none-any.whl", hash = "sha256:4f96682bda1234c3be652db2f9b7cfb8d858cc870c8e7a51213163e743d8ccf7", size = 44090, upload-time = "2026-03-23T20:58:40.016Z" },
+]
+
+[[package]]
+name = "plantuml-markdown"
+version = "3.11.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/41/807c38a6c703ee9b94be4120102247691aeeb4aefea034eaf687ef515594/plantuml_markdown-3.11.2.tar.gz", hash = "sha256:700a6ebf5c265da488aafa3c376f27e23d604dc4a151ff811fc3aec156ed51a3", size = 32319, upload-time = "2026-04-18T06:09:53.132Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/ca/e0afead2f0466b5af237cf01beaa04b6c7d9479b24ead4ad10cc3c7a4209/plantuml_markdown-3.11.2-py3-none-any.whl", hash = "sha256:45eb97fed669cc23c90593ae1d42122809bfc3693970a6edb0004c0dc20cde27", size = 20158, upload-time = "2026-04-18T06:09:51.581Z" },
 ]
 
 [[package]]
@@ -3080,7 +3101,9 @@ docs = [
     { name = "mkdocs-material" },
     { name = "mkdocs-minify-plugin" },
     { name = "mkdocs-redirects" },
+    { name = "mkdocs-static-i18n" },
     { name = "mkdocstrings", extra = ["python"] },
+    { name = "plantuml-markdown" },
 ]
 webapp = [
     { name = "fastapi" },
@@ -3148,7 +3171,9 @@ docs = [
     { name = "mkdocs-material", specifier = ">=9.6.19,<10.0.0" },
     { name = "mkdocs-minify-plugin", specifier = ">=0.8.0,<0.9.0" },
     { name = "mkdocs-redirects", specifier = ">=1.2.2,<2.0.0" },
+    { name = "mkdocs-static-i18n", specifier = ">=1.2.3,<2.0.0" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=0.30.0,<0.31.0" },
+    { name = "plantuml-markdown", specifier = ">=3.9.2,<4.0.0" },
 ]
 webapp = [
     { name = "fastapi", specifier = ">=0.115.0,<1.0.0" },

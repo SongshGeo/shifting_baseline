@@ -1,112 +1,79 @@
 # Shifting Baseline
 
-A comprehensive Python library for analyzing historical climate reconstruction data and comparing it with collective memory records from historical documents.
+Research codebase for the manuscript *“Archival and palaeoenvironmental documentation
+of historical extreme events reveals perceptual bias in collective memory.”*
 
-## Overview
+It compares historical Chinese climate archives (1470–1900 CE) against tree-ring
+hydroclimate reconstructions and instrumental data (1901–2000 CE) to study
+**Shifting Baseline Syndrome (SBS)**, and uses an **agent-based model (ABM)** to
+reproduce the observed perceptual-bias pattern.
 
-Shifting Baseline is designed to bridge the gap between objective climate reconstructions and subjective historical records. The library provides tools for:
+!!! tip "Language"
+    Use the language selector in the top bar to switch between **English** and **中文**.
+    使用顶部的语言选择器在 **English** 与 **中文** 之间切换。
 
-- **Data Processing**: Loading and standardizing climate reconstruction data from various sources
-- **Historical Analysis**: Processing and analyzing historical drought/flood records
-- **Statistical Comparison**: Advanced correlation analysis between different data sources
-- **Agent-Based Modeling**: Simulating how historical observers might have recorded climate events
-- **Calibration**: Evaluating the accuracy and reliability of different data sources
+## What this project does
 
-## Key Features
+- **Two Wet/Dry Index (WDI) series.** The perception-mediated **H-WDI** (historical
+  archives) is compared against the more independent **N-WDI** (natural tree-ring
+  proxy), both classified into five ordinal levels (SD, MD, N, MW, SW).
+- **Mismatch analysis.** Where the two disagree, the archive shows a systematic
+  *shifted-comparison* bias — years are judged relative to recent experience rather
+  than to an absolute baseline.
+- **Sliding-window re-standardisation.** Re-standardising the natural series within a
+  ~20–40-year (optimal ≈ 30-year) window improves agreement — the central finding.
+- **Agent-based model.** A minimal ABM discriminates the two SBS mechanisms
+  (**H1 generational amnesia** vs **H2 collective illusion**); only generational
+  amnesia reproduces the empirical generational optimum. Robustness is established
+  with AR(1) climate forcing and a global (Sobol) sensitivity analysis.
 
-### 🔬 Scientific Analysis
-- Advanced statistical methods for climate data analysis
-- Monte Carlo simulations for uncertainty quantification
-- Multiple correlation analysis techniques (Pearson, Kendall, Spearman)
-- Time series filtering and windowing methods
+## Reproduce it
 
-### 📊 Data Integration
-- Support for multiple climate reconstruction datasets
-- Historical document processing and classification
-- Spatial and temporal data aggregation
-- Standardized data formats and interfaces
+We share the **two derived series** the analysis actually uses — the historical-archive
+**H-WDI** (ordinal levels) and the tree-ring **N-WDI** (z-score) — so you can reproduce
+the central result and plug in your own data. The raw corpus and the data-production
+steps are not required. Start at **[Data & Reproduction](guide/data.md)**.
 
-### 🤖 Agent-Based Modeling
-- Climate observer simulation framework
-- Collective memory modeling
-- Bias analysis in historical recording
-- Behavioral pattern simulation
+## Analysis modules
 
-### 📈 Visualization
-- Comprehensive plotting utilities
-- Statistical visualization tools
-- Interactive correlation analysis plots
-- Publication-ready figure generation
+| Module | Role |
+| --- | --- |
+| [`filters`](api/filters.md) | Sliding-window re-standardisation & ordinal classification |
+| [`compare`](api/compare.md) | Correlation machinery & the window sweep (~30-year optimum) |
+| [`calibration`](api/calibration.md) | `MismatchReport` confusion-matrix / error-pattern analysis + MC null |
+| [`abm`](api/abm.md) | `ClimateObservingModel` and observer agents |
+| [`climate_forcing`](api/climate_forcing.md) | i.i.d. / AR(1) / trend climate generators |
+| [`sensitivity`](api/sensitivity.md) | Variance-based Sobol sensitivity analysis |
+| [`constants`](api/constants.md), [`utils`](api/utils.md) | Year boundaries, maps, plotting, logging |
 
-## Quick Start
-
-```python
-from shifting_baseline import HistoricalRecords, load_data
-from shifting_baseline.compare import experiment_corr_2d
-from shifting_baseline.calibration import MismatchReport
-
-# Load historical records
-history = HistoricalRecords(
-    shp_path="data/regions.shp",
-    data_path="data/historical_data.xlsx",
-    region="华北地区"
-)
-
-# Load climate reconstruction data
-datasets, uncertainties, _ = load_data(config)
-
-# Perform correlation analysis
-corr_df, r_benchmark, ax = experiment_corr_2d(
-    data1=history.aggregate("mean"),
-    data2=climate_data,
-    corr_method="kendall"
-)
-
-# Generate mismatch report
-report = MismatchReport(
-    pred=classified_predictions,
-    true=classified_observations,
-    value_series=raw_data
-)
-report.analyze_error_patterns()
-```
-
-## Installation
+## Quick start
 
 ```bash
-uv sync
+uv sync                                   # install runtime + dev deps
+uv run python shifting_baseline/abm.py    # run the ABM (self-contained, no data needed)
+uv run pytest                             # run the test suite
 ```
 
-## Documentation Structure
-
-- **[Getting Started](getting-started/installation.md)**: Installation and basic setup
-- **[API Reference](api/)**: Complete API documentation for all modules
-- **[Examples](examples/)**: Practical usage examples and tutorials
-- **[Development](development/)**: Contributing guidelines and development setup
+See **[Getting Started](getting-started/installation.md)** to install, the
+**[User Guide](guide/overview.md)** for the science, and
+**[Data & Reproduction](guide/data.md)** to run the analysis from the shared series.
 
 ## Citation
 
-If you use Shifting Baseline in your research, please cite:
-
 ```bibtex
 @software{shifting_baseline,
-  title={Shifting Baseline: A Python Library for Historical Climate Reconstruction Analysis},
-  author={Song, Shuang},
-  year={2025},
-  url={https://github.com/SongshGeo/shifting_baseline}
+  title  = {Shifting Baseline: analysis of Shifting Baseline Syndrome in historical climate archives},
+  author = {Song, Shuang},
+  url    = {https://github.com/SongshGeo/shifting_baseline},
 }
 ```
 
-## License
+## Contributing
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/SongshGeo/shifting_baseline/blob/main/LICENSE) file for details.
+This is a research codebase under active development. If you're interested in
+contributing — extending the ABM, the analysis pipeline, or building a front end —
+please get in touch:
 
-## Support
-
-- 📧 Email: [songshgeo@gmail.com](mailto:songshgeo@gmail.com)
-- 🐛 Issues: [GitHub Issues](https://github.com/SongshGeo/shifting_baseline/issues)
-- 📖 Documentation: [This site](https://songshgeo.github.io/shifting_baseline)
-
----
-
-*Built with ❤️ for climate science and historical research*
+- 📧 **song[at]gea.mpg.de**
+- 🌐 [cv.songshgeo.com](https://cv.songshgeo.com/)
+- 🐛 [GitHub issues](https://github.com/SongshGeo/shifting_baseline/issues)

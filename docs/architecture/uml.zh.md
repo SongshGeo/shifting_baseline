@@ -1,28 +1,25 @@
-# Architecture (UML)
+# 架构图 (UML)
 
-This page describes the architecture of `shifting_baseline` with **PlantUML**, focused
-on the agent-based model (ABM) built on the [`abses`](https://github.com/ABSESpy/ABSES)
-framework. It doubles as a blueprint for building a front end / deploying the model
-(class structure, parameter surface, runtime sequence).
+本页用 **PlantUML** 描述 `shifting_baseline` 的架构，重点是基于
+[`abses`](https://github.com/ABSESpy/ABSES) 框架的多主体模型（ABM）。它也是**为 ABM 搭建
+前端 / 部署模型**的参考蓝图（类结构、参数面、运行时序一目了然）。
 
-Four diagrams, organised **overview → ABM core**:
+共四张图，组织为「总览 → ABM 核心」：
 
-1. [Component / package overview](#1-component-overview) — the analysis modules and their dependencies
-2. [ABM class diagram](#2-abm-class-diagram) — the model and observer classes (the key front-end reference)
-3. [Observer lifecycle](#3-observer-lifecycle) — the "born → record → die" state machine
-4. [Simulation sequence](#4-simulation-sequence) — the call chain for one tick and finalisation
+1. [组件 / 包总览图](#1-component-overview) — 分析模块与其依赖
+2. [ABM 类图](#2-abm-class-diagram) — 模型与观察者主体的类结构（前端最重要的参考）
+3. [Observer 生命周期状态图](#3-observer-lifecycle) — 主体的「出生 → 记录 → 死亡」状态机
+4. [仿真运行时序图](#4-simulation-sequence) — 一个 tick 与收尾阶段的调用链
 
 ---
 
-## 1. Component / package overview {#1-component-overview}
+## 1. 组件 / 包总览图 {#1-component-overview}
 
-The analysis consumes the two [shared series](../guide/data.md) and runs a short chain:
-re-standardise & classify → correlate → calibrate → validate with the ABM. Raw-data
-loading, spatial aggregation and reconstruction integration are *data production* and
-are intentionally omitted here.
+分析消费两条[共享序列](../guide/data.md)，运行一条短链：再标准化与分级 → 相关 → 校准 →
+用 ABM 验证。原始数据读取、空间聚合、重建整合属于*数据生产*，此处有意省略。
 
 ```plantuml
-@startuml component_overview
+@startuml component_overview_zh
 title shifting_baseline — Analysis & Model Components
 
 skinparam componentStyle rectangle
@@ -55,7 +52,6 @@ cloud "External libs" {
   component "pandas / numpy" as Pandas
 }
 
-' --- analysis layer (starts from shared data) ---
 SharedData ..> Filters
 Filters ..> Const
 Compare ..> Filters
@@ -64,7 +60,6 @@ Compare ..> UPlot
 Calib ..> Filters
 Calib ..> UPlot
 
-' --- ABM core ---
 ABM ..> Forcing
 ABM ..> Filters
 ABM ..> Calib
@@ -74,7 +69,6 @@ ABM ..> Abses
 ABM ..> UCalc
 ABM ..> Hydra
 
-' --- sensitivity drives ABM via Hydra subprocess ---
 SA ..> ABM : Hydra multirun\n(subprocess overrides)
 SA ..> SALib
 
@@ -91,24 +85,21 @@ end note
 
 ---
 
-## 2. ABM class diagram {#2-abm-class-diagram}
+## 2. ABM 类图 {#2-abm-class-diagram}
 
-The ABM has two classes: `ClimateObservingModel` (extends `abses.MainModel`) and
-`ClimateObserver` (extends `abses.Actor`). The model holds a discrete climate series
-`_climate` and a per-tick archive `_archive`, and spawns new observers each tick;
-observers perceive the climate z-score **relative to a baseline** and record extremes
-with a "negativity-bias" probability. This is the core structure a front end would
-expose parameters for and read results from.
+ABM 由两个类构成：`ClimateObservingModel`（继承 `abses.MainModel`）与 `ClimateObserver`
+（继承 `abses.Actor`）。模型持有离散气候序列 `_climate` 与逐 tick 档案 `_archive`，每个 tick
+生成新的观察者；观察者相对**基线**感知气候 z-score 并按「负偏好」概率记录极端事件。这是
+**前端要暴露参数、读取结果**的核心结构。
 
 ```plantuml
-@startuml abm_class_diagram
+@startuml abm_class_diagram_zh
 title ABM — Class Diagram (abm.py + climate_forcing.py)
 
 skinparam shadowing false
 skinparam classAttributeIconSize 0
 hide empty members
 
-' ---------- abses base classes (external) ----------
 class MainModel <<abses>> {
   + agents
   + time
@@ -123,7 +114,6 @@ class Actor <<abses>> {
   + die()
 }
 
-' ---------- core model ----------
 class ClimateObservingModel {
   -- climate / time --
   - _climate : np.ndarray
@@ -161,7 +151,6 @@ class ClimateObservingModel {
   - _aggregate_to_yearly(series) : pd.Series
 }
 
-' ---------- observer agent ----------
 class ClimateObserver {
   - _memory : deque  '' maxlen = max_age
   - _max_age : int
@@ -173,7 +162,6 @@ class ClimateObserver {
   + memory : np.ndarray <<property>>
 }
 
-' ---------- support / external ----------
 class MismatchReport <<calibration>> {
   + pred / true : pd.Series
   + analyze_error_patterns() : pd.DataFrame
@@ -191,7 +179,6 @@ class "filters" as Filters <<module>> {
   + classify(series, handle_na) : pd.Series
 }
 
-' ---------- enums / value types ----------
 enum SubannualAggregation {
   mean
   sum
@@ -215,12 +202,11 @@ enum CorrFunc {
   spearman
 }
 
-' ---------- relationships ----------
 MainModel <|-- ClimateObservingModel
 Actor <|-- ClimateObserver
 
 ClimateObservingModel "1" *-- "0..*" ClimateObserver : agents.new()\nspawns each tick
-ClimateObserver --> ClimateObservingModel : self.model\n(reads climate_now,\ncollective_baseline_stats)
+ClimateObserver --> ClimateObservingModel : self.model
 
 ClimateObservingModel ..> MismatchReport : mismatch_report
 ClimateObservingModel ..> Forcing : _generate_climate_series()
@@ -230,18 +216,16 @@ ClimateObserver ..> Filters : classify_single_value()
 ClimateObservingModel ..> ClimateProcess
 ClimateObservingModel ..> SubannualAggregation
 ClimateObservingModel ..> CorrFunc
-ClimateObserver ..> MemoryBaseline : perceive() branches on\nmodel.p.memory_baseline
+ClimateObserver ..> MemoryBaseline
 
 note right of ClimateObserver
-  perceive() baselines:
-  - personal: mean/std of own memory
-  - collective: mean/std of the current
-    collective memory this tick
-  - collective_lifetime: collective, but
-    windowed to the observer's lifespan
-  - model: mean/std of the whole climate
-    series (constant, non-perceptual)
-  NaN fallback: baseline -> 0, std -> 1
+  perceive() 的四种基线：
+  - personal: 自身 memory 的 mean/std
+  - collective: 当前 tick 群体记忆 mean/std
+  - collective_lifetime: 集体档案，但限于
+    主体自身寿命窗口
+  - model: 全程气候序列 mean/std (恒定, 非感知)
+  NaN 兜底: baseline→0, std→1
 end note
 
 note bottom of Filters
@@ -256,15 +240,14 @@ end note
 
 ---
 
-## 3. Observer lifecycle {#3-observer-lifecycle}
+## 3. Observer 生命周期状态图 {#3-observer-lifecycle}
 
-Each `ClimateObserver` pushes the current climate into personal memory every tick; it
-only starts recording once its age reaches `min_age`, and dies past `max_age`. This age
-structure is the vehicle of the shifting-baseline mechanism — young and old observers
-perceive the same extreme differently.
+每个 `ClimateObserver` 在每个 tick 都把当前气候压入个人记忆；年龄达到 `min_age` 后才开始按
+概率记录事件，超过 `max_age` 即死亡。这一年龄结构正是「基线偏移」机制的载体——年轻主体与
+年长主体对同一极端事件的感知不同。
 
 ```plantuml
-@startuml observer_lifecycle
+@startuml observer_lifecycle_zh
 title ClimateObserver — Lifecycle State Machine
 
 skinparam shadowing false
@@ -290,21 +273,20 @@ state Dead {
 }
 
 Youth --> Prime : age() >= min_age
-Prime --> Prime : each tick\n(perceive -> write_down)
+Prime --> Prime : each tick
 Prime --> Dead : age() > max_age
 Dead --> [*]
 
 note right of Prime
-  write_down uses a negativity-bias
-  probability:
+  write_down 采用"负偏好"概率：
   prob = norm.sf(|z|, scale)
   record  <=  rand() < f0 + 0.5 - prob
-  stronger extreme -> higher chance
+  极端越强 → 记录概率越高
 end note
 
 note bottom of Dead
-  archive_it also drops records with
-  probability loss_rate (exp default 0.4)
+  archive_it 还会按 loss_rate 概率丢弃
+  记录（实验默认 0.4）
 end note
 
 @enduml
@@ -312,14 +294,13 @@ end note
 
 ---
 
-## 4. Simulation sequence {#4-simulation-sequence}
+## 4. 仿真运行时序图 {#4-simulation-sequence}
 
-The call chain of one experiment: initialisation generates the climate series → each
-tick spawns observers and steps them → finalisation computes the correlation curve and
-writes outputs. `abses.Experiment` runs the batch in parallel per `repeats / num_process`.
+下图展示一次实验的调用链：初始化生成气候序列 → 每个 tick 生成主体并令其 `step` → 收尾计算
+相关性曲线并输出。`abses.Experiment` 负责按 `repeats / num_process` 批量并行运行。
 
 ```plantuml
-@startuml simulation_sequence
+@startuml simulation_sequence_zh
 title ABM — Simulation Run Sequence
 
 skinparam shadowing false
@@ -376,11 +357,6 @@ Exp -> Model : end()
 Model -> Model : climate_df\n(aggregate + drop spin-up)
 Model -> Model : get_corr_curve()\n-> compare_corr_2d(...)
 Model -> Model : write correlations.csv
-note over Exp, Model
-  mismatch_report is built on demand:
-  MismatchReport(pred=classify(memory),
-                 true=classify(climate))
-end note
 
 @enduml
 ```
