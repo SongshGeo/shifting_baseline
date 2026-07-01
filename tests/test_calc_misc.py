@@ -93,12 +93,12 @@ class TestFillStarMatrix:
             [[0.5, np.nan], [1.234, -0.7]], index=["a", "b"], columns=["x", "y"]
         )
         pvals = pd.DataFrame(
-            [[0.01, 0.5], [0.08, 0.2]], index=["a", "b"], columns=["x", "y"]
+            [[0.009, 0.5], [0.03, 0.2]], index=["a", "b"], columns=["x", "y"]
         )
         out = fill_star_matrix(pvals, values)
-        assert out.loc["a", "x"] == "0.50**"  # p=0.01 → **
+        assert out.loc["a", "x"] == "0.50**"  # p=0.009 → **
         assert out.loc["a", "y"] == ""  # value NaN → 空
-        assert out.loc["b", "x"] == "1.23*"  # p=0.08 → *
+        assert out.loc["b", "x"] == "1.23*"  # p=0.03 → *
         assert out.loc["b", "y"] == "-0.70"  # p=0.2 → 无星
 
 
