@@ -20,7 +20,14 @@ from geo_dskit.utils.io import check_tab_sep, find_first_uncommented_line
 from geo_dskit.utils.path import filter_files, get_files
 from omegaconf import DictConfig
 
-from shifting_baseline.constants import END, FINAL, LEVELS, MAP, STAGES_BINS, START
+from shifting_baseline.constants import (
+    END,
+    FINAL,
+    MAP,
+    NEUTRAL_GRADE,
+    STAGES_BINS,
+    START,
+)
 from shifting_baseline.filters import classify
 from shifting_baseline.utils.calc import calc_corr, rand_generate_from_std_levels
 
@@ -192,7 +199,7 @@ class HistoricalRecords:
         """处理对称等级和标准化"""
         if to_level:
             log.info("处理为对称等级 ...")
-            self._data = 3 - self._data
+            self._data = NEUTRAL_GRADE - self._data
         if to_std is None:
             return
         assert to_level, "to_std 必须设置 to_level 同时为 True"
@@ -283,13 +290,13 @@ class HistoricalRecords:
           - ``"stage1"``, ``"stage2"``, ...
           - ``"1:3"`` or ``"1-3"`` for stages
           - ``"stage1:stage3"`` or ``"stage1-stage3"``
-          - ``"1000:1469"`` or ``"1000-1469"`` for explicit year ranges
+          - ``"1000:1470"`` or ``"1000-1470"`` for explicit year ranges
           - ``"all"`` / ``"full"`` / ``"total"`` for the whole series
 
         Returns a slice object representing the time range.
 
         Examples:
-            >>> history.get_time_slice(1)  # slice(1000, 1469)
+            >>> history.get_time_slice(1)  # slice(1000, 1470)
             >>> history.get_time_slice(slice(1, 2))  # slice(1000, 1659)
             >>> history.get_time_slice("1:4")  # slice(1000, 2000)
             >>> history.get_time_slice("stage3")  # slice(1659, 1900)
@@ -377,7 +384,7 @@ class HistoricalRecords:
                 return slice(start_year, end_year)
 
             raise ValueError(
-                f"Invalid stage expression: {stage}. Expected like 'stage1', '1:3', or '1000-1469'."
+                f"Invalid stage expression: {stage}. Expected like 'stage1', '1:3', or '1000-1470'."
             )
 
         raise TypeError("stage must be int, slice, or str representing stage/years")
@@ -411,7 +418,9 @@ class HistoricalRecords:
 
     def _read_data(self, region: Region) -> pd.DataFrame:
         """读取数据，并统一为逐年索引"""
-        full_index = np.arange(1000, 2021)
+        # 原始图集数据覆盖 START 至 2020 年（2021 为 arange 的开区间上界，
+        # 比分析窗口 FINAL=2000 更晚，属于数据本身的范围，暂无对应常数）。
+        full_index = np.arange(START, 2021)
         df = pd.read_excel(
             self.data_path,
             sheet_name=region,

@@ -37,14 +37,17 @@ def compare_corr(
     n_diff_w: int | float = 2,
     **rolling_kwargs,
 ) -> tuple[float, float, int]:
-    """
-    对比两个序列的相关性，并返回相关性系数
+    """对比两个序列的相关性，并返回相关性系数
 
     Args:
-        data (pd.DataFrame): 数据
-        filter_func (Callable | None): 滤波函数
-        corr_func (Callable | None): 相关性函数
-        rolling_kwargs (dict): 滚动窗口参数
+        data1 (pd.Series): 序列 1
+        data2 (pd.Series): 序列 2
+        filter_func (Callable | None): 滑窗再标准化函数；None 时直接返回基准相关性
+        filter_side (str): 对哪一侧做滤波（"both"/"left"/"right"）
+        corr_method (CorrFunc): 相关性方法（"pearson"/"kendall"/"spearman"）
+        window_error (str): 窗口过小时的处理（"raise" 抛错、"nan" 返回 NaN）
+        n_diff_w (int | float): 窗口与最小样本数之间要求的最小间隔
+        rolling_kwargs (dict): 传给 ``pandas.Series.rolling`` 的滚动窗口参数
 
     Returns:
         tuple[float, float, int]: 相关性系数，p值，样本数
@@ -265,7 +268,6 @@ def sweep_slices(
         current_start += step_size
 
     mid_year = [np.mean([s.start, s.stop]).astype(int) for s in slices]
-    # mid_year = [s.stop for s in slices]
     return slices, mid_year, slice_labels
 
 

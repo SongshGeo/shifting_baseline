@@ -181,19 +181,26 @@ class MismatchReport:
 
         # 重命名列以匹配预期的结构
         df.columns = ["value", "pred", "true"]
-        # 检查分类准确性
-        df["exact"] = df["pred"] == df["true"]
-        # 计算同类别内的差异
-        df["last"] = self._generate_last_column(df, shift=shift)
-        df["diff"] = df["value"] - df["last"]
 
-        # 创建错误分析矩阵
-        self.diff_matrix = self._create_misclassification_matrix(df)
+        # 创建错误分析矩阵（shifted-comparison 差异矩阵）
+        self.diff_matrix = self._shifted_diff_matrix(df, shift=shift)
         self._analyzed = True
         self._run_significance_test(
             mc_runs=mc_runs, shift=shift, random_seed=random_seed
         )
         return self.diff_matrix
+
+    def _shifted_diff_matrix(self, df: pd.DataFrame, shift: int = 1) -> pd.DataFrame:
+        """Build the shifted-comparison diff matrix from a value/pred/true frame.
+
+        Shared by the observed analysis and the Monte Carlo null so both apply the
+        identical look-back (``shift``) and same-grade pairing. Adds ``exact`` /
+        ``last`` / ``diff`` columns to ``df`` in place, then pivots the mismatches.
+        """
+        df["exact"] = df["pred"] == df["true"]
+        df["last"] = self._generate_last_column(df, shift=shift)
+        df["diff"] = df["value"] - df["last"]
+        return self._create_misclassification_matrix(df)
 
     def _generate_last_column(self, df: pd.DataFrame, shift: int = 1) -> pd.Series:
         """生成上一次同类别的值"""
@@ -258,12 +265,8 @@ class MismatchReport:
                 }
             )
 
-            # 计算差异矩阵
-            random_df["exact"] = random_df["pred"] == random_df["true"]
-            random_df["last"] = self._generate_last_column(random_df, shift=shift)
-            random_df["diff"] = random_df["value"] - random_df["last"]
-
-            diff_matrix = self._create_misclassification_matrix(random_df)
+            # 计算差异矩阵（与观测数据同一套 shifted-comparison 逻辑）
+            diff_matrix = self._shifted_diff_matrix(random_df, shift=shift)
             if not diff_matrix.empty:
                 all_diff_matrices.append(diff_matrix)
 

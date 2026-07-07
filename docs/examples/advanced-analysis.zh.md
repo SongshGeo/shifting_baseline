@@ -59,7 +59,7 @@ fig = report.generate_report_figure()
 重跑，以确认模式并非单一数据集的伪影：
 
 ```bash
-uv run python -m shifting_baseline how=correlation ds=best using_val_data=gpcc
+uv run python -m shifting_baseline ds=best using_val_data=gpcc
 ```
 
 下一步：**[ABM 模拟](abm-simulation.md)**。

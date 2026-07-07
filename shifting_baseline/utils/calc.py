@@ -102,6 +102,24 @@ def calc_corr(
         return _calc_corr_pandas(arr1, arr2, how)
 
 
+def _correlation(valid1, valid2, how: CorrFunc) -> tuple[float, float]:
+    """Dispatch to the requested SciPy correlation on already-cleaned inputs.
+
+    Shared tail of both ``_calc_corr_numpy`` and ``_calc_corr_pandas``; the two
+    differ only in how they clean/align their inputs (positional vs index-aware).
+    """
+    try:
+        if how == "pearson":
+            return stats.pearsonr(valid1, valid2)
+        elif how == "kendall":
+            return stats.kendalltau(valid1, valid2)
+        elif how == "spearman":
+            return stats.spearmanr(valid1, valid2)
+        raise ValueError(f"无效的相关系数计算方法: {how}")
+    except (ValueError, RuntimeError, FloatingPointError) as e:
+        raise ValueError(f"计算相关系数时出错: {e}") from e
+
+
 def _calc_corr_numpy(
     arr1: np.ndarray,
     arr2: np.ndarray,
@@ -131,18 +149,7 @@ def _calc_corr_numpy(
     if np.var(valid_arr1) == 0 or np.var(valid_arr2) == 0:
         return np.nan, np.nan, n
 
-    # 计算相关系数
-    try:
-        if how == "pearson":
-            r, p = stats.pearsonr(valid_arr1, valid_arr2)
-        elif how == "kendall":
-            r, p = stats.kendalltau(valid_arr1, valid_arr2)
-        elif how == "spearman":
-            r, p = stats.spearmanr(valid_arr1, valid_arr2)
-        else:
-            raise ValueError(f"无效的相关系数计算方法: {how}")
-    except (ValueError, RuntimeError, FloatingPointError) as e:
-        raise ValueError(f"计算相关系数时出错: {e}") from e
+    r, p = _correlation(valid_arr1, valid_arr2, how)
     return r, p, n
 
 
@@ -181,18 +188,7 @@ def _calc_corr_pandas(
     if valid_arr1.nunique() <= 1 or valid_arr2.nunique() <= 1:
         return np.nan, np.nan, n
 
-    # 计算相关系数
-    try:
-        if how == "pearson":
-            r, p = stats.pearsonr(valid_arr1, valid_arr2)
-        elif how == "kendall":
-            r, p = stats.kendalltau(valid_arr1, valid_arr2)
-        elif how == "spearman":
-            r, p = stats.spearmanr(valid_arr1, valid_arr2)
-        else:
-            raise ValueError(f"无效的相关系数计算方法: {how}")
-    except (ValueError, RuntimeError, FloatingPointError) as e:
-        raise ValueError(f"计算相关系数时出错: {e}") from e
+    r, p = _correlation(valid_arr1, valid_arr2, how)
     return r, p, n
 
 

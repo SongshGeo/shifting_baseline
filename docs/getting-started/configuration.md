@@ -15,11 +15,11 @@ defaults:
 
 | Group | Options (`config/<group>/*.yaml`) | Meaning |
 | --- | --- | --- |
-| `ds` | `pure` (default), `best`, `mac`, `win_serve` | Paths to archives, reconstructions, validation datasets (`china`/`gpcc`/`cru`), PMIP outputs |
-| `how` | `process` (default), `correlation`, `compare` | Which analysis the entrypoint runs |
+| `ds` | `pure` (default), `best`, `mac` | Paths to archives, reconstructions, validation datasets (`china`/`gpcc`/`cru`), PMIP outputs |
+| `how` | `process` (default), `correlation`, `compare` | Nominal analysis selector — **note:** `__main__` currently ignores `cfg.how` (only `process.py`'s separate CLI reads it), so overriding it does not change the main run |
 | `model` | `exp` (default), `test` | ABM parameters (`exp` for experiments, `test` for quick runs) |
 
-Select a group on the command line, e.g. `ds=best how=correlation model=test`.
+Select a group on the command line, e.g. `ds=best model=test`.
 
 ## Top-level knobs
 

@@ -26,14 +26,15 @@ shifting_baseline/
 ├── docs/               # Documentation
 ├── reports/            # Jupyter notebooks for analysis and visualization
 ├── shifting_baseline/  # Main Python package
-│   ├── abm.py         # Agent-based model implementation
-│   ├── calibration.py # Model calibration
-│   ├── compare.py     # Comparison between historical and natural records
+│   ├── abm.py         # Agent-based model (personal vs collective baselines)
+│   ├── calibration.py # Mismatch report + Monte Carlo randomisation null
+│   ├── compare.py     # Sliding-window re-standardisation & correlation sweeps
 │   ├── data.py        # Data loading and preprocessing
-│   ├── filters.py     # Signal processing filters
-│   ├── mc.py          # Monte Carlo simulations
-│   └── utils/         # Utility functions
-└── tests/             # Unit tests
+│   ├── filters.py     # Re-standardisation + 5-level classification
+│   ├── mc.py          # Bayesian (PyMC) integration of reconstructions → N-WDI
+│   ├── results.py     # Reproducible builders for the manuscript numbers
+│   └── utils/         # Utility functions (calc, plot, log, types)
+└── tests/             # Unit tests (+ results regression guardrail)
 ```
 
 ## Key Features
@@ -75,35 +76,57 @@ uv sync --group docs
 source .venv/bin/activate
 ```
 
+4. Configure local paths (machine-specific paths are never committed):
+```bash
+cp .env.example .env   # then edit SBS_ROOT / SBS_DATA_ROOT / SBS_OUT_DIR
+```
+`.env` is loaded automatically on `import shifting_baseline` and backs the
+`${oc.env:...}` interpolations in `config/ds/*.yaml`. See [Data availability](#data-availability)
+for how to obtain the raw datasets that `SBS_DATA_ROOT` should point at.
+
 ## Usage
 
 ### Running Analyses
 
-The project uses [Hydra](https://hydra.cc/) for configuration management. Main analyses can be executed through the command line:
+The project uses [Hydra](https://hydra.cc/) for configuration management.
 
 ```bash
-# Run correlation analysis
-python -m shifting_baseline how=correlation
+# Main pipeline (Steps 1–6: load → validate → mismatch → correlation sweep → figures)
+python -m shifting_baseline                 # default config (ds=pure)
+python -m shifting_baseline ds=best         # swap the data-source profile
 
-# Run comparison analysis
-python -m shifting_baseline how=compare
-
-# Run data processing
-python -m shifting_baseline how=process
+# Agent-based model (supports --multirun sweeps)
+python shifting_baseline/abm.py --multirun model=exp model.max_age=30,40,50 \
+    model.memory_baseline=personal,collective
 ```
+
+Each run writes figures, logs, and the resolved config to a timestamped folder under
+`outputs/` (or `multirun/` for sweeps).
 
 ### Jupyter Notebooks
 
-Interactive analyses and visualizations are available in the `reports/` directory:
+The figure-producing notebooks live in `reports/`:
 
-- `history.ipynb`: Historical records analysis
-- `natural.ipynb`: Natural archives analysis
-- `mismatch.ipynb`: Mismatch analysis between historical and natural records
-- `abm.ipynb`: Agent-based model simulations
+- `natural.ipynb` — reconstruction/validation (Fig 2)
+- `mismatch.ipynb` — H-WDI vs N-WDI mismatch (Fig 3)
+- `history.ipynb` — sliding-window re-standardisation (Fig 4)
+- `abm.ipynb` — agent-based model (Fig 5)
+- `subplots.ipynb` — figure compositor
+- Supplementary: `abm_mechanism.ipynb`, `archives.ipynb`, `climate_forcing.ipynb`, `life_expectancy.ipynb`
 
 Launch Jupyter:
 ```bash
 jupyter notebook reports/
+```
+
+### Reproducing the manuscript numbers
+
+The numbers rendered into the manuscript are assembled by
+`shifting_baseline.results.build_results` and stored in `results.json`. A regression
+guardrail locks them (skips automatically when the datasets are not present locally):
+
+```bash
+uv run pytest tests/test_results_regression.py -m slow -v
 ```
 
 ### Configuration
@@ -125,10 +148,21 @@ Configuration files are located in the `config/` directory and follow the Hydra 
 
 The analysis integrates multiple data sources:
 
-- Historical climate archives from northern China (1470–1900 CE)
-- Tree-ring-based hydroclimate reconstructions
-- Instrumental Wet/Dry Index observations (1901–2000 CE)
+- Historical climate archives from northern China (1470–1900 CE) — from the *Atlas of Extreme Droughts and Floods over the Past Millennium* (Yang et al., 2024)
+- Tree-ring-based hydroclimate reconstructions — public NOAA paleoclimate repositories (see Supplementary Information S2, Table S8)
+- Instrumental precipitation for validation (1901–2000 CE) — CRU TS, GPCC, and a China gridded product
 - PMIP past1000 climate model outputs (ACCESS-ESM1-5, MIROC-ES2L, MRI-ESM2-0)
+
+### Data availability
+
+The raw datasets (multi-GB gridded NetCDF, base-map shapefiles, and the licensed
+drought/flood atlas) are **not distributed with this repository** (`data/` is
+gitignored). Point `SBS_DATA_ROOT` (in `.env`) at a local folder holding them; the
+pipeline then writes standardized intermediates to `${SBS_ROOT}/data/*.csv`, which
+are reused by default (`recalculate_data=false`). The reconstruction sources and
+their DOIs are listed in the manuscript's Supplementary Information S2; instrumental
+products are available from their original providers (CRU, GPCC). Please contact the
+corresponding author for access details to the compiled archive datasets.
 
 ## Testing
 

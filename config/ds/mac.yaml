@@ -3,17 +3,17 @@ setname: "mac" # 数据集名称
 description: "所有重建数据都用到了" # 数据集描述
 
 # 项目根目录
-root: /Users/songshgeo/Documents/CodeBase/Scholar/shifting_baseline
+root: ${oc.env:SBS_ROOT}
 # 项目数据目录
 processed: ${ds.root}/data
 multirun: ${ds.root}/multirun
 
 # 最终作图输出目录
-longform: /Users/songshgeo/Documents/Obsidian/SongshGeo/Outputs/ColMemo_MS
+longform: ${oc.env:SBS_OUT_DIR}
 figs: ${ds.longform}/figs
 
 # 其它数据文件夹
-data: /Users/songshgeo/Documents/Datasets
+data: ${oc.env:SBS_DATA_ROOT}
 # 重建数据
 noaa: ${ds.data}/东亚古气候重建数据
 

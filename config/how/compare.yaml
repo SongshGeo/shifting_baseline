@@ -1,6 +1,6 @@
 detrend: true
 filter_func: calc_std_deviation
-slice1: [1469, 1659]
+slice1: [1470, 1659]
 slice2: [1659, 1949]
 slice3: [1949, 2010]
 

@@ -14,11 +14,11 @@ defaults:
 
 | 组 | 选项（`config/<组>/*.yaml`） | 含义 |
 | --- | --- | --- |
-| `ds` | `pure`（默认）、`best`、`mac`、`win_serve` | 档案、重建、验证数据（`china`/`gpcc`/`cru`）、PMIP 输出的路径 |
-| `how` | `process`（默认）、`correlation`、`compare` | 入口运行哪种分析 |
+| `ds` | `pure`（默认）、`best`、`mac` | 档案、重建、验证数据（`china`/`gpcc`/`cru`）、PMIP 输出的路径 |
+| `how` | `process`（默认）、`correlation`、`compare` | 名义上的分析选择器——**注意**：`__main__` 目前不读 `cfg.how`（仅 `process.py` 的独立 CLI 读取），故覆盖它不会改变主流程 |
 | `model` | `exp`（默认）、`test` | ABM 参数（`exp` 做实验、`test` 快速运行） |
 
-命令行选择组，例如 `ds=best how=correlation model=test`。
+命令行选择组，例如 `ds=best model=test`。
 
 ## 顶层参数
 

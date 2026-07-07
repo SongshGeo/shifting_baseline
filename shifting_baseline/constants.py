@@ -20,6 +20,9 @@ LEVELS_PROB: list[float] = [0.1, 0.25, 0.30, 0.25, 0.1]  # 各等级先验概率
 
 # ── 历史档案 5 级 → 标准差 ─────────────────────────────────────────
 GRADE_VALUES: list[int] = [5, 4, 3, 2, 1]  # 原始等级值（旱→涝）
+# 中立等级（GRADE_VALUES 的中位数）。用于把原始档案等级转成对称等级：
+# symmetrical_level = NEUTRAL_GRADE - raw_grade，即 LEVELS[i] = NEUTRAL_GRADE - GRADE_VALUES[i]。
+NEUTRAL_GRADE: int = 3
 # 5 级档案值的代表性 z 值（中性档=0，其余直接取分类切点）。
 # 从 THRESHOLDS 派生，确保两套阈值不会失同步。
 STD_THRESHOLDS: list[float] = [*THRESHOLDS[:2], 0.0, *THRESHOLDS[2:]]  # 标准差阈值 - 5
@@ -45,7 +48,7 @@ MAP = {
 
 # 历史记录数据的时间段
 START = 1000
-STAGE1 = 1469
+STAGE1 = 1470
 STAGE2 = 1659
 END = 1900
 FINAL = 2000

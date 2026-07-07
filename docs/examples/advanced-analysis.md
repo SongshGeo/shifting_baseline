@@ -65,7 +65,7 @@ validation dataset (`using_val_data=china|gpcc|cru`) to confirm the pattern is n
 artefact of one dataset:
 
 ```bash
-uv run python -m shifting_baseline how=correlation ds=best using_val_data=gpcc
+uv run python -m shifting_baseline ds=best using_val_data=gpcc
 ```
 
 Next: **[ABM Simulation](abm-simulation.md)**.

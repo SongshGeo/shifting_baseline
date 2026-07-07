@@ -19,12 +19,15 @@ run:
 	uv run python shifting_baseline/abm.py --multirun model=exp model.max_age=30,35,40,45,50,55,60,65 model.memory_baseline=personal,collective model.loss_rate=0.2,0.4,0.6,0.8 model.new_agents=5,10,15,20,25,30,35,40
 
 # --- Sensitivity-analysis result fetching + plotting ------------------------
-# Pull Sobol/Morris artifacts from the geany HPC, skipping the heavy
-# sample_NNNNNN/ per-sample sub-dirs. Then plot locally with uv.
+# Pull Sobol/Morris artifacts from an HPC, skipping the heavy sample_NNNNNN/
+# per-sample sub-dirs, then plot locally with uv. The remote defaults to the
+# author's cluster; override it for your own HPC, e.g.:
+#   make fetch-sa SA_REMOTE=user@host:/path/to/reports/results/sensitivity/
+SA_REMOTE ?= geany:/u/songsh/CodeBase/shifting_baseline/reports/results/sensitivity/
 fetch-sa:
 	@command -v rsync >/dev/null 2>&1 || { echo "Error: rsync is not installed"; exit 1; }
 	@mkdir -p ./reports/results/sensitivity/
-	@echo "Fetching SA results from geany server..."
+	@echo "Fetching SA results from $(SA_REMOTE) ..."
 	@rsync -avzP --partial \
 	    --exclude='sample_*/' \
 	    --include='*/' \
@@ -33,13 +36,11 @@ fetch-sa:
 	    --include='*.txt' \
 	    --include='*.png' \
 	    --exclude='*' \
-	    geany:/u/songsh/CodeBase/shifting_baseline/reports/results/sensitivity/ \
+	    $(SA_REMOTE) \
 	    ./reports/results/sensitivity/ || { \
-	        echo "Error: Failed to fetch SA results from geany server"; \
-	        echo "Please check:"; \
-	        echo "  1. Network connectivity"; \
-	        echo "  2. SSH access to geany server (try: ssh geany)"; \
-	        echo "  3. Remote path exists: /u/songsh/CodeBase/shifting_baseline/reports/results/sensitivity"; \
+	        echo "Error: Failed to fetch SA results from $(SA_REMOTE)"; \
+	        echo "Please check network connectivity, SSH access, and that the"; \
+	        echo "remote path exists. Override the remote with SA_REMOTE=..."; \
 	        exit 1; \
 	    }
 	@echo "SA fetch completed successfully"

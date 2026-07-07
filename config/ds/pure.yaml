@@ -2,18 +2,18 @@
 setname: "pure" # 数据集名称
 description: "纯重建数据，不包括任何文献数据" # 数据集描述
 
-# 项目根目录
-root: /Users/songshgeo/Documents/CodeBase/Scholar/shifting_baseline
+# 项目根目录（由环境变量提供，见 .env.example；避免提交机器相关的绝对路径）
+root: ${oc.env:SBS_ROOT}
 # 项目数据目录
 processed: ${ds.root}/data
 multirun: ${ds.root}/multirun
 
-# 最终作图输出目录
-longform: /Users/songshgeo/Documents/Obsidian/SongshGeo/Outputs/ColMemo_MS
+# 最终作图输出目录（环境变量）
+longform: ${oc.env:SBS_OUT_DIR}
 figs: ${ds.longform}/figs
 
-# 其它数据文件夹
-data: /Users/songshgeo/Documents/Datasets
+# 其它数据文件夹（原始数据集根目录，环境变量）
+data: ${oc.env:SBS_DATA_ROOT}
 # 重建数据
 noaa: ${ds.data}/东亚古气候重建数据
 

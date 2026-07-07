@@ -11,6 +11,18 @@ import pandas as pd
 from shifting_baseline.constants import LEVELS, THRESHOLDS
 
 
+def _validate_thresholds_levels(thresholds: list[float], levels: list[int]) -> None:
+    """Validate that ``levels`` has one more element than ``thresholds`` and that
+    ``thresholds`` are strictly ascending. Shared by both classifiers."""
+    if len(levels) != len(thresholds) + 1:
+        raise ValueError(
+            f"Levels must be one element longer than thresholds. "
+            f"Got {len(levels)} levels and {len(thresholds)} thresholds"
+        )
+    if not all(thresholds[i] < thresholds[i + 1] for i in range(len(thresholds) - 1)):
+        raise ValueError("Thresholds must be in strictly ascending order")
+
+
 def calc_std_deviation(series: pd.Series | np.ndarray) -> float:
     """How many standard deviations the last value sits from the window mean.
 
@@ -110,15 +122,7 @@ def classify_single_value(
     if np.isinf(value):
         raise ValueError("Cannot classify infinite values")
 
-    if len(levels) != len(thresholds) + 1:
-        raise ValueError(
-            f"Levels must be one element longer than thresholds. "
-            f"Got {len(levels)} levels and {len(thresholds)} thresholds"
-        )
-
-    # Check if thresholds are in ascending order
-    if not all(thresholds[i] < thresholds[i + 1] for i in range(len(thresholds) - 1)):
-        raise ValueError("Thresholds must be in strictly ascending order")
+    _validate_thresholds_levels(thresholds, levels)
 
     # Classify based on thresholds
     classification = levels[0]  # Start with the lowest level
@@ -198,15 +202,7 @@ def classify_series(
     if len(series) == 0:
         raise ValueError("Cannot classify empty series")
 
-    if len(levels) != len(thresholds) + 1:
-        raise ValueError(
-            f"Levels must be one element longer than thresholds. "
-            f"Got {len(levels)} levels and {len(thresholds)} thresholds"
-        )
-
-    # Check if thresholds are in ascending order
-    if not all(thresholds[i] < thresholds[i + 1] for i in range(len(thresholds) - 1)):
-        raise ValueError("Thresholds must be in strictly ascending order")
+    _validate_thresholds_levels(thresholds, levels)
 
     # Validate handle_na up-front, regardless of whether NaNs are present
     if handle_na not in ("raise", "skip", "fill"):
@@ -255,5 +251,6 @@ def classify_series(
     )
 
 
-# Backward compatibility alias
+# ``classify`` is the primary name used across the package; ``classify_series``
+# spells out the vectorised counterpart of ``classify_single_value``.
 classify = classify_series

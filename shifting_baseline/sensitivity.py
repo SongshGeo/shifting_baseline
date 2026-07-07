@@ -391,6 +391,56 @@ def benchmark_runtime(
     return df
 
 
+def _write_sampling_inputs(
+    output_root: Path, problem: dict, samples: np.ndarray, problem_json: dict
+) -> None:
+    """Persist the sample matrix + problem spec and clear any stale ERRORS.txt."""
+    output_root.mkdir(parents=True, exist_ok=True)
+    # Drop any stale ERRORS.txt from a prior failed pass so its presence/content
+    # always reflects the latest run (not a leftover from before a successful resume).
+    (output_root / "ERRORS.txt").unlink(missing_ok=True)
+    np.savetxt(
+        output_root / "samples.csv",
+        samples,
+        header=",".join(problem["names"]),
+        delimiter=",",
+        comments="",
+    )
+    (output_root / "problem.json").write_text(json.dumps(problem_json, indent=2))
+
+
+def _analyze_and_write(
+    output_root: Path,
+    problem: dict,
+    samples: np.ndarray,
+    raw: pd.DataFrame,
+    *,
+    prefix: str,
+    analyze_metric: Callable[[np.ndarray], dict],
+) -> dict[str, pd.DataFrame]:
+    """Per-metric analysis loop shared by Morris and Sobol.
+
+    ``analyze_metric(Y)`` returns the index columns for one response metric; this
+    function handles the NaN-fill, failure accounting, DataFrame assembly and CSV
+    output identically for both samplers.
+    """
+    indices: dict[str, pd.DataFrame] = {}
+    successful = raw[raw["status"] == "ok"]
+    if len(successful) != len(samples):
+        (output_root / "ERRORS.txt").write_text(
+            f"{len(samples) - len(successful)} of {len(samples)} samples failed\n"
+        )
+    for metric in RESPONSE_METRICS:
+        Y = raw[metric].to_numpy(dtype=float)
+        if np.isnan(Y).any():
+            # SALib will refuse NaNs; fill with median for analysis stability
+            Y = np.where(np.isnan(Y), np.nanmedian(Y), Y)
+        df = pd.DataFrame({"name": problem["names"], **analyze_metric(Y)})
+        df.to_csv(output_root / f"{prefix}_{metric}.csv", index=False)
+        indices[metric] = df
+    return indices
+
+
 def run_morris(
     output_root: Path,
     *,
@@ -413,22 +463,11 @@ def run_morris(
     Writes: sample matrix, raw outputs, and analysis indices.
     """
     output_root = Path(output_root)
-    output_root.mkdir(parents=True, exist_ok=True)
-    # Drop any stale ERRORS.txt from a prior failed pass so its presence/content
-    # always reflects the latest run (not a leftover from before a successful resume).
-    (output_root / "ERRORS.txt").unlink(missing_ok=True)
     problem = define_problem(param_names)
     samples = morris_sample.sample(
         problem, N=r_trajectories, num_levels=num_levels, seed=seed
     )
-    np.savetxt(
-        output_root / "samples.csv",
-        samples,
-        header=",".join(problem["names"]),
-        delimiter=",",
-        comments="",
-    )
-    (output_root / "problem.json").write_text(json.dumps(problem, indent=2))
+    _write_sampling_inputs(output_root, problem, samples, problem)
 
     raw = _evaluate_samples(
         samples,
@@ -445,31 +484,20 @@ def run_morris(
         retry_failed=retry_failed,
     )
 
-    indices: dict[str, pd.DataFrame] = {}
-    successful = raw[raw["status"] == "ok"]
-    if len(successful) != len(samples):
-        (output_root / "ERRORS.txt").write_text(
-            f"{len(samples) - len(successful)} of {len(samples)} samples failed\n"
-        )
-    for metric in RESPONSE_METRICS:
-        Y = raw[metric].to_numpy(dtype=float)
-        if np.isnan(Y).any():
-            # SALib will refuse NaNs; fill with median for analysis stability
-            Y = np.where(np.isnan(Y), np.nanmedian(Y), Y)
+    def _metric(Y: np.ndarray) -> dict:
         Si = morris_analyze.analyze(
             problem, samples, Y, num_levels=num_levels, seed=seed
         )
-        df = pd.DataFrame(
-            {
-                "name": problem["names"],
-                "mu": Si["mu"],
-                "mu_star": Si["mu_star"],
-                "sigma": Si["sigma"],
-                "mu_star_conf": Si["mu_star_conf"],
-            }
-        )
-        df.to_csv(output_root / f"morris_{metric}.csv", index=False)
-        indices[metric] = df
+        return {
+            "mu": Si["mu"],
+            "mu_star": Si["mu_star"],
+            "sigma": Si["sigma"],
+            "mu_star_conf": Si["mu_star_conf"],
+        }
+
+    indices = _analyze_and_write(
+        output_root, problem, samples, raw, prefix="morris", analyze_metric=_metric
+    )
     return {"problem": problem, "samples": samples, "raw": raw, "indices": indices}
 
 
@@ -492,25 +520,15 @@ def run_sobol(
 ) -> dict:
     """Generate Saltelli samples, evaluate ABM, and analyze with Sobol."""
     output_root = Path(output_root)
-    output_root.mkdir(parents=True, exist_ok=True)
-    # See run_morris for the rationale.
-    (output_root / "ERRORS.txt").unlink(missing_ok=True)
     problem = define_problem(param_names)
     samples = sobol_sample.sample(
         problem, N, calc_second_order=calc_second_order, seed=seed
     )
-    np.savetxt(
-        output_root / "samples.csv",
+    _write_sampling_inputs(
+        output_root,
+        problem,
         samples,
-        header=",".join(problem["names"]),
-        delimiter=",",
-        comments="",
-    )
-    (output_root / "problem.json").write_text(
-        json.dumps(
-            {**problem, "N": N, "calc_second_order": calc_second_order, "seed": seed},
-            indent=2,
-        )
+        {**problem, "N": N, "calc_second_order": calc_second_order, "seed": seed},
     )
 
     raw = _evaluate_samples(
@@ -528,30 +546,20 @@ def run_sobol(
         retry_failed=retry_failed,
     )
 
-    indices: dict[str, pd.DataFrame] = {}
-    successful = raw[raw["status"] == "ok"]
-    if len(successful) != len(samples):
-        (output_root / "ERRORS.txt").write_text(
-            f"{len(samples) - len(successful)} of {len(samples)} samples failed\n"
-        )
-    for metric in RESPONSE_METRICS:
-        Y = raw[metric].to_numpy(dtype=float)
-        if np.isnan(Y).any():
-            Y = np.where(np.isnan(Y), np.nanmedian(Y), Y)
+    def _metric(Y: np.ndarray) -> dict:
         Si = sobol_analyze.analyze(
             problem, Y, calc_second_order=calc_second_order, seed=seed
         )
-        df = pd.DataFrame(
-            {
-                "name": problem["names"],
-                "S1": Si["S1"],
-                "S1_conf": Si["S1_conf"],
-                "ST": Si["ST"],
-                "ST_conf": Si["ST_conf"],
-            }
-        )
-        df.to_csv(output_root / f"sobol_{metric}.csv", index=False)
-        indices[metric] = df
+        return {
+            "S1": Si["S1"],
+            "S1_conf": Si["S1_conf"],
+            "ST": Si["ST"],
+            "ST_conf": Si["ST_conf"],
+        }
+
+    indices = _analyze_and_write(
+        output_root, problem, samples, raw, prefix="sobol", analyze_metric=_metric
+    )
     return {"problem": problem, "samples": samples, "raw": raw, "indices": indices}
 
 

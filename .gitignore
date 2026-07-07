@@ -163,5 +163,12 @@ multirun
 playground.ipynb
 manuscript
 reports/results
+reports/logs
 docs/reviews
 webapp/
+
+# Manuscript symlink (points at a private Obsidian vault; not for the public repo)
+ColMemo_MS
+
+# One-shot reviewer-response reproducers (not part of the analysis pipeline)
+reports/_bug*.py

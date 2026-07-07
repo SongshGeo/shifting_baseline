@@ -72,10 +72,7 @@ def _main(cfg: DictConfig | None = None):
         resolution=cfg.resolution,
         csv_save_to=ds.csv,
     )
-    # log.info("Step 2: 整合树轮数据")
-    log.info("Step 3: 比较每个树轮数据 skipped for now")
-    # TODO 需要添加一个函数，用于比较每个树轮数据
-    log.info("Step 4: 比较树轮数据和测试数据 z-score")
+    log.info("Step 2: 比较树轮数据和测试数据 z-score")
     tree_ring = combined["mean"]
     control_mismatch_report = MismatchReport(
         pred=classify(regional_prec_z),
@@ -86,7 +83,7 @@ def _main(cfg: DictConfig | None = None):
     control_mismatch_report.generate_report_figure(
         save_path=out_dir / "control_mismatch.png"
     )
-    log.info("Step 5: 分时期对比历史数据和整合树轮数据")
+    log.info("Step 3: 分时期对比历史数据和整合树轮数据")
     slice_now = history.get_time_slice("2-3")
     his, nat = history.aggregate(cfg.agg_method, inplace=True).merge_with(
         combined["mean"],
@@ -117,7 +114,7 @@ def _main(cfg: DictConfig | None = None):
     )
     ax.figure.savefig(out_dir / "periodization.png")
 
-    log.info("step 6: 最佳匹配窗口")
+    log.info("Step 4: 最佳匹配窗口")
     # 生成所有可能的300年窗口
     slices, mid_year, slice_labels = sweep_slices(
         start_year=STAGE1,

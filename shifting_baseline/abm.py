@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import deque
 from datetime import datetime
 from functools import cached_property
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
@@ -18,7 +18,14 @@ from abses import Actor, Experiment, MainModel
 from hydra import main
 from omegaconf import DictConfig
 from scipy.stats import norm
-from twist_academic import notify
+
+try:  # optional run-completion notifier (author's private package)
+    from twist_academic import notify
+except ImportError:
+
+    def notify(*_args, **_kwargs) -> None:
+        """No-op fallback used when ``twist_academic`` is not installed."""
+
 
 from shifting_baseline.calibration import MismatchReport
 from shifting_baseline.climate_forcing import generate as generate_climate_forcing
