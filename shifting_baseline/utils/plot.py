@@ -162,9 +162,9 @@ def plot_corr_heatmap(
         cbar = ax.collections[0].colorbar
         # 添加垂直参考线（因为现在是水平的colorbar）
         cbar.ax.axhline(y=r_benchmark, color="black", linewidth=2)
-        cbar.ax.set_yticks(np.linspace(v_min, v_max, 5))
+        cbar.ax.set_yticks(np.linspace(v_min, v_max, 3))
         # 2位小数点
-        cbar.ax.set_yticklabels([f"{v:.2f}" for v in np.linspace(v_min, v_max, 5)])
+        cbar.ax.set_yticklabels([f"{v:.2f}" for v in np.linspace(v_min, v_max, 3)])
     return ax
 
 

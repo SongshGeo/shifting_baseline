@@ -11,6 +11,10 @@ import pandas as pd
 import pymc as pm
 from sklearn.preprocessing import StandardScaler
 
+from shifting_baseline.utils.log import get_logger
+
+log = get_logger()
+
 
 def standardize_data(
     data: pd.DataFrame | pd.Series,
@@ -165,6 +169,26 @@ def combine_reconstructions(
             cores=4,
             random_seed=random_seed,
         )
+
+    # 收敛诊断：对所有采样参数（含 nu）报告 R-hat / ESS，供 Methods/SI 引用
+    # convergence diagnostics over ALL sampled params (incl. nu), not just true_drought
+    diag = az.summary(trace, var_names=["true_drought", "nu"])
+    max_rhat = float(diag["r_hat"].max())
+    min_ess_bulk = float(diag["ess_bulk"].min())
+    min_ess_tail = float(diag["ess_tail"].min())
+    nu_row = az.summary(trace, var_names=["nu"]).iloc[0]
+    log.info(
+        "MCMC 收敛诊断: max R-hat=%.4f, min ESS(bulk)=%.0f, min ESS(tail)=%.0f",
+        max_rhat,
+        min_ess_bulk,
+        min_ess_tail,
+    )
+    log.info(
+        "后验自由度 nu-hat=%.2f, 94%% HDI=[%.2f, %.2f]",
+        float(nu_row["mean"]),
+        float(nu_row["hdi_3%"]),
+        float(nu_row["hdi_97%"]),
+    )
 
     # 提取结果
     summary = az.summary(trace, var_names=["true_drought"])

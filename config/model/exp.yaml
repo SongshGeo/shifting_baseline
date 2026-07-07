@@ -12,7 +12,7 @@ min_age: 10
 memory_baseline: "personal"
 step_per_year: 1
 subannual_aggregation: "mean"  # mean, sum, last
-climate_process: "iid"  # iid, ar1, trend_plus_noise, ar1_trend
+climate_process: "ar1"  # 主分析用 AR(1)（与正文/图5一致）; 可选 iid, trend_plus_noise, ar1_trend
 climate_sigma: 1.0
 climate_phi: 0.5
 climate_trend: 0.0

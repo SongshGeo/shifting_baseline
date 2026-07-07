@@ -336,7 +336,7 @@ class MismatchReport:
         }
 
         if as_str:
-            string = f"Kappa: {kappa:.2f}, Kendall's Tau: {tau:.2f}"
+            string = f"Kappa: {kappa:.3f}, Kendall's Tau: {tau:.3f}"
             string += "**" if tau_p_value < 0.05 else ""
             return string
         return stats

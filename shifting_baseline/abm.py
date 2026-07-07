@@ -79,7 +79,7 @@ class ClimateObservingModel(MainModel):
                 "subannual_aggregation must be one of {'mean', 'sum', 'last'}"
             )
         self._subannual_aggregation: SubannualAggregation = raw_agg
-        self._climate_process: str = self.p.get("climate_process", "iid")
+        self._climate_process: str = self.p.get("climate_process", "ar1")
         # ``climate_sigma`` is interpreted as yearly-scale sigma. When
         # ``step_per_year > 1`` we rescale to tick-scale internally so that
         # annual and subannual runs remain comparable after yearly aggregation.
@@ -95,7 +95,7 @@ class ClimateObservingModel(MainModel):
         years: int = self.p.get("years", 100)
         # Maximum age for an observer
         self._max_age_years: int = self.p.get("max_age", 40)
-        self._new_agents: int = self.p.get("new_agents", 10)
+        self._new_agents: int = self.p.get("new_agents", 5)
         # Minimum age for recording events
         self._min_age_years: int = self.p.get("min_age", 10)
         self._max_age_ticks: int = self._max_age_years * self._step_per_year
@@ -308,7 +308,7 @@ class ClimateObservingModel(MainModel):
             extreme (int): The classified extreme event level.
             Archive is a dictionary of lists, the key is the tick, the value is the list of extreme event levels reported by observers.
         """
-        loss_rate: float = self.p.get("loss_rate", 0.2)
+        loss_rate: float = self.p.get("loss_rate", 0.4)
         if np.random.random() < loss_rate:
             return
         self._archive[self.time.tick].append(extreme)

@@ -28,7 +28,8 @@ atlas:
   region: 华北地区
 
 # abm: ${ds.multirun}/2025-09-11/15-46-18  # 之前的
-abm: ${ds.multirun}/2026-06-11/08-14-34
+# abm: ${ds.multirun}/2026-06-11/08-14-34  # iid 版本（旧）
+abm: ${ds.multirun}/2026-06-23/22-22-32  # AR(1) 主运行，与正文/图5一致（personal+collective+collective_lifetime, 100 reps, min_period=5）
 
 # 整合校验数据，提取夏季降水，并保存为nc文件
 # 用于计算自然数据，调用 process.py 脚本
