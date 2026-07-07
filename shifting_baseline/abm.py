@@ -27,15 +27,10 @@ except ImportError:
         """No-op fallback used when ``twist_academic`` is not installed."""
 
 
-from shifting_baseline.calibration import MismatchReport
 from shifting_baseline.climate_forcing import generate as generate_climate_forcing
 from shifting_baseline.climate_forcing import sigma_tick_from_sigma_year
 from shifting_baseline.compare import compare_corr_2d
-from shifting_baseline.filters import (
-    calc_std_deviation,
-    classify,
-    classify_single_value,
-)
+from shifting_baseline.filters import calc_std_deviation, classify_single_value
 from shifting_baseline.utils.calc import rand_generate_from_std_levels
 
 if TYPE_CHECKING:
@@ -288,25 +283,6 @@ class ClimateObservingModel(MainModel):
         Cached once because the climate series doesn't change after init.
         """
         return float(self.climate_series.mean()), float(self.climate_series.std())
-
-    @property
-    def mismatch_report(self) -> MismatchReport:
-        """Mismatch report of the model.
-
-        Returns:
-            MismatchReport: Mismatch report of the model.
-        """
-        # Load simulated data
-        climate_series = self.climate_df["climate"]
-        collective_memory_climate = self.climate_df["collective_memory_climate"]
-        # Create mismatch report
-        mismatch_report = MismatchReport(
-            pred=classify(collective_memory_climate, handle_na="skip"),
-            true=classify(climate_series, handle_na="skip"),
-            value_series=climate_series,
-        )
-        mismatch_report.analyze_error_patterns()
-        return mismatch_report
 
     def archive_it(self, extreme: int) -> None:
         """Record an extreme climate event reported by an observer.
