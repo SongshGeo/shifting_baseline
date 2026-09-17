@@ -50,7 +50,8 @@ submit() {
         echo "sbatch $*" >&2
         echo "0"
     else
-        sbatch --parsable "$@"
+        # --parsable prints "jobid" or "jobid;cluster" on multi-cluster sites
+        sbatch --parsable "$@" | cut -d";" -f1
     fi
 }
 
