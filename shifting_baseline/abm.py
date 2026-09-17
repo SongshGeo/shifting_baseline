@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import math
+from bisect import bisect_left
 from collections import deque
 from datetime import datetime
 from functools import cached_property
@@ -17,7 +19,6 @@ import pandas as pd
 from abses import Actor, Experiment, MainModel
 from hydra import main
 from omegaconf import DictConfig
-from scipy.stats import norm
 
 try:  # optional run-completion notifier (author's private package)
     from twist_academic import notify
@@ -30,6 +31,7 @@ except ImportError:
 from shifting_baseline.climate_forcing import generate as generate_climate_forcing
 from shifting_baseline.climate_forcing import sigma_tick_from_sigma_year
 from shifting_baseline.compare import compare_corr_2d
+from shifting_baseline.constants import LEVELS, THRESHOLDS
 from shifting_baseline.filters import calc_std_deviation, classify_single_value
 from shifting_baseline.utils.calc import rand_generate_from_std_levels
 
@@ -40,6 +42,21 @@ if TYPE_CHECKING:
 from shifting_baseline.utils.log import get_logger
 
 MAX_AGE: int = 40  # 主体气候观察者的最大年龄
+_SQRT2: float = math.sqrt(2.0)
+
+
+def _classify_level(z_score: float) -> int:
+    """Hot-path equivalent of ``classify_single_value`` with default thresholds.
+
+    Called once per recorded event (~10⁶–10⁷ calls per SA sample), so it skips
+    the per-call argument validation. ``bisect_left`` reproduces the
+    ``t_{i-1} < x <= t_i`` rule exactly. Non-finite inputs are delegated to
+    ``classify_single_value`` so they still raise as before.
+    """
+    if not math.isfinite(z_score):
+        return classify_single_value(z_score)
+    return LEVELS[bisect_left(THRESHOLDS, z_score)]
+
 
 # 使用主logger，避免重复设置
 log = get_logger()
@@ -100,6 +117,9 @@ class ClimateObservingModel(MainModel):
         self._new_agents: int = self.p.get("new_agents", 5)
         # Minimum age for recording events
         self._min_age_years: int = self.p.get("min_age", 10)
+        # Read once: archive_it runs once per recorded event and an OmegaConf
+        # lookup costs ~4 µs, which adds up at the SA upper corner.
+        self._loss_rate: float = float(self.p.get("loss_rate", 0.4))
         self._max_age_ticks: int = self._max_age_years * self._step_per_year
         self._min_age_ticks: int = self._min_age_years * self._step_per_year
         # Cache for collective memory
@@ -291,8 +311,7 @@ class ClimateObservingModel(MainModel):
             extreme (int): The classified extreme event level.
             Archive is a dictionary of lists, the key is the tick, the value is the list of extreme event levels reported by observers.
         """
-        loss_rate: float = self.p.get("loss_rate", 0.4)
-        if np.random.random() < loss_rate:
+        if np.random.random() < self._loss_rate:
             return
         self._archive[self.time.tick].append(extreme)
         # Cache is tick-based, so no need to clear unless logic changes.
@@ -459,7 +478,10 @@ class ClimateObserver(Actor):
         """
         if f0 > 0.5 or f0 < 0:
             raise ValueError("f0 must be between 0 and 0.5")
-        prob = norm.sf(abs(z_score), scale=scale)
+        # Normal survival function sf(|z|; scale) written with math.erfc: the
+        # scipy scalar call costs ~17 µs vs ~0.06 µs and runs once per agent
+        # per tick (identical to within 1e-16).
+        prob = 0.5 * math.erfc(abs(z_score) / (scale * _SQRT2))
         return np.random.random() < f0 + 0.5 - prob
 
     def perceive(self, climate: float) -> float:
@@ -516,16 +538,16 @@ class ClimateObserver(Actor):
         """
         climate = self.model.climate_now
         self._memory.append(climate)
+        age = self.age()
         # If the observer is too young, it won't record any event
-        if self.age() < self._min_age:
+        if age < self._min_age:
             return
         z_score = self.perceive(climate)
         # If the observer records an event, classify and archive it
         if self.write_down(z_score):
-            extreme_level = classify_single_value(z_score)
-            self.model.archive_it(extreme_level)
+            self.model.archive_it(_classify_level(z_score))
         # If the observer is too old, it dies
-        if self.age() > self._max_age:
+        if age > self._max_age:
             self.die()
 
 

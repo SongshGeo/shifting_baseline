@@ -95,6 +95,14 @@ fi
 SBS_MORRIS_TIMEOUT="${SBS_MORRIS_TIMEOUT:-7200}"
 SBS_SOBOL_TIMEOUT="${SBS_SOBOL_TIMEOUT:-7200}"
 
+# Parallelism split for morris/sobol (defaults = previous behaviour):
+#   SBS_N_WORKERS   concurrent samples            (default: all allocated CPUs)
+#   SBS_NUM_PROCESS replicate processes per sample (default: 1)
+# Keep SBS_N_WORKERS × SBS_NUM_PROCESS ≈ --cpus-per-task. For a retry pass over
+# corner samples that timed out, fewer workers with more replicate processes
+# (e.g. 4 × 8) cuts each sample's wall-clock roughly by the process count.
+SBS_NUM_PROCESS="${SBS_NUM_PROCESS:-1}"
+
 mkdir -p logs/slurm
 
 # --- Environment ------------------------------------------------------------
@@ -122,7 +130,8 @@ export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
 # --- Run --------------------------------------------------------------------
-N_WORKERS="${SLURM_CPUS_PER_TASK:-8}"
+N_WORKERS="${SBS_N_WORKERS:-${SLURM_CPUS_PER_TASK:-8}}"
+echo "[parallelism] n-workers=$N_WORKERS num-process=$SBS_NUM_PROCESS"
 
 case "$STAGE" in
     smoke)
@@ -148,6 +157,7 @@ case "$STAGE" in
             --r-trajectories 20 --num-levels 4 \
             --repeats 30 --years 100 \
             --n-workers "$N_WORKERS" \
+            --num-process "$SBS_NUM_PROCESS" \
             --timeout "$SBS_MORRIS_TIMEOUT" \
             --climate-process ar1 \
             ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"} \
@@ -165,6 +175,7 @@ case "$STAGE" in
             --N "$N_SOBOL" \
             --repeats 30 --years 100 \
             --n-workers "$N_WORKERS" \
+            --num-process "$SBS_NUM_PROCESS" \
             --timeout "$SBS_SOBOL_TIMEOUT" \
             --climate-process ar1 \
             ${RESUME_FLAG[@]+"${RESUME_FLAG[@]}"} \
