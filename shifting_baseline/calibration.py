@@ -19,6 +19,7 @@ from tqdm.auto import tqdm
 
 from shifting_baseline.constants import LEVELS, LEVELS_PROB, TICK_LABELS
 from shifting_baseline.filters import classify
+from shifting_baseline.utils.calc import get_significance_stars
 from shifting_baseline.utils.plot import (
     heatmap_with_annot,
     plot_confusion_matrix,
@@ -340,7 +341,7 @@ class MismatchReport:
 
         if as_str:
             string = f"Kappa: {kappa:.3f}, Kendall's Tau: {tau:.3f}"
-            string += "**" if tau_p_value < 0.05 else ""
+            string += get_significance_stars(tau_p_value)
             return string
         return stats
 

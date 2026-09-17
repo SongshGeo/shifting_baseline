@@ -53,6 +53,11 @@ STAGE2 = 1659
 END = 1900
 FINAL = 2000
 
+# 仪器验证期（1901–2000 CE）：历史分析期 END 之后一年到 FINAL，两端都含。
+# 所有“树轮 vs 仪器”的验证（相关、站点显著性、κ/τ、错配检验）统一用它截取。
+VALIDATION_START = END + 1
+VALIDATION_PERIOD = slice(VALIDATION_START, FINAL)
+
 STAGES_BINS: list[int] = [START, STAGE1, STAGE2, END, FINAL]
 
 # 极端等级（±2）反推数值时截断在 ±2σ：重建值不应超出物理合理范围（有意为之）。

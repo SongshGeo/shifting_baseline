@@ -41,8 +41,8 @@ from shifting_baseline.compare import (
     sweep_max_corr_year,
     sweep_slices,
 )
-from shifting_baseline.constants import END, FINAL, STAGE1
-from shifting_baseline.data import load_data, load_validation_data
+from shifting_baseline.constants import END, STAGE1, VALIDATION_PERIOD
+from shifting_baseline.data import load_data, load_validation_data, to_validation_period
 from shifting_baseline.filters import calc_std_deviation, classify
 from shifting_baseline.utils.calc import calc_corr
 
@@ -61,9 +61,11 @@ _TAU_KEYS = {"kendall_tau", "kendall_tau_validation"}
 def _spatial_corr(series: xr.DataArray, validation_z: xr.DataArray) -> xr.DataArray:
     """Grid-wise Pearson r / p / n between the N-WDI series and the validation grid.
 
-    Mirrors ``calc_spatial_corr`` in natural.ipynb: correlate over the overlapping
+    Mirrors ``calc_spatial_corr`` in natural.ipynb: the validation grid is restricted
+    to the validation period (1901–2000 CE) before correlating over the overlapping
     years, returning stacked (r, p, n) DataArrays over the spatial dims.
     """
+    validation_z = to_validation_period(validation_z)
     common_years = np.intersect1d(series.year.values, validation_z.year.values)
     return xr.apply_ufunc(
         calc_corr,
@@ -107,7 +109,7 @@ def compute_results1(cfg: DictConfig) -> dict:
 
     - ``n_datasets``: number of integrated tree-ring reconstructions.
     - ``corr``: point-to-point Pearson r between the N-WDI and the ``using_val_data``
-      instrumental validation series over the validation period (END–FINAL).
+      instrumental validation series over the validation period (1901–2000 CE).
     - ``n_pass_years``: the low-pass filter window quoted in the text — a config
       value (``cfg.low_pass.window_size``), not a fitted statistic.
     - ``n_sites_sig005`` / ``n_sites_sig01``: number of the historical-archive sites
@@ -118,7 +120,6 @@ def compute_results1(cfg: DictConfig) -> dict:
     """
     combined, uncertainties, history = load_data(cfg)
     tree_ring = combined["mean"]
-    tree_ring_z = tree_ring.loc[STAGE1:FINAL]
 
     ds = cfg.ds.validation[cfg.using_val_data]
     summer_precip_z, regional_z = load_validation_data(
@@ -129,7 +130,9 @@ def compute_results1(cfg: DictConfig) -> dict:
     )
 
     # Point-to-point validation correlation (Fig 2a), using_val_data (default china)
-    corr = float(regional_z.corr(tree_ring_z.loc[END:FINAL]))
+    corr = float(
+        to_validation_period(regional_z).corr(tree_ring.loc[VALIDATION_PERIOD])
+    )
 
     # Spatial significance at the historical-archive sites (Fig 2c), same val grid
     history.setup()  # restrict shp to the study region (华北, 30 sites)
@@ -194,7 +197,9 @@ def compute_results2(cfg: DictConfig) -> dict:
     """Reproduce ``results2`` (mismatch.ipynb): H-WDI vs N-WDI confusion statistics.
 
     Mirrors mismatch.ipynb cells 6/9/14 exactly: main mismatch report statistics,
-    ``mean_diff`` under the shift=2 convention, plus validation-period stats.
+    ``mean_diff`` under the shift=2 convention, plus validation-period stats
+    restricted to the validation period (1901–2000 CE, ``VALIDATION_PERIOD``), with the
+    instrumental z-scores re-standardised within that period.
     """
     combined, _, history = load_data(cfg)
     tree_ring = combined["mean"]
@@ -212,9 +217,9 @@ def compute_results2(cfg: DictConfig) -> dict:
         nc_save_to=ds.z_nc,
     )
     validation_mismatch_report = MismatchReport(
-        pred=classify(validation_data),
-        true=classify(tree_ring),
-        value_series=tree_ring,
+        pred=classify(to_validation_period(validation_data)),
+        true=classify(tree_ring.loc[VALIDATION_PERIOD]),
+        value_series=tree_ring.loc[VALIDATION_PERIOD],
     )
     validation_mismatch_report.analyze_error_patterns(random_seed=seed)
 

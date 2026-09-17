@@ -22,8 +22,8 @@ from shifting_baseline.compare import (
     sweep_max_corr_year,
     sweep_slices,
 )
-from shifting_baseline.constants import END, STAGE1
-from shifting_baseline.data import load_data, load_validation_data
+from shifting_baseline.constants import END, STAGE1, VALIDATION_PERIOD
+from shifting_baseline.data import load_data, load_validation_data, to_validation_period
 from shifting_baseline.filters import calc_std_deviation, classify
 from shifting_baseline.utils.log import get_logger, setup_logger_from_hydra
 from shifting_baseline.utils.plot import plot_correlation_windows
@@ -74,12 +74,15 @@ def _main(cfg: DictConfig | None = None):
     )
     log.info("Step 2: 比较树轮数据和测试数据 z-score")
     tree_ring = combined["mean"]
+    # 仅在验证期（1901–2000 CE）内比较，仪器 z-score 在期内重新标准化
     control_mismatch_report = MismatchReport(
-        pred=classify(regional_prec_z),
-        true=classify(tree_ring),
-        value_series=tree_ring,
+        pred=classify(to_validation_period(regional_prec_z)),
+        true=classify(tree_ring.loc[VALIDATION_PERIOD]),
+        value_series=tree_ring.loc[VALIDATION_PERIOD],
     )
-    control_mismatch_report.analyze_error_patterns()
+    control_mismatch_report.analyze_error_patterns(
+        mc_runs=cfg.mc_runs, random_seed=cfg.random_seed
+    )
     control_mismatch_report.generate_report_figure(
         save_path=out_dir / "control_mismatch.png"
     )
@@ -95,7 +98,9 @@ def _main(cfg: DictConfig | None = None):
         true=classify(nat),
         value_series=nat,
     )
-    mismatch_report.analyze_error_patterns()
+    mismatch_report.analyze_error_patterns(
+        mc_runs=cfg.mc_runs, random_seed=cfg.random_seed
+    )
     log.debug(mismatch_report.get_statistics_summary(as_str=True))
     mismatch_report.generate_report_figure(save_path=out_dir / "mismatch_2-3.png")
     _, r_benchmark, ax = experiment_corr_2d(

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Tuple, overload
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Tuple, TypeVar, overload
 
 import geopandas as gpd
 import numpy as np
@@ -27,6 +27,7 @@ from shifting_baseline.constants import (
     NEUTRAL_GRADE,
     STAGES_BINS,
     START,
+    VALIDATION_PERIOD,
 )
 from shifting_baseline.filters import classify
 from shifting_baseline.utils.calc import calc_corr, rand_generate_from_std_levels
@@ -48,6 +49,7 @@ log = get_logger()
 # 常用的分布
 common_distributions = get_common_distributions()
 common_distributions.append("t")
+_ValidationDataT = TypeVar("_ValidationDataT", pd.Series, xr.DataArray)
 
 
 def check_distribution(
@@ -631,6 +633,26 @@ def regional_precip_z(
     series = summer_precip.sel(sel_dict).mean(dim=["x", "y"]).to_series()
     series.name = "pre"
     return (series - series.mean()) / series.std()
+
+
+def to_validation_period(data: _ValidationDataT) -> _ValidationDataT:
+    """截取仪器验证期（``VALIDATION_PERIOD``，1901–2000 CE）并在期内重新标准化。
+
+    缓存的验证 z-score 是在各数据集的完整记录期上算的（China 1901–2017、
+    GPCC 1891–2020、CRU 1901–2023）。只截取年份仍会带入验证期外的均值和方差，
+    进而影响分级（``classify``）。这里在验证期内重算 z-score；Pearson 相关对这一步不变。
+
+    Args:
+        data: 区域序列（年份为索引）或带 ``year`` 维度的网格数据。
+
+    Returns:
+        截取并重新标准化后的同类型数据。
+    """
+    if isinstance(data, xr.DataArray):
+        subset = data.sel(year=VALIDATION_PERIOD)
+        return (subset - subset.mean(dim="year")) / subset.std(dim="year")
+    subset = data.loc[VALIDATION_PERIOD]
+    return (subset - subset.mean()) / subset.std()
 
 
 def load_validation_data(
