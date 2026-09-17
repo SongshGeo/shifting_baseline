@@ -129,6 +129,24 @@ export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
+# --- Preflight ----------------------------------------------------------------
+# Every sample runs abm.py in a subprocess; if the Hydra config cannot resolve
+# (e.g. the gitignored .env with SBS_ROOT / SBS_DATA_ROOT / SBS_OUT_DIR is
+# missing on the cluster), each subprocess fails within seconds and thousands
+# of samples get written as errors. Fail the job up front instead.
+$PY - <<'PY'
+from pathlib import Path
+
+import shifting_baseline  # noqa: F401 — loads the repo-root .env
+from hydra import compose, initialize_config_dir
+from omegaconf import OmegaConf
+
+with initialize_config_dir(version_base=None, config_dir=str(Path("config").resolve())):
+    cfg = compose(config_name="config")
+OmegaConf.to_container(cfg, resolve=True)
+print("[preflight] Hydra config resolves (SBS_ROOT =", cfg.ds.root, ")")
+PY
+
 # --- Run --------------------------------------------------------------------
 N_WORKERS="${SBS_N_WORKERS:-${SLURM_CPUS_PER_TASK:-8}}"
 echo "[parallelism] n-workers=$N_WORKERS num-process=$SBS_NUM_PROCESS"
