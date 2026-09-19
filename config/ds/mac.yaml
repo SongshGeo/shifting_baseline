@@ -65,18 +65,19 @@ validation:
     z_nc: ${ds.processed}/JAS_z_CRU_1900-2017.nc
     csv: ${ds.processed}/JAS_z_CRU.csv
 
+# All-mixed scenario (SI Table S5): every screened reconstruction, including those
+# that also assimilate historical documents (marked * in SI Table S8). Each entry
+# matches a <name>.txt data file under ${ds.noaa}.
 includes:
-- "li2015b"  # not good
-- "li2019a"  # not good
-- "liu2020"  # not good
-- "shi2017"
-- "shi2018"
-- "tan2011"  # not good
-- "xu2023c"  # great
-- "yang2016"  # great
-- "yang2019d"  # terrible
-- "yi2010"  # very good
-- "yi2012"  # very good
+- "li2015b"
+- "li2019a"
+- "liu2020"
+- "tan2011"
+- "xu2023c"
+- "yang2016"
+- "yang2019d"
+- "yi2010"
+- "yi2012"
 
 out:
   tree_ring: ${ds.processed}/combined_mean.csv

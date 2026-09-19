@@ -726,14 +726,26 @@ def load_validation_data(
     return summer_precip_z, regional_z
 
 
-def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRecords]:
-    """读取自然和历史数据，以及不确定性"""
+def load_data(
+    cfg: DictConfig, combined: pd.DataFrame | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRecords]:
+    """读取自然和历史数据，以及不确定性
+
+    Args:
+        cfg: Hydra 配置。
+        combined: 若给定，直接用作整合后的 N-WDI（``combine_reconstructions`` 的输出），
+            不读缓存也不重算；用于先验敏感性等需要替换 N-WDI 的分析。
+    """
     start_year = START
     end_year = END
     log.info("加载自然数据 [%s-%s]...", start_year, end_year)
     log.debug("数据路径: %s", cfg.ds.noaa)
     log.debug("数据包括: %s", cfg.ds.includes)
-    if cfg.recalculate_data:
+    if combined is not None:
+        log.info("使用传入的整合自然数据 ...")
+        datasets = combined
+        uncertainties = pd.read_csv(cfg.ds.out.tree_ring_uncertainty, index_col=0)
+    elif cfg.recalculate_data:
         from shifting_baseline.mc import combine_reconstructions
 
         log.info("重新计算自然数据 ...")
@@ -762,3 +774,16 @@ def load_data(cfg: DictConfig) -> tuple[pd.DataFrame, pd.DataFrame, HistoricalRe
         random_seed=cfg.get("random_seed", 42),
     )
     return datasets, uncertainties, history
+
+
+def load_scenario_nwdi(cfg: DictConfig, setname: str) -> pd.Series:
+    """Posterior-mean N-WDI of a data scenario (SI Table S5: ``pure``/``best``/``mac``).
+
+    The active scenario (``cfg.ds.setname``) reads ``cfg.ds.out.tree_ring``; the other
+    scenarios read their cached ``${ds.processed}/<setname>/integrated.csv``.
+    """
+    if setname == cfg.ds.setname:
+        path = Path(cfg.ds.out.tree_ring)
+    else:
+        path = Path(cfg.ds.processed) / setname / "integrated.csv"
+    return pd.read_csv(path, index_col=0)["mean"]

@@ -58,10 +58,10 @@ __all__ = [
 _TAU_KEYS = {"kendall_tau", "kendall_tau_validation"}
 
 
-def _spatial_corr(series: xr.DataArray, validation_z: xr.DataArray) -> xr.DataArray:
+def spatial_corr(series: xr.DataArray, validation_z: xr.DataArray) -> xr.DataArray:
     """Grid-wise Pearson r / p / n between the N-WDI series and the validation grid.
 
-    Mirrors ``calc_spatial_corr`` in natural.ipynb: the validation grid is restricted
+    Shared with natural.ipynb (Fig 2c, SI Fig 4): the validation grid is restricted
     to the validation period (1901–2000 CE) before correlating over the overlapping
     years, returning stacked (r, p, n) DataArrays over the spatial dims.
     """
@@ -99,7 +99,7 @@ def _round_stats(results: dict) -> dict:
     return rounded
 
 
-def compute_results1(cfg: DictConfig) -> dict:
+def compute_results1(cfg: DictConfig, combined: pd.DataFrame | None = None) -> dict:
     """Reproduce ``results1`` (natural.ipynb): reconstruction/validation summary.
 
     Fields (all mirror the manuscript's §2.1 / Fig 2 definitions). Everything uses
@@ -118,7 +118,7 @@ def compute_results1(cfg: DictConfig) -> dict:
     - ``sig_sites_percentage``: ``n_sites_sig005 / n_sites`` in percent (Fig 2c caption).
     - ``sig_sites_ratio``: ``n_sites_sig01 / n_sites`` (legacy key, p<0.1).
     """
-    combined, uncertainties, history = load_data(cfg)
+    combined, uncertainties, history = load_data(cfg, combined)
     tree_ring = combined["mean"]
 
     ds = cfg.ds.validation[cfg.using_val_data]
@@ -137,7 +137,7 @@ def compute_results1(cfg: DictConfig) -> dict:
     # Spatial significance at the historical-archive sites (Fig 2c), same val grid
     history.setup()  # restrict shp to the study region (华北, 30 sites)
     region_gdf = history.shp
-    spatial = _spatial_corr(tree_ring.to_xarray(), summer_precip_z)
+    spatial = spatial_corr(tree_ring.to_xarray(), summer_precip_z)
     p_sites = _site_pvalues(spatial, region_gdf)
     n_sites = int(len(region_gdf))
     n_sites_sig005 = int((p_sites < 0.05).sum())
@@ -177,7 +177,7 @@ def site_significance_table(cfg: DictConfig) -> pd.DataFrame:
             csv_save_to=vds.csv,
             nc_save_to=vds.z_nc,
         )
-        p_sites = _site_pvalues(_spatial_corr(series, summer_precip_z), region_gdf)
+        p_sites = _site_pvalues(spatial_corr(series, summer_precip_z), region_gdf)
         n05 = int((p_sites < 0.05).sum())
         n10 = int((p_sites < 0.1).sum())
         rows.append(
@@ -193,7 +193,7 @@ def site_significance_table(cfg: DictConfig) -> pd.DataFrame:
     return pd.DataFrame(rows).set_index("dataset")
 
 
-def compute_results2(cfg: DictConfig) -> dict:
+def compute_results2(cfg: DictConfig, combined: pd.DataFrame | None = None) -> dict:
     """Reproduce ``results2`` (mismatch.ipynb): H-WDI vs N-WDI confusion statistics.
 
     Mirrors mismatch.ipynb cells 6/9/14 exactly: main mismatch report statistics,
@@ -201,7 +201,7 @@ def compute_results2(cfg: DictConfig) -> dict:
     restricted to the validation period (1901–2000 CE, ``VALIDATION_PERIOD``), with the
     instrumental z-scores re-standardised within that period.
     """
-    combined, _, history = load_data(cfg)
+    combined, _, history = load_data(cfg, combined)
     tree_ring = combined["mean"]
     # Seed the Monte-Carlo null so the analysis is reproducible. (results2's fields
     # come from the observed confusion matrix / diff matrix and don't read the MC
@@ -251,14 +251,14 @@ def compute_results2(cfg: DictConfig) -> dict:
     return _round_stats(results)
 
 
-def compute_results3(cfg: DictConfig) -> dict:
+def compute_results3(cfg: DictConfig, combined: pd.DataFrame | None = None) -> dict:
     """Reproduce ``results3`` (history.ipynb): sliding-window re-standardisation gains.
 
     Mirrors history.ipynb cells 6/7/8/15/16. The whole-period optimum uses the Fig4b
     variant (``std_offset=0, max_window=51``); the per-segment optimum comes from the
     ``sweep_max_corr_year`` scan. Percentages follow the "value × 100" convention.
     """
-    combined, _, history = load_data(cfg)
+    combined, _, history = load_data(cfg, combined)
     tree_ring = combined["mean"]
     slice_now = slice(STAGE1, END)
 
@@ -319,10 +319,14 @@ def compute_results3(cfg: DictConfig) -> dict:
     }
 
 
-def build_results(cfg: DictConfig) -> dict:
-    """Assemble the full ``results.json`` payload (results1 + results2 + results3)."""
+def build_results(cfg: DictConfig, combined: pd.DataFrame | None = None) -> dict:
+    """Assemble the full ``results.json`` payload (results1 + results2 + results3).
+
+    ``combined`` optionally replaces the cached N-WDI (see ``load_data``), e.g. to
+    recompute the headline numbers for an alternative prior.
+    """
     return {
-        "results1": compute_results1(cfg),
-        "results2": compute_results2(cfg),
-        "results3": compute_results3(cfg),
+        "results1": compute_results1(cfg, combined),
+        "results2": compute_results2(cfg, combined),
+        "results3": compute_results3(cfg, combined),
     }

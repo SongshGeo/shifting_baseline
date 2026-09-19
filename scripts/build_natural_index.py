@@ -36,6 +36,7 @@ from omegaconf import DictConfig, OmegaConf
 from shifting_baseline.constants import START
 from shifting_baseline.data import check_distribution, load_nat_data
 from shifting_baseline.mc import combine_reconstructions
+from shifting_baseline.utils.io import write_table_sheet
 from shifting_baseline.utils.log import get_logger, setup_logger_from_hydra
 
 # 分布拟合表(SI Table S10)的列名与四舍五入位数
@@ -59,19 +60,6 @@ def _build_fit_table(series: pd.Series) -> pd.DataFrame:
     table = table.rename(columns={raw: nice for raw, (nice, _) in _FIT_COLUMNS.items()})
     table.index.name = "Distribution"
     return table.reset_index()
-
-
-def _write_table_sheet(xlsx_path: Path, table: pd.DataFrame, log) -> None:
-    """把分布拟合表写入工作簿的 Table S10 表,保留其它手工维护的表。"""
-    if not xlsx_path.exists():
-        log.warning("工作簿不存在,跳过写入 xlsx: %s", xlsx_path)
-        return
-    # mode="a" + if_sheet_exists="replace":仅新增/替换 Table S10,不动其它 sheet
-    with pd.ExcelWriter(
-        xlsx_path, engine="openpyxl", mode="a", if_sheet_exists="replace"
-    ) as writer:
-        table.to_excel(writer, sheet_name=_TABLE_SHEET, index=False)
-    log.info("已写入分布拟合表到 %s [%s]", xlsx_path.name, _TABLE_SHEET)
 
 
 @main(config_path="../config", config_name="config", version_base=None)
@@ -122,7 +110,7 @@ def _main(cfg: DictConfig | None = None) -> None:
         fit_table.iloc[0]["Distribution"],
         fit_table.to_string(index=False),
     )
-    _write_table_sheet(Path(cfg.ds.figs) / "CollMemo_Tables.xlsx", fit_table, log)
+    write_table_sheet(cfg.ds.figs, fit_table, _TABLE_SHEET)
 
     log.info("完成。数据 -> %s ,表格 -> %s", tree_ring.parent, fit_csv.name)
 

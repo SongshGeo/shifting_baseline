@@ -65,18 +65,11 @@ validation:
     z_nc: ${ds.processed}/JAS_z_CRU_1900-2017.nc
     csv: ${ds.processed}/JAS_z_CRU.csv
 
+# Best-correlated scenario (SI Table S5): the pure-natural subset with the best
+# correlation to instrumental data over 1901–2000 CE.
 includes:
-- "li2015b"  # not good
-# - "li2019a"  # not good
-# - "liu2020"  # not good
-# - "shi2017"
-# - "shi2018"
-# - "tan2011"  # not good
-- "xu2023c"  # great
-# - "yang2016"  # great
-# - "yang2019d"  # terrible
-# - "yi2010"  # very good
-# - "yi2012"  # very good
+- "li2015b"
+- "xu2023c"
 
 
 out:
