@@ -135,7 +135,7 @@ def compute_results1(cfg: DictConfig, combined: pd.DataFrame | None = None) -> d
     )
 
     # Spatial significance at the historical-archive sites (Fig 2c), same val grid
-    history.setup()  # restrict shp to the study region (华北, 30 sites)
+    history.setup()  # restrict shp to the study region (华北, 32 sites)
     region_gdf = history.shp
     spatial = spatial_corr(tree_ring.to_xarray(), summer_precip_z)
     p_sites = _site_pvalues(spatial, region_gdf)

@@ -24,7 +24,7 @@ base_maps:
 # 千年旱涝地图集数据
 atlas:
   file: ${ds.data}/中国历史千年旱涝数据/中国千年区域极端旱涝地图集（表格） - 杨煜达 主编.xlsx
-  shp: ${ds.data}/中国历史千年旱涝数据/point.shp
+  shp: ${ds.data}/中国历史千年旱涝数据/site_centres/site_centres.shp  # 图集作者提供的站点中心（清理说明见同目录 README.txt）
   region: 华北地区
 
 # abm: ${ds.multirun}/2025-07-27/23-18-33  # 之前的
