@@ -51,11 +51,23 @@ __all__ = [
     "compute_results1",
     "compute_results2",
     "compute_results3",
+    "site_corr_table",
     "site_significance_table",
 ]
 
-# tau 类保留 3 位小数（区分 0.176/0.18/0.19），其余 2 位（与 mismatch.ipynb 约定一致）
-_TAU_KEYS = {"kendall_tau", "kendall_tau_validation"}
+# tau 类与 p 值保留 3 位小数（区分 0.176/0.18/0.19；p 按期刊要求到三位），其余 2 位
+_TAU_KEYS = {
+    "kendall_tau",
+    "kendall_tau_validation",
+    "tau_ci_low",
+    "tau_ci_high",
+    "tau_ci_low_validation",
+    "tau_ci_high_validation",
+    "tau_p_value",
+    "tau_p_value_validation",
+    "kappa_p_value",
+    "kappa_p_value_validation",
+}
 
 
 def spatial_corr(series: xr.DataArray, validation_z: xr.DataArray) -> xr.DataArray:
@@ -78,12 +90,21 @@ def spatial_corr(series: xr.DataArray, validation_z: xr.DataArray) -> xr.DataArr
     )
 
 
-def _site_pvalues(corr: xr.DataArray, region_gdf) -> np.ndarray:
-    """Nearest-grid p-value at each historical-archive site (mirrors calc_sites_corr)."""
-    ps = []
-    for lon, lat in zip(region_gdf.lon, region_gdf.lat):
-        ps.append(corr[1].sel(x=lon, y=lat, method="nearest").item())
-    return np.asarray(ps, dtype=float)
+def _site_corr(corr: tuple[xr.DataArray, ...], region_gdf) -> pd.DataFrame:
+    """Nearest-grid Pearson r / p / n at each historical-archive site (mirrors calc_sites_corr)."""
+    rows = [
+        {
+            "site": name,
+            "lon": lon,
+            "lat": lat,
+            **{
+                key: da.sel(x=lon, y=lat, method="nearest").item()
+                for key, da in zip(("r", "p", "n"), corr)
+            },
+        }
+        for name, lon, lat in zip(region_gdf.name_en, region_gdf.lon, region_gdf.lat)
+    ]
+    return pd.DataFrame(rows).set_index("site")
 
 
 def _round_stats(results: dict) -> dict:
@@ -138,7 +159,7 @@ def compute_results1(cfg: DictConfig, combined: pd.DataFrame | None = None) -> d
     history.setup()  # restrict shp to the study region (华北, 32 sites)
     region_gdf = history.shp
     spatial = spatial_corr(tree_ring.to_xarray(), summer_precip_z)
-    p_sites = _site_pvalues(spatial, region_gdf)
+    p_sites = _site_corr(spatial, region_gdf)["p"].to_numpy()
     n_sites = int(len(region_gdf))
     n_sites_sig005 = int((p_sites < 0.05).sum())
     n_sites_sig01 = int((p_sites < 0.1).sum())
@@ -152,6 +173,28 @@ def compute_results1(cfg: DictConfig, combined: pd.DataFrame | None = None) -> d
         "n_sites_sig01": n_sites_sig01,
         "sig_sites_percentage": round(n_sites_sig005 / n_sites * 100, 2),
     }
+
+
+def site_corr_table(cfg: DictConfig) -> pd.DataFrame:
+    """Per-site Pearson r / two-sided p / n behind Fig 2c (site-significance counts).
+
+    Same data and nearest-grid lookup as ``compute_results1``: the N-WDI against the
+    ``using_val_data`` grid over the validation period, at each of the study-region
+    historical-archive sites.
+    """
+    combined, _, history = load_data(cfg)
+    ds = cfg.ds.validation[cfg.using_val_data]
+    summer_precip_z, _ = load_validation_data(
+        data_path=ds.z_nc,
+        resolution=cfg.resolution,
+        csv_save_to=ds.csv,
+        nc_save_to=ds.z_nc,
+    )
+    history.setup()
+    spatial = spatial_corr(combined["mean"].to_xarray(), summer_precip_z)
+    table = _site_corr(spatial, history.shp)
+    table["n"] = table["n"].astype(int)
+    return table
 
 
 def site_significance_table(cfg: DictConfig) -> pd.DataFrame:
@@ -177,7 +220,9 @@ def site_significance_table(cfg: DictConfig) -> pd.DataFrame:
             csv_save_to=vds.csv,
             nc_save_to=vds.z_nc,
         )
-        p_sites = _site_pvalues(spatial_corr(series, summer_precip_z), region_gdf)
+        p_sites = _site_corr(spatial_corr(series, summer_precip_z), region_gdf)[
+            "p"
+        ].to_numpy()
         n05 = int((p_sites < 0.05).sum())
         n10 = int((p_sites < 0.1).sum())
         rows.append(
@@ -238,15 +283,26 @@ def compute_results2(cfg: DictConfig, combined: pd.DataFrame | None = None) -> d
     mismatch_report.analyze_error_patterns(random_seed=seed)
 
     results = mismatch_report.get_statistics_summary()
+    results.update(mismatch_report.get_agreement_inference(random_seed=seed))
     # mean_diff 采用 shift=2 口径（与正文表述一致），而非整体平均
     mismatch_report.analyze_error_patterns(shift=2, random_seed=seed)
     assert mismatch_report.diff_matrix is not None  # set by analyze_error_patterns
     results["mean_diff"] = float(mismatch_report.diff_matrix.abs().mean().mean())
 
     validation_stats = validation_mismatch_report.get_statistics_summary()
-    results["kendall_tau_validation"] = validation_stats["kendall_tau"]
-    results["kappa_validation"] = validation_stats["kappa"]
-    results["n_samples_validation"] = validation_stats["n_samples"]
+    validation_stats.update(
+        validation_mismatch_report.get_agreement_inference(random_seed=seed)
+    )
+    for key in (
+        "kendall_tau",
+        "tau_p_value",
+        "tau_ci_low",
+        "tau_ci_high",
+        "kappa",
+        "kappa_p_value",
+        "n_samples",
+    ):
+        results[f"{key}_validation"] = validation_stats[key]
 
     return _round_stats(results)
 

@@ -345,6 +345,54 @@ class MismatchReport:
             return string
         return stats
 
+    def get_agreement_inference(
+        self,
+        *,
+        n_resamples: int = 10_000,
+        random_seed: int | None = None,
+        weights: Literal["linear", "quadratic"] = "quadratic",
+    ) -> dict:
+        """Inference for the agreement statistics of :meth:`get_statistics_summary`.
+
+        - ``kappa_p_value``: two-sided permutation test of the weighted Cohen's
+          kappa (archival categories shuffled against the natural ones, which keeps
+          both marginals fixed); ``(k + 1) / (n_resamples + 1)`` convention.
+        - ``tau_ci_low`` / ``tau_ci_high``: 95% percentile bootstrap interval of
+          Kendall's tau (year pairs resampled with replacement).
+
+        - ``kappa``: the observed weighted kappa (equals ``get_statistics_summary``).
+
+        Weighted kappa is written as ``1 - D_obs / D_exp``: under a permutation the
+        expected disagreement ``D_exp`` (mean weight over all cross pairs) is fixed,
+        so the null distribution is vectorised. It equals sklearn's
+        ``cohen_kappa_score`` with the same ``weights``.
+        """
+        rng = np.random.default_rng(random_seed)
+        true = self.true_clean.to_numpy()
+        pred = self.pred_clean.to_numpy()
+        labels = np.union1d(true, pred)
+        t_idx = np.searchsorted(labels, true)
+        p_idx = np.searchsorted(labels, pred)
+        power = {"linear": 1, "quadratic": 2}[weights]
+        d_exp = (np.abs(t_idx[:, None] - p_idx[None, :]) ** power).mean()
+
+        def _kappa(p: np.ndarray) -> np.ndarray:
+            return 1 - (np.abs(t_idx - p) ** power).mean(axis=-1) / d_exp
+
+        kappa_obs = _kappa(p_idx)
+        kappa_null = _kappa(rng.permuted(np.tile(p_idx, (n_resamples, 1)), axis=1))
+        n_extreme = int((np.abs(kappa_null) >= abs(kappa_obs)).sum())
+
+        boot = rng.integers(0, len(true), size=(n_resamples, len(true)))
+        taus = [kendalltau(true[i], pred[i])[0] for i in boot]
+        tau_ci_low, tau_ci_high = np.nanpercentile(taus, [2.5, 97.5])
+        return {
+            "kappa": float(kappa_obs),
+            "kappa_p_value": (n_extreme + 1) / (n_resamples + 1),
+            "tau_ci_low": float(tau_ci_low),
+            "tau_ci_high": float(tau_ci_high),
+        }
+
     def plot_confusion_matrix(
         self, ax: plt.Axes | None = None, title: str | None = None, **kwargs
     ) -> plt.Axes:

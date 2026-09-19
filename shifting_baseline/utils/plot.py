@@ -85,7 +85,10 @@ def plot_confusion_matrix(
         mask=mask | zero_mask,  # 对角线不显示颜色
         **kwargs,
     )
-    ax.figure.axes[-1].yaxis.label.set_size(9)
+    # 只调颜色条标签；cbar=False 时 figure.axes[-1] 是本 ax，不能误改其 ylabel
+    cbar = ax.collections[0].colorbar
+    if cbar is not None:
+        cbar.ax.yaxis.label.set_size(9)
 
     # 手动在对角线上写黑色数字
     for i in range(len(cm_df)):
@@ -99,7 +102,7 @@ def plot_confusion_matrix(
             ha="center",
             va="center",
             color="black",
-            fontsize=9,
+            fontsize="medium",  # 与 seaborn annot 的格子数字同字号
             fontweight="bold",
         )
 
@@ -426,6 +429,7 @@ def plot_correlation_windows(
     slice_labels: list[str] | None = None,
     p_value_list: list[float] | None = None,
     ax: Optional[Axes] = None,
+    seed: int | None = None,
 ) -> Axes:
     """
     绘制时间窗口的最优相关性年份图
@@ -438,8 +442,8 @@ def plot_correlation_windows(
         每个时间窗口的最大相关性改进值数据
     slice_labels : list, optional
         时间窗口标签
-    figsize : tuple
-        图形大小
+    seed : int, optional
+        趋势线 95% bootstrap 置信带的随机种子（None 则每次不同）
     """
     assert isinstance(ax, Axes), "ax must be an instance of Axes"
     # 数据预处理
@@ -528,13 +532,14 @@ def plot_correlation_windows(
             line_kws={"linewidth": 2, "alpha": 0.8, "linestyle": "--"},
             ax=ax,
             truncate=False,
+            seed=seed,
         )
 
     # 设置坐标轴
     ax.set_xticks(mid_years)
     ax.set_xticklabels(slice_labels, rotation=30)
     ax.set_xlabel("Periods applied the filter (AD)")
-    ax.set_ylabel("Window Size with Optimal $Tau$")
+    ax.set_ylabel(r"Window size with optimal $\tau$")
     # ax.set_title("Optimal Year of Max Correlation with Error Bars\n(Color indicates correlation improvement)")
     ax.grid(True, alpha=0.3)
 
@@ -546,7 +551,7 @@ def plot_correlation_windows(
         sm.set_array(valid_improvements)  # 设置实际数据数组
 
         cbar = plt.colorbar(sm, ax=ax)
-        cbar.set_label("Avg. Improvement of $Tau$", rotation=270, labelpad=15)
+        cbar.set_label(r"Avg. improvement of $\tau$", rotation=270, labelpad=15)
     lims = ax.get_xlim()
     ax.set_xlim(lims)
     ax.spines["top"].set_visible(False)
@@ -907,6 +912,8 @@ def _assign_groups_and_labels(long: pd.DataFrame) -> pd.DataFrame:
             lambda r: f"{level_to_name[r['pred']]}\n→\n{level_to_name[r['true']]}",
             axis=1,
         ),
+        # 自然（N-WDI）等级；组偏移 + 自然等级即唯一确定档案等级
+        natural_label=lambda d: d["pred"].map(level_to_name),
     )
 
     # Keep only defined groups
@@ -1054,7 +1061,7 @@ def _draw_single_bar(
     # Add significance marker
     if marker:
         va = "top" if y < 0 else "bottom"
-        ax.text(x, y, marker, ha="center", va=va, fontsize=9, color="black")
+        ax.text(x, y, marker, ha="center", va=va, fontsize="medium", color="black")
 
 
 def _set_y_axis_label(
@@ -1136,6 +1143,7 @@ def plot_mismatch_bar(
     pval_df: pd.DataFrame,
     ax: Optional[Axes] = None,
     show_pair_labels: bool = False,
+    natural_ticks: bool = False,
     show_legend: bool = False,
     legend_loc: str = "upper right",
     y_metric: str = "proportion",
@@ -1158,6 +1166,11 @@ def plot_mismatch_bar(
         ax: Matplotlib axes.
         show_pair_labels: Whether to annotate each bar with label like
             "SD→MW" on top of the bar.
+        natural_ticks: Whether to label each bar on the x-axis with its
+            natural (N-WDI) level only, as minor ticks, with the group offsets
+            (``---`` … ``+++``) on a second row. The archival level is the
+            natural level shifted by the group offset, so the pair is implied
+            without per-bar "SD→MW" annotations.
         show_legend: Whether to show legend.
         legend_loc: Location of legend.
         y_metric: Which quantity to plot on y-axis. One of:
@@ -1211,12 +1224,15 @@ def plot_mismatch_bar(
 
     # Draw bars for each group
     bar_width = 0.8
+    bar_xs, bar_names = [], []
     for g, sub in long.groupby("group", sort=False):
         if g not in offsets:
             continue
         xs = offsets[g]
         for i, (_, row) in enumerate(sub.iterrows()):
             x = xs[i]
+            bar_xs.append(x)
+            bar_names.append(row["natural_label"])
             count_val = 0.0 if pd.isna(row["count"]) else float(row["count"])
             diff_val = 0.0 if pd.isna(row["diff"]) else float(row["diff"])
 
@@ -1251,6 +1267,17 @@ def plot_mismatch_bar(
     ax.set_xticks(tick_positions)
     ax.set_xticklabels(tick_labels_list)
     ax.set_xlabel("Relative level difference (pred - true)")
+    if natural_ticks:
+        # 3 根柱子的组，中间柱与组中心主刻度重合；默认会删掉重合的次刻度
+        ax.xaxis.remove_overlapping_locs = False
+        ax.set_xticks(bar_xs, minor=True)
+        ax.set_xticklabels(bar_names, minor=True, rotation=90)
+        ax.tick_params(axis="x", which="minor", length=2, pad=1)
+        # 组偏移标签放在竖排等级标签下方：间距随刻度字号缩放（两个字母 + 余量）
+        label_pt = mpl.font_manager.FontProperties(
+            size=plt.rcParams["xtick.labelsize"]
+        ).get_size_in_points()
+        ax.tick_params(axis="x", which="major", length=0, pad=3 * label_pt)
 
     # Add reference line and separators
     ax.axhline(0, color="black", linewidth=0.6)

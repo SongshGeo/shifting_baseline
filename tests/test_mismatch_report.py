@@ -298,6 +298,38 @@ class TestMismatchReportStatistics:
         assert "Kappa:" in stats_str
         assert "Tau:" in stats_str
 
+    @pytest.mark.parametrize("weights", ["linear", "quadratic"])
+    def test_agreement_inference(self, realistic_data, weights):
+        """Kappa permutation p and tau bootstrap CI for strongly agreeing data.
+
+        The vectorised kappa must equal sklearn's; the observed tau must lie in its
+        bootstrap interval; and the results must be reproducible under a seed.
+        """
+        pred, true = realistic_data
+        report = MismatchReport(pred, true)
+        stats = report.get_statistics_summary(weights=weights)
+        inference = report.get_agreement_inference(
+            n_resamples=500, random_seed=0, weights=weights
+        )
+
+        assert inference["kappa"] == pytest.approx(stats["kappa"])
+        assert inference["kappa_p_value"] == pytest.approx(1 / 501)
+        assert inference["tau_ci_low"] < stats["kendall_tau"] < inference["tau_ci_high"]
+        assert inference == report.get_agreement_inference(
+            n_resamples=500, random_seed=0, weights=weights
+        )
+
+    def test_agreement_inference_null(self):
+        """Independent categories should give a non-significant kappa and a CI covering 0."""
+        rng = np.random.default_rng(7)
+        pred = pd.Series(rng.choice(LEVELS, size=300))
+        true = pd.Series(rng.choice(LEVELS, size=300))
+        inference = MismatchReport(pred, true).get_agreement_inference(
+            n_resamples=1000, random_seed=0
+        )
+        assert inference["kappa_p_value"] > 0.05
+        assert inference["tau_ci_low"] < 0 < inference["tau_ci_high"]
+
 
 class TestMismatchReportConfusionMatrix:
     """Tests for confusion matrix computation and properties."""
