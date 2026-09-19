@@ -25,6 +25,7 @@ whether to trust the indices.
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -49,8 +50,13 @@ def find_latest_sobol_dirs(n: int = 3) -> list[Path]:
     """
     if not SENSITIVITY_ROOT.exists():
         return []
+    # 只认标准目录名 <日期>-<时间>-sobol-<baseline>，排除 "*.n512.bak" 等手工备份
     dirs = sorted(
-        SENSITIVITY_ROOT.glob("2026*-sobol-*"),
+        (
+            d
+            for d in SENSITIVITY_ROOT.glob("2026*-sobol-*")
+            if d.is_dir() and re.fullmatch(r"\d{8}-\d{6}-sobol-[a-z_]+", d.name)
+        ),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
