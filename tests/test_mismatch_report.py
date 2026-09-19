@@ -315,6 +315,7 @@ class TestMismatchReportStatistics:
         assert inference["kappa"] == pytest.approx(stats["kappa"])
         assert inference["kappa_p_value"] == pytest.approx(1 / 501)
         assert inference["tau_ci_low"] < stats["kendall_tau"] < inference["tau_ci_high"]
+        assert inference["kappa_ci_low"] < stats["kappa"] < inference["kappa_ci_high"]
         assert inference == report.get_agreement_inference(
             n_resamples=500, random_seed=0, weights=weights
         )
@@ -329,6 +330,7 @@ class TestMismatchReportStatistics:
         )
         assert inference["kappa_p_value"] > 0.05
         assert inference["tau_ci_low"] < 0 < inference["tau_ci_high"]
+        assert inference["kappa_ci_low"] < 0 < inference["kappa_ci_high"]
 
 
 class TestMismatchReportConfusionMatrix:

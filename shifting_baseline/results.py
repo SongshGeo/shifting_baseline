@@ -300,6 +300,8 @@ def compute_results2(cfg: DictConfig, combined: pd.DataFrame | None = None) -> d
         "tau_ci_high",
         "kappa",
         "kappa_p_value",
+        "kappa_ci_low",
+        "kappa_ci_high",
         "n_samples",
     ):
         results[f"{key}_validation"] = validation_stats[key]

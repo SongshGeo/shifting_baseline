@@ -359,6 +359,8 @@ class MismatchReport:
           both marginals fixed); ``(k + 1) / (n_resamples + 1)`` convention.
         - ``tau_ci_low`` / ``tau_ci_high``: 95% percentile bootstrap interval of
           Kendall's tau (year pairs resampled with replacement).
+        - ``kappa_ci_low`` / ``kappa_ci_high``: 95% percentile bootstrap interval of
+          the weighted kappa, on the same year-pair resamples.
 
         - ``kappa``: the observed weighted kappa (equals ``get_statistics_summary``).
 
@@ -386,9 +388,22 @@ class MismatchReport:
         boot = rng.integers(0, len(true), size=(n_resamples, len(true)))
         taus = [kendalltau(true[i], pred[i])[0] for i in boot]
         tau_ci_low, tau_ci_high = np.nanpercentile(taus, [2.5, 97.5])
+
+        # 同一批 bootstrap 重采样上的加权 kappa（不额外消耗 rng，tau CI 不变）；
+        # 每次重采样的 D_exp 由两边的类别频率与权重矩阵给出
+        t_boot, p_boot = t_idx[boot], p_idx[boot]
+        levels = np.arange(len(labels))
+        t_freq = (t_boot[..., None] == levels).mean(axis=1)
+        p_freq = (p_boot[..., None] == levels).mean(axis=1)
+        w = np.abs(levels[:, None] - levels[None, :]) ** power
+        d_exp_boot = np.einsum("ra,ab,rb->r", t_freq, w, p_freq)
+        kappa_boot = 1 - (np.abs(t_boot - p_boot) ** power).mean(axis=1) / d_exp_boot
+        kappa_ci_low, kappa_ci_high = np.nanpercentile(kappa_boot, [2.5, 97.5])
         return {
             "kappa": float(kappa_obs),
             "kappa_p_value": (n_extreme + 1) / (n_resamples + 1),
+            "kappa_ci_low": float(kappa_ci_low),
+            "kappa_ci_high": float(kappa_ci_high),
             "tau_ci_low": float(tau_ci_low),
             "tau_ci_high": float(tau_ci_high),
         }
