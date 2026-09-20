@@ -3,14 +3,16 @@
 # @Author  : Shuang (Twist) Song
 # @Contact   : SongshGeo@gmail.com
 
-"""Build SI Table S2: historical-archive sites and their location.
+"""Build SI Table S2: historical-archive sites, their location and validation r/p.
 
 Lists the 32 study-region sites with their coordinates, taken from the site layer
-in ``cfg.ds.atlas.shp`` (the atlas authors' site centres). Only one validation
-correlation is reported in the paper (the regional series, results1), so no
-per-site r/p is listed here. The sites are laid out in two side-by-side column
-blocks, as in the manuscript, and written to sheet "Table S2" of
-``<ds.figs>/CollMemo_Tables.xlsx``.
+in ``cfg.ds.atlas.shp`` (the atlas authors' site centres), together with the
+nearest-grid Pearson r, two-sided p and n behind Figure 2c. The r/p come from
+``results.site_corr_table``, i.e. the same computation as ``results1``'s
+``n_sites_sig005``, so the figure caption's "exact r and p in Supplementary
+Information Table S2" and the main-text site count cannot drift apart.
+
+Written to sheet "Table S2" of ``<ds.figs>/CollMemo_Tables.xlsx``.
 
 Run:
   uv run python scripts/build_site_table.py
@@ -24,6 +26,7 @@ from hydra import main
 from omegaconf import DictConfig, OmegaConf
 
 from shifting_baseline.data import HistoricalRecords
+from shifting_baseline.results import site_corr_table
 from shifting_baseline.utils.io import write_table_sheet
 from shifting_baseline.utils.log import get_logger, setup_logger_from_hydra
 
@@ -73,24 +76,28 @@ def _dms(value: float, pos: str, neg: str) -> str:
     return f"{deg}°{minute}′{second}″{pos if value >= 0 else neg}"
 
 
-def _build_site_table(sites: pd.DataFrame) -> pd.DataFrame:
+def _fmt_p(value: float) -> str:
+    """Two-sided p, 3 dp; below that report the threshold (Nature statistics style)."""
+    return "$< 0.001$" if value < 0.001 else f"{value:.3f}"
+
+
+def _build_site_table(sites: pd.DataFrame, stats: pd.DataFrame) -> pd.DataFrame:
     assert set(sites.index) == set(
         _SITE_ORDER
     ), f"站点图层与 _SITE_ORDER 不一致: {set(sites.index) ^ set(_SITE_ORDER)}"
     sites = sites.loc[_SITE_ORDER]
-    table = pd.DataFrame(
+    stats = stats.loc[_SITE_ORDER]
+    return pd.DataFrame(
         {
             "Index": np.arange(len(sites)),
             "Name": sites.index,
             "Longitude": [_dms(v, "E", "W") for v in sites["lon"]],
             "Latitude": [_dms(v, "N", "S") for v in sites["lat"]],
+            "$r$": [f"{v:.2f}" for v in stats["r"]],
+            "$p$": [_fmt_p(v) for v in stats["p"]],
+            "$n$": stats["n"].to_numpy(),
         }
     )
-    # 两栏并排排版（与手稿原表一致）：前一半站点在左，后一半在右
-    half = int(np.ceil(len(table) / 2))
-    left = table.iloc[:half].reset_index(drop=True)
-    right = table.iloc[half:].reset_index(drop=True)
-    return pd.concat([left, right], axis=1)
 
 
 @main(config_path="../config", config_name="config", version_base=None)
@@ -104,8 +111,9 @@ def _main(cfg: DictConfig | None = None) -> None:
     sites = HistoricalRecords(
         shp_path=cfg.ds.atlas.shp, data_path=cfg.ds.atlas.file
     ).shp.set_index("name_en")[["lon", "lat"]]
-    log.info("站点数: %d", len(sites))
-    write_table_sheet(cfg.ds.figs, _build_site_table(sites), _TABLE_SHEET)
+    stats = site_corr_table(cfg)
+    log.info("站点数: %d; p<0.05 的站点数: %d", len(sites), int((stats["p"] < 0.05).sum()))
+    write_table_sheet(cfg.ds.figs, _build_site_table(sites, stats), _TABLE_SHEET)
 
 
 if __name__ == "__main__":
