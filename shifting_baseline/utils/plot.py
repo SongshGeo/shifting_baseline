@@ -38,6 +38,10 @@ sns.set_style("ticks")
 sns.set_context("paper")
 # 设置字体大小
 config_font({"font.size": 9})
+# 矢量输出内嵌 TrueType 而非 matplotlib 默认的 Type 3：Type 3 字体在出版社
+# preflight（Nature artwork guidelines 要求 Type 1/TrueType）里会被打回。
+plt.rcParams["pdf.fonttype"] = 42
+plt.rcParams["ps.fonttype"] = 42
 
 
 @with_axes(figsize=(4, 3.5))
