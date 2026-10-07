@@ -1,6 +1,6 @@
 [project]
 name = "shifting_baseline"
-version = "0.1.0"
+version = "1.0.0"
 description = "Detecting Shifting Baseline Syndrome (SBS) behind data."
 readme = "README.md"
 license = "Apache-2.0"

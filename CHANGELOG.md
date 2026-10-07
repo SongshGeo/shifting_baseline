@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.0](https://github.com/SongshGeo/shifting_baseline/compare/shifting_baseline-v0.1.0...shifting_baseline-v1.0.0) (2026-10-07)
+
+
+### Features
+
+* :sparkles: 更新项目文档和配置文件 ([6d2d570](https://github.com/SongshGeo/shifting_baseline/commit/6d2d570a7214671c0ddd851079e01437ab0b92b2))
+* :sparkles: 添加项目元数据和配置文件 ([af66a0b](https://github.com/SongshGeo/shifting_baseline/commit/af66a0b75f5a47b356494970dc5073d856c35a15))
+
+## Changelog
+
 ## 自底向上代码审查（2026-06，`743560b`..`HEAD`）
 
 对全仓活代码做了一轮自底向上（叶子模块 → 编排入口）的逐模块手动检查：每站先人工核对逻辑，
