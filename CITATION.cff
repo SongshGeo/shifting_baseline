@@ -7,6 +7,8 @@ title: >-
 type: software
 version: 1.0.0
 license: Apache-2.0
+# Concept DOI: always resolves to the latest archived version on Zenodo.
+doi: 10.5281/zenodo.23223234
 repository-code: https://github.com/SongshGeo/shifting_baseline
 authors:
   - family-names: Song

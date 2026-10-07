@@ -3,6 +3,7 @@
 [![Status](https://img.shields.io/badge/status-under%20peer%20review-yellow)](https://github.com/SongshGeo/shifting_baseline)
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23223234.svg)](https://doi.org/10.5281/zenodo.23223234)
 
 This repository contains the code and analysis pipeline for the manuscript:
 
@@ -198,8 +199,8 @@ If you use this code or data, please cite:
   year      = {2026},
   version   = {v1.0.0},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.XXXXXXX},
-  url       = {https://doi.org/10.5281/zenodo.XXXXXXX}
+  doi       = {10.5281/zenodo.23223235},
+  url       = {https://doi.org/10.5281/zenodo.23223235}
 }
 ```
 
