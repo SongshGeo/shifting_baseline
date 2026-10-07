@@ -1,0 +1,46 @@
+name: release-please
+
+# 只在 main 上运行：合并到 main 的 Conventional Commits（feat/fix/...）会被
+# release-please 汇总成一个 Release PR；合并该 PR 即打 tag 并发布 GitHub Release，
+# Zenodo 的 GitHub 集成随之存档并分配 DOI。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # release-please 的 python 策略只改 pyproject.toml，不改 uv.lock；
+      # 在 Release PR 分支上同步 uv.lock 里本包的版本号。
+      - name: Checkout release PR branch
+        if: ${{ steps.release.outputs.pr }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+
+      - name: Set up uv
+        if: ${{ steps.release.outputs.pr }}
+        uses: astral-sh/setup-uv@v6
+
+      - name: Sync uv.lock on release PR
+        if: ${{ steps.release.outputs.pr }}
+        run: |
+          uv lock
+          if ! git diff --quiet uv.lock; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: sync uv.lock version" uv.lock
+            git push
+          fi

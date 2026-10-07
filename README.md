@@ -192,14 +192,18 @@ Then visit `http://127.0.0.1:8000/` in your browser.
 If you use this code or data, please cite:
 
 ```bibtex
-@article{shifting_baseline_2025,
-  title={Archival and palaeoenvironmental documentation of historical extreme events reveals perceptual bias in collective memory},
-  author={[Authors]},
-  journal={[Journal]},
-  year={2025},
-  note={Under peer review}
+@software{song2026shifting,
+  title     = {Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory (SongshGeo/shifting_baseline)},
+  author    = {Song, Shuang and Hu, Bo and Findley, David Max and Wu, Xutong and Liu, Wei and Middeke-Conlin, Robert W. and Caetano-Andrade, Victor L. and Yang, Yuda and Wang, Shuai and Renn, Jürgen and Roberts, Patrick},
+  year      = {2026},
+  version   = {v1.0.0},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.XXXXXXX},
+  url       = {https://doi.org/10.5281/zenodo.XXXXXXX}
 }
 ```
+
+GitHub's "Cite this repository" button reads `CITATION.cff`.
 
 ## Contributing
 
@@ -207,7 +211,7 @@ This repository contains research code under peer review. For questions or colla
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Apache License, Version 2.0](LICENSE).
 
 ## Acknowledgments
 

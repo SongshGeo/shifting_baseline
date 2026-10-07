@@ -3,6 +3,8 @@ name = "shifting_baseline"
 version = "0.1.0"
 description = "Detecting Shifting Baseline Syndrome (SBS) behind data."
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11,<3.12"
 authors = [
     { name = "SongshGeo", email = "songshgeo@gmail.com" },

@@ -1,0 +1,47 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite it as below."
+title: "Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory (SongshGeo/shifting_baseline)"
+type: software
+version: 0.1.0
+license: Apache-2.0
+repository-code: "https://github.com/SongshGeo/shifting_baseline"
+authors:
+  - family-names: Song
+    given-names: Shuang
+    email: song@gea.mpg.de
+    affiliation: Max Planck Institute of Geoanthropology
+  - family-names: Hu
+    given-names: Bo
+    affiliation: Nanjing University
+  - family-names: Findley
+    given-names: David Max
+    affiliation: Max Planck Institute of Geoanthropology
+  - family-names: Wu
+    given-names: Xutong
+    affiliation: Beijing Normal University
+  - family-names: Liu
+    given-names: Wei
+    affiliation: Fudan University
+  - family-names: Middeke-Conlin
+    given-names: Robert W.
+    affiliation: Max Planck Institute of Geoanthropology
+  - family-names: Caetano-Andrade
+    given-names: Victor L.
+    affiliation: Max Planck Institute of Geoanthropology
+  - family-names: Yang
+    given-names: Yuda
+    affiliation: Fudan University
+  - family-names: Wang
+    given-names: Shuai
+    affiliation: Beijing Normal University
+  - family-names: Renn
+    given-names: Jürgen
+    affiliation: Max Planck Institute of Geoanthropology
+  - family-names: Roberts
+    given-names: Patrick
+    affiliation: Max Planck Institute of Geoanthropology
+keywords:
+  - collective memory
+  - shifting baseline syndrome
+  - agent-based model
+  - palaeoclimate

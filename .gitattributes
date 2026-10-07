@@ -1,0 +1,3 @@
+# Keep figure notebooks out of GitHub release archives (and thus the Zenodo deposit);
+# they remain in the GitHub repository.
+reports/*.ipynb export-ignore

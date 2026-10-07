@@ -1,0 +1,39 @@
+{
+  "title": "Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory (SongshGeo/shifting_baseline)",
+  "upload_type": "software",
+  "version": "0.1.0",
+  "description": "<p>Analysis pipeline and agent-based model accompanying the manuscript <em>Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory</em> (submitted to Nature Communications). The code compares historical Chinese climate archives (1470–1900 CE) with tree-ring hydroclimate reconstructions validated against instrumental data (1901–2000 CE), quantifies the mismatch and sliding-window re-standardisation patterns, and runs the heuristic agent-based model (built on ABSESpy) that tests generational amnesia against collective memory illusion.</p>",
+  "creators": [
+    {"name": "Song, Shuang", "affiliation": "Max Planck Institute of Geoanthropology"},
+    {"name": "Hu, Bo", "affiliation": "Nanjing University"},
+    {"name": "Findley, David Max", "affiliation": "Max Planck Institute of Geoanthropology"},
+    {"name": "Wu, Xutong", "affiliation": "Beijing Normal University"},
+    {"name": "Liu, Wei", "affiliation": "Fudan University"},
+    {"name": "Middeke-Conlin, Robert W.", "affiliation": "Max Planck Institute of Geoanthropology"},
+    {"name": "Caetano-Andrade, Victor L.", "affiliation": "Max Planck Institute of Geoanthropology"},
+    {"name": "Yang, Yuda", "affiliation": "Fudan University"},
+    {"name": "Wang, Shuai", "affiliation": "Beijing Normal University"},
+    {"name": "Renn, Jürgen", "affiliation": "Max Planck Institute of Geoanthropology"},
+    {"name": "Roberts, Patrick", "affiliation": "Max Planck Institute of Geoanthropology"}
+  ],
+  "keywords": [
+    "collective memory",
+    "shifting baseline syndrome",
+    "agent-based model",
+    "palaeoclimate",
+    "historical climatology",
+    "climate change",
+    "adaptation"
+  ],
+  "license": "Apache-2.0",
+  "access_right": "open",
+  "language": "eng",
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/SongshGeo/shifting_baseline",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    }
+  ]
+}
