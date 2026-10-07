@@ -129,6 +129,7 @@ dmypy.json
 .pyre/
 .idea/
 data
+!tests/data/
 .vscode
 
 # LaTeX

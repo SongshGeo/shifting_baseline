@@ -28,7 +28,6 @@ from shifting_baseline.filters import calc_std_deviation, classify
 from shifting_baseline.utils.log import get_logger, setup_logger_from_hydra
 from shifting_baseline.utils.plot import plot_correlation_windows
 
-__version__ = "0.1.0"
 __all__ = [
     "_main",
 ]

@@ -68,4 +68,4 @@
   （多气候强迫 iid/ar1/trend × 时间分辨率 step_per_year 扫描）。
 - `reports/abm.ipynb`：移除旧的描述性视图，全面改为 Sobol 全局敏感性分析；驱动散点图重做为
   左 `max_age` / 右 `climate_phi` 双面板，颜色区分 personal vs collective 基线。
-- 文档：新增 `docs/architecture/uml.md` 架构图、`notes/climate_forcing_review.md` 评审笔记。
+- 文档：新增 `docs/architecture/uml.md` 架构图。

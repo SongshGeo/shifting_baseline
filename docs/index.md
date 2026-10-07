@@ -1,7 +1,7 @@
 # Shifting Baseline
 
 Research codebase for the manuscript *“Archival and palaeoenvironmental documentation
-of historical extreme events reveals perceptual bias in collective memory.”*
+of extreme climate events reveals generational amnesia in collective memory.”*
 
 It compares historical Chinese climate archives (1470–1900 CE) against tree-ring
 hydroclimate reconstructions and instrumental data (1901–2000 CE) to study

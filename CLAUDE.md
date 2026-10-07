@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Research codebase for the manuscript "Archival and palaeoenvironmental documentation of historical extreme events reveals perceptual bias in collective memory" (under peer review). It compares historical Chinese climate archives (1470–1900 CE) against tree-ring hydroclimate reconstructions and instrumental data (1901–2000 CE) to study Shifting Baseline Syndrome (SBS), and uses an agent-based model (ABM) to reproduce the observed perceptual-bias pattern.
+Research codebase for the manuscript "Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory" (under peer review). It compares historical Chinese climate archives (1470–1900 CE) against tree-ring hydroclimate reconstructions and instrumental data (1901–2000 CE) to study Shifting Baseline Syndrome (SBS), and uses an agent-based model (ABM) to reproduce the observed perceptual-bias pattern.
 
 Python 3.11 only. Dependencies are managed with **uv** (`uv.lock` / `uv sync`; the `makefile` targets already call `uv`). Do not use `poetry` commands — prefer `uv run ...` or activate `.venv`.
 

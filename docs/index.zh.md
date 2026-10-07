@@ -1,7 +1,7 @@
 # Shifting Baseline（基线偏移）
 
-本仓库对应论文 *“Archival and palaeoenvironmental documentation of historical extreme
-events reveals perceptual bias in collective memory”* 的研究代码。
+本仓库对应论文 *“Archival and palaeoenvironmental documentation of extreme climate
+events reveals generational amnesia in collective memory”* 的研究代码。
 
 它将中国历史气候档案（1470–1900 CE）与树轮水文气候重建、器测数据（1901–2000 CE）
 进行对比，用以研究**基线偏移综合征（Shifting Baseline Syndrome, SBS）**，并用

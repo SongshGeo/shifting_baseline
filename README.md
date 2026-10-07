@@ -2,11 +2,11 @@
 
 [![Status](https://img.shields.io/badge/status-under%20peer%20review-yellow)](https://github.com/SongshGeo/shifting_baseline)
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 This repository contains the code and analysis pipeline for the manuscript:
 
-**Archival and palaeoenvironmental documentation of historical extreme events reveals perceptual bias in collective memory**
+**Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory**
 
 > **Status**: Currently under peer review
 
@@ -105,7 +105,7 @@ Each run writes figures, logs, and the resolved config to a timestamped folder u
 
 ### Jupyter Notebooks
 
-The figure-producing notebooks live in `reports/`:
+The figure-producing notebooks live in `reports/` on GitHub (they are not included in the release archive on Zenodo; all headline numbers come from `shifting_baseline.results.build_results`):
 
 - `natural.ipynb` — reconstruction/validation (Fig 2)
 - `mismatch.ipynb` — H-WDI vs N-WDI mismatch (Fig 3)

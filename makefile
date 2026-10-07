@@ -20,11 +20,12 @@ run:
 
 # --- Sensitivity-analysis result fetching + plotting ------------------------
 # Pull Sobol/Morris artifacts from an HPC, skipping the heavy sample_NNNNNN/
-# per-sample sub-dirs, then plot locally with uv. The remote defaults to the
-# author's cluster; override it for your own HPC, e.g.:
+# per-sample sub-dirs, then plot locally with uv. Set the remote on the command
+# line or as SA_REMOTE in your environment, e.g.:
 #   make fetch-sa SA_REMOTE=user@host:/path/to/reports/results/sensitivity/
-SA_REMOTE ?= geany:/u/songsh/CodeBase/shifting_baseline/reports/results/sensitivity/
+SA_REMOTE ?=
 fetch-sa:
+	@test -n "$(SA_REMOTE)" || { echo "Error: set SA_REMOTE=user@host:/path/to/reports/results/sensitivity/"; exit 1; }
 	@command -v rsync >/dev/null 2>&1 || { echo "Error: rsync is not installed"; exit 1; }
 	@mkdir -p ./reports/results/sensitivity/
 	@echo "Fetching SA results from $(SA_REMOTE) ..."

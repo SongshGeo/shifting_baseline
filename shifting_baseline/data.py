@@ -121,7 +121,6 @@ def load_nat_data(
         )
         df.index.name = index_name
         if standardize:
-            # TODO：这里怎么没有输入uncertainty？
             ser, uncertainty = standardize_both(df.iloc[:, 0])
             uncertainty.name = path.stem
         else:

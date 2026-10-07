@@ -1,0 +1,42 @@
+{
+  "results1": {
+    "n_datasets": 5,
+    "corr": 0.35,
+    "n_pass_years": 30,
+    "sig_sites_ratio": 0.88,
+    "n_sites_sig005": 19,
+    "n_sites_sig01": 28,
+    "sig_sites_percentage": 59.38
+  },
+  "results2": {
+    "kappa": 0.2,
+    "kendall_tau": 0.176,
+    "tau_p_value": 0.004,
+    "accuracy": 0.39,
+    "n_samples": 208,
+    "n_raw_samples": 431,
+    "n_mismatches": 126,
+    "kappa_p_value": 0.004,
+    "kappa_ci_low": 0.07,
+    "kappa_ci_high": 0.33,
+    "tau_ci_low": 0.054,
+    "tau_ci_high": 0.293,
+    "mean_diff": 0.17,
+    "kendall_tau_validation": 0.214,
+    "tau_p_value_validation": 0.012,
+    "tau_ci_low_validation": 0.063,
+    "tau_ci_high_validation": 0.361,
+    "kappa_validation": 0.24,
+    "kappa_p_value_validation": 0.009,
+    "kappa_ci_low_validation": 0.08,
+    "kappa_ci_high_validation": 0.38,
+    "n_samples_validation": 100
+  },
+  "results3": {
+    "tau": 0.19,
+    "w_optimal": 18,
+    "max_increase": 19.65,
+    "optimal_segment_w": 33,
+    "whole_period_increase_pct": 5.37
+  }
+}

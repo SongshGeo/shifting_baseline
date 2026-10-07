@@ -25,15 +25,7 @@
     "climate change",
     "adaptation"
   ],
-  "license": "Apache-2.0",
+  "license": "apache-2.0",
   "access_right": "open",
-  "language": "eng",
-  "related_identifiers": [
-    {
-      "identifier": "https://github.com/SongshGeo/shifting_baseline",
-      "relation": "isSupplementTo",
-      "resource_type": "software",
-      "scheme": "url"
-    }
-  ]
+  "language": "eng"
 }
