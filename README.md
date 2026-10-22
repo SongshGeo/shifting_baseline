@@ -1,15 +1,15 @@
 # Shifting Baseline Syndrome in Historical Climate Records
 
-[![Status](https://img.shields.io/badge/status-under%20peer%20review-yellow)](https://github.com/SongshGeo/shifting_baseline)
+[![Paper](https://img.shields.io/badge/DOI-10.1038%2Fs41467--026--78922--x-blue)](https://doi.org/10.1038/s41467-026-78922-x)
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23223234.svg)](https://doi.org/10.5281/zenodo.23223234)
+[![Software DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23223234.svg)](https://doi.org/10.5281/zenodo.23223234)
 
-This repository contains the code and analysis pipeline for the manuscript:
+This repository contains the code and analysis pipeline for:
 
 **Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory**
 
-> **Status**: Currently under peer review
+> **Song et al. (2026), *Nature Communications***. [doi:10.1038/s41467-026-78922-x](https://doi.org/10.1038/s41467-026-78922-x)
 
 ## Abstract
 
@@ -190,25 +190,22 @@ Then visit `http://127.0.0.1:8000/` in your browser.
 
 ## Citation
 
-If you use this code or data, please cite:
+If you use this work, please cite:
 
 ```bibtex
-@software{song2026shifting,
-  title     = {Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory (SongshGeo/shifting_baseline)},
-  author    = {Song, Shuang and Hu, Bo and Findley, David Max and Wu, Xutong and Liu, Wei and Middeke-Conlin, Robert W. and Caetano-Andrade, Victor L. and Yang, Yuda and Wang, Shuai and Renn, Jürgen and Roberts, Patrick},
+@article{song2026archival,
+  title     = {Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory},
+  author    = {Song, Shuang and Hu, Bo and Findley, David Max and Wu, Xutong and Liu, Wei and Middeke-Conlin, Robert W. and Caetano-Andrade, Victor L. and Yang, Yuda and Wang, Shuai and Renn, J{\"u}rgen and Roberts, Patrick},
+  journal   = {Nature Communications},
   year      = {2026},
-  version   = {v1.0.0},
-  publisher = {Zenodo},
-  doi       = {10.5281/zenodo.23223235},
-  url       = {https://doi.org/10.5281/zenodo.23223235}
+  doi       = {10.1038/s41467-026-78922-x},
+  url       = {https://doi.org/10.1038/s41467-026-78922-x}
 }
 ```
 
-GitHub's "Cite this repository" button reads `CITATION.cff`.
-
 ## Contributing
 
-This repository contains research code under peer review. For questions or collaboration inquiries, please open an issue or contact the corresponding author.
+For questions or collaboration inquiries, please open an issue or contact the corresponding author.
 
 ## License
 
@@ -216,7 +213,7 @@ This project is licensed under the [Apache License, Version 2.0](LICENSE).
 
 ## Acknowledgments
 
-We acknowledge the use of historical climate archives from northern China and paleoclimate reconstruction data. Detailed acknowledgments will be provided upon publication.
+We acknowledge the use of historical climate archives from northern China and paleoclimate reconstruction data. Full acknowledgments are in the paper.
 
 ## Contact
 
@@ -225,6 +222,3 @@ We acknowledge the use of historical climate archives from northern China and pa
 - **GitHub**: [@SongshGeo](https://github.com/SongshGeo)
 - **Website**: [https://cv.songshgeo.com/](https://cv.songshgeo.com/)
 
----
-
-**Note**: This repository is actively maintained during the peer review process. Code and documentation may be updated based on reviewer feedback.

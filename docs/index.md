@@ -1,7 +1,9 @@
 # Shifting Baseline
 
-Research codebase for the manuscript *“Archival and palaeoenvironmental documentation
-of extreme climate events reveals generational amnesia in collective memory.”*
+Research codebase for Song et al. (2026), *Nature Communications*
+([doi:10.1038/s41467-026-78922-x](https://doi.org/10.1038/s41467-026-78922-x)):
+*“Archival and palaeoenvironmental documentation of extreme climate events reveals
+generational amnesia in collective memory.”*
 
 It compares historical Chinese climate archives (1470–1900 CE) against tree-ring
 hydroclimate reconstructions and instrumental data (1901–2000 CE) to study
@@ -61,10 +63,13 @@ See **[Getting Started](getting-started/installation.md)** to install, the
 ## Citation
 
 ```bibtex
-@software{shifting_baseline,
-  title  = {Shifting Baseline: analysis of Shifting Baseline Syndrome in historical climate archives},
-  author = {Song, Shuang},
-  url    = {https://github.com/SongshGeo/shifting_baseline},
+@article{song2026archival,
+  title     = {Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory},
+  author    = {Song, Shuang and Hu, Bo and Findley, David Max and Wu, Xutong and Liu, Wei and Middeke-Conlin, Robert W. and Caetano-Andrade, Victor L. and Yang, Yuda and Wang, Shuai and Renn, J{\"u}rgen and Roberts, Patrick},
+  journal   = {Nature Communications},
+  year      = {2026},
+  doi       = {10.1038/s41467-026-78922-x},
+  url       = {https://doi.org/10.1038/s41467-026-78922-x}
 }
 ```
 

@@ -1,7 +1,9 @@
 # Shifting Baseline（基线偏移）
 
-本仓库对应论文 *“Archival and palaeoenvironmental documentation of extreme climate
-events reveals generational amnesia in collective memory”* 的研究代码。
+本仓库对应 *Nature Communications* 论文 *“Archival and palaeoenvironmental
+documentation of extreme climate events reveals generational amnesia in
+collective memory”*（[doi:10.1038/s41467-026-78922-x](https://doi.org/10.1038/s41467-026-78922-x)）
+的研究代码。
 
 它将中国历史气候档案（1470–1900 CE）与树轮水文气候重建、器测数据（1901–2000 CE）
 进行对比，用以研究**基线偏移综合征（Shifting Baseline Syndrome, SBS）**，并用
@@ -54,10 +56,13 @@ uv run pytest                             # 运行测试
 ## 引用
 
 ```bibtex
-@software{shifting_baseline,
-  title  = {Shifting Baseline: analysis of Shifting Baseline Syndrome in historical climate archives},
-  author = {Song, Shuang},
-  url    = {https://github.com/SongshGeo/shifting_baseline},
+@article{song2026archival,
+  title     = {Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory},
+  author    = {Song, Shuang and Hu, Bo and Findley, David Max and Wu, Xutong and Liu, Wei and Middeke-Conlin, Robert W. and Caetano-Andrade, Victor L. and Yang, Yuda and Wang, Shuai and Renn, J{\"u}rgen and Roberts, Patrick},
+  journal   = {Nature Communications},
+  year      = {2026},
+  doi       = {10.1038/s41467-026-78922-x},
+  url       = {https://doi.org/10.1038/s41467-026-78922-x}
 }
 ```
 

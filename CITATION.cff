@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: If you use this code, please cite it as below.
+message: If you use this software, please cite the article below (preferred) and the software.
 title: >-
   Archival and palaeoenvironmental documentation of extreme climate events
   reveals generational amnesia in collective memory
@@ -10,6 +10,38 @@ license: Apache-2.0
 # Concept DOI: always resolves to the latest archived version on Zenodo.
 doi: 10.5281/zenodo.23223234
 repository-code: https://github.com/SongshGeo/shifting_baseline
+preferred-citation:
+  type: article
+  title: >-
+    Archival and palaeoenvironmental documentation of extreme climate events
+    reveals generational amnesia in collective memory
+  authors:
+    - family-names: Song
+      given-names: Shuang
+    - family-names: Hu
+      given-names: Bo
+    - family-names: Findley
+      given-names: David Max
+    - family-names: Wu
+      given-names: Xutong
+    - family-names: Liu
+      given-names: Wei
+    - family-names: Middeke-Conlin
+      given-names: Robert W.
+    - family-names: Caetano-Andrade
+      given-names: Victor L.
+    - family-names: Yang
+      given-names: Yuda
+    - family-names: Wang
+      given-names: Shuai
+    - family-names: Renn
+      given-names: Jürgen
+    - family-names: Roberts
+      given-names: Patrick
+  journal: Nature Communications
+  year: 2026
+  doi: 10.1038/s41467-026-78922-x
+  url: https://doi.org/10.1038/s41467-026-78922-x
 authors:
   - family-names: Song
     given-names: Shuang

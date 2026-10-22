@@ -2,7 +2,7 @@
   "title": "Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory (SongshGeo/shifting_baseline)",
   "upload_type": "software",
   "version": "1.0.0",
-  "description": "<p>Analysis pipeline and agent-based model accompanying the manuscript <em>Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory</em> (submitted to Nature Communications). The code compares historical Chinese climate archives (1470–1900 CE) with tree-ring hydroclimate reconstructions validated against instrumental data (1901–2000 CE), quantifies the mismatch and sliding-window re-standardisation patterns, and runs the heuristic agent-based model (built on ABSESpy) that tests generational amnesia against collective memory illusion.</p>",
+  "description": "<p>Analysis pipeline and agent-based model accompanying Song et al. (2026), <em>Archival and palaeoenvironmental documentation of extreme climate events reveals generational amnesia in collective memory</em>, Nature Communications, <a href=\"https://doi.org/10.1038/s41467-026-78922-x\">doi:10.1038/s41467-026-78922-x</a>. The code compares historical Chinese climate archives (1470–1900 CE) with tree-ring hydroclimate reconstructions validated against instrumental data (1901–2000 CE), quantifies the mismatch and sliding-window re-standardisation patterns, and runs the heuristic agent-based model (built on ABSESpy) that tests generational amnesia against collective memory illusion.</p>",
   "creators": [
     {
       "name": "Song, Shuang",
@@ -60,5 +60,13 @@
   ],
   "license": "apache-2.0",
   "access_right": "open",
-  "language": "eng"
+  "language": "eng",
+  "related_identifiers": [
+    {
+      "identifier": "10.1038/s41467-026-78922-x",
+      "relation": "isSupplementTo",
+      "scheme": "doi",
+      "resource_type": "publication-article"
+    }
+  ]
 }
